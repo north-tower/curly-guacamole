@@ -2,7 +2,7 @@
 #######################################
 
 # Select the config file
-rmariadb.settingsfile <- "~/Database_Access.cnf"
+rmariadb.settingsfile <- "./Database_Access.cnf"
 rmariadb.db <- "Database_Access"
 
 # Use the config file to connect
