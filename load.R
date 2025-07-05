@@ -11,25 +11,25 @@ smartformDB <- dbConnect(RMariaDB::MariaDB(),
                          group=rmariadb.db
                          )
 
-# ## Query to load relevant data
-# #######################################
+## Query to load relevant data
+#######################################
 
-# racesQ <- paste ("
-# SELECT * FROM smartform.sr_sample_races
-#                     ", sep = "")
-# races <- dbGetQuery(smartformDB, racesQ)
+racesQ <- paste ("
+SELECT * FROM coolwed1_WP9PN.sr_sample_races
+                    ", sep = "")
+races <- dbGetQuery(smartformDB, racesQ)
 
-# runnersQ <- paste ("
-# SELECT * FROM smartform.sr_data
-#                     ", sep = "")
-# runners <- dbGetQuery(smartformDB, runnersQ)
+runnersQ <- paste ("
+SELECT * FROM coolwed1_WP9PN.sr_data
+                    ", sep = "")
+runners <- dbGetQuery(smartformDB, runnersQ)
 
-# daily_dataQ <- paste ("
-# SELECT * FROM smartform.sr_daily_data WHERE CURDATE() = date(scheduled_time)
-#                     ", sep = "")
-# daily_data <- dbGetQuery(smartformDB, daily_dataQ)
+daily_dataQ <- paste ("
+SELECT * FROM coolwed1_WP9PN.sr_daily_data WHERE CURDATE() = date(scheduled_time)
+                    ", sep = "")
+daily_data <- dbGetQuery(smartformDB, daily_dataQ)
 
-# rm(racesQ, runnersQ, daily_dataQ)
+rm(racesQ, runnersQ, daily_dataQ)
 
 ## Disconnect from DB
 #######################################
