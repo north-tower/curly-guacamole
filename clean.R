@@ -1,7 +1,16 @@
 # clean.R
 
+# First, let's see what columns we actually have
+print("Available columns in races data:")
+print(names(races))
+
+# Remove columns only if they exist
+columns_to_remove <- c("min_age", "race_id")
+existing_columns <- names(races)
+columns_to_remove <- columns_to_remove[columns_to_remove %in% existing_columns]
+
 CL_data <- races %>% 
-  select(-min_age, -race_id) %>% 
+  select(-all_of(columns_to_remove)) %>% 
   filter(winning_time_secs > 10) %>% 
   mutate(going = case_when(
     going == "Good - Firm" ~ "Good to Firm",
