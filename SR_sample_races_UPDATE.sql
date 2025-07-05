@@ -1,3 +1,5 @@
+DELIMITER $$
+
 CREATE DEFINER=`smartform_user`@`localhost` PROCEDURE `SR_sample_races_UPDATE`()
 BEGIN
 	DROP TABLE IF EXISTS SR_sample_races;
@@ -47,4 +49,6 @@ BEGIN
 					order by finish_position asc
 					) hrunb ON hracb.race_id = hrunb.race_id
         ;
-END
+END$$
+
+DELIMITER ;
