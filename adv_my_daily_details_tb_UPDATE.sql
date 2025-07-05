@@ -1,4 +1,6 @@
-CREATE DEFINER=`smartform`@`localhost` PROCEDURE `adv_my_daily_details_tb_UPDATE`()
+DELIMITER $$
+
+CREATE DEFINER=`smartform_user`@`localhost` PROCEDURE `adv_my_daily_details_tb_UPDATE`()
 BEGIN
 	DROP TABLE IF EXISTS adv_my_daily_details_tb;
 	CREATE TABLE adv_my_daily_details_tb as
@@ -116,4 +118,6 @@ BEGIN
         LEFT JOIN non_runners nr ON (((amdr.race_id = nr.race_id)
             AND (adrunb.runner_id = nr.runner_id))))
     ORDER BY amdr.scheduled_time , adrunb.cloth_number;
-END
+END$$
+
+DELIMITER ;
