@@ -1,0 +1,16 @@
+[Unit]
+Description=R Analysis Service
+After=network.target mariadb.service
+
+[Service]
+Type=simple
+User=your_username
+WorkingDirectory=/home/your_username/Web_SR_Analysis
+ExecStart=/usr/bin/Rscript do.R
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target 
