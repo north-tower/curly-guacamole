@@ -8,7 +8,10 @@
 library(RMariaDB)
 library(plyr)
 library(mgcv)
-library(tidyverse)
+library(dplyr)      # Data manipulation (from tidyverse)
+library(readr)      # Data reading (from tidyverse)
+library(stringr)    # String manipulation (from tidyverse)
+library(lubridate)  # Date handling (from tidyverse)
 library(broom)
 
 
