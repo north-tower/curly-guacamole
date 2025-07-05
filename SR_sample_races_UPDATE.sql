@@ -1,4 +1,4 @@
-CREATE DEFINER=`smartform`@`localhost` PROCEDURE `SR_sample_races_UPDATE`()
+CREATE DEFINER=`smartform_user`@`localhost` PROCEDURE `SR_sample_races_UPDATE`()
 BEGIN
 	DROP TABLE IF EXISTS SR_sample_races;
 	CREATE TABLE SR_sample_races AS
