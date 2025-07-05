@@ -28,14 +28,28 @@ echo ""
 
 # Check recent log files
 echo "Recent Analysis Logs:"
-ls -la logs/ | tail -5
+if [ -d "logs" ]; then
+    ls -la logs/ | tail -5
+else
+    echo "No logs directory found"
+fi
 echo ""
 
 # Database connection test
 echo "Database Connection Test:"
-mysql -u your_username -p -e "SELECT 1;" 2>/dev/null && echo "Database: OK" || echo "Database: FAILED"
+mysql -u smartform_user -p -e "SELECT 1;" 2>/dev/null && echo "Database: OK" || echo "Database: FAILED"
 echo ""
 
 # Check cron jobs
 echo "Active Cron Jobs:"
-crontab -l 2>/dev/null | grep -v "^#" | grep -v "^$" 
+crontab -l 2>/dev/null | grep -v "^#" | grep -v "^$"
+
+# Check if R is installed
+echo ""
+echo "R Installation Check:"
+if command -v Rscript &> /dev/null; then
+    echo "Rscript: OK - $(which Rscript)"
+    Rscript --version | head -1
+else
+    echo "Rscript: NOT FOUND"
+fi 

@@ -3,8 +3,8 @@
 # Automated R Analysis Runner
 # Run as: bash run_analysis.sh
 
-# Set working directory
-PROJECT_DIR="/home/$(whoami)/Web_SR_Analysis"
+# Set working directory to current directory
+PROJECT_DIR="$(pwd)"
 cd "$PROJECT_DIR"
 
 # Create logs directory
@@ -15,6 +15,14 @@ TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 LOG_FILE="logs/analysis_${TIMESTAMP}.log"
 
 echo "Starting R analysis at $(date)" | tee -a "$LOG_FILE"
+echo "Working directory: $PROJECT_DIR" | tee -a "$LOG_FILE"
+
+# Check if R is installed
+if ! command -v Rscript &> /dev/null; then
+    echo "ERROR: Rscript not found. Please install R first." | tee -a "$LOG_FILE"
+    echo "Run: sudo bash setup_vps_centos.sh" | tee -a "$LOG_FILE"
+    exit 1
+fi
 
 # Run R script with error handling
 Rscript do.R 2>&1 | tee -a "$LOG_FILE"
