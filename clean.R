@@ -1,12 +1,23 @@
 # clean.R
 
-CL_data <- races %>% 
-  select( -race_id) %>% 
-  filter(winning_time_secs > 10) %>% 
-  mutate(going = case_when(
-    going == "Good - Firm" ~ "Good to Firm",
-    going != "Good - Firm" ~ going
-  ))
+# Check if race_id column exists before trying to remove it
+if ("race_id" %in% colnames(races)) {
+  CL_data <- races %>% 
+    select( -race_id) %>% 
+    filter(winning_time_secs > 10) %>% 
+    mutate(going = case_when(
+      going == "Good - Firm" ~ "Good to Firm",
+      going != "Good - Firm" ~ going
+    ))
+} else {
+  # If race_id doesn't exist, just filter and mutate without removing it
+  CL_data <- races %>% 
+    filter(winning_time_secs > 10) %>% 
+    mutate(going = case_when(
+      going == "Good - Firm" ~ "Good to Firm",
+      going != "Good - Firm" ~ going
+    ))
+}
 
 
 AW_goings <- data.frame(going = c("Slow", "Standard to Slow", "Standard", "Standard to Fast", "Fast"))
