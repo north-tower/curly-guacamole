@@ -2,7 +2,7 @@
 #######################################
 
 # Select the config file
-rmariadb.settingsfile <- "~/Database_Access.cnf"
+rmariadb.settingsfile <- "Database_Access.cnf"
 rmariadb.db <- "Database_Access"
 
 # Use the config file to connect
@@ -15,17 +15,17 @@ smartformDB <- dbConnect(RMariaDB::MariaDB(),
 #######################################
 
 racesQ <- paste ("
-SELECT * FROM smartform.sr_sample_races
+SELECT * FROM coolwed1_WP9PN.sr_sample_races
                     ", sep = "")
 races <- dbGetQuery(smartformDB, racesQ)
 
 runnersQ <- paste ("
-SELECT * FROM smartform.sr_data
+SELECT * FROM coolwed1_WP9PN.sr_data
                     ", sep = "")
 runners <- dbGetQuery(smartformDB, runnersQ)
 
 daily_dataQ <- paste ("
-SELECT * FROM smartform.sr_daily_data WHERE CURDATE() = date(scheduled_time)
+SELECT * FROM coolwed1_WP9PN.sr_daily_data WHERE CURDATE() = date(scheduled_time)
                     ", sep = "")
 daily_data <- dbGetQuery(smartformDB, daily_dataQ)
 
