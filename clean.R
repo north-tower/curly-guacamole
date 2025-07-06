@@ -1,7 +1,7 @@
 # clean.R
 
 CL_data <- races %>% 
-  select(-min_age, -race_id) %>% 
+  select( -race_id) %>% 
   filter(winning_time_secs > 10) %>% 
   mutate(going = case_when(
     going == "Good - Firm" ~ "Good to Firm",

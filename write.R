@@ -2,8 +2,8 @@
 #######################################
 
 # Select the config file
-rmariadb.settingsfile <- "~/Database_Access.cnf"
-rmariadb.db <- "smartform_search"
+rmariadb.settingsfile <- "./Database_Access.cnf"
+rmariadb.db <- "Database_Access"
 
 # Use the config file to connect
 smartformDB <- dbConnect(RMariaDB::MariaDB(),
@@ -20,8 +20,8 @@ dbWriteTable(smartformDB, "sr_results", SR_data)
 dbExecute(smartformDB, "DROP TABLE IF EXISTS draw_bias")
 dbWriteTable(smartformDB, "draw_bias", draw_bias)
 
-dbExecute(smartformDB, "CALL `smartform`.`adv_speed_analysis_UPDATE`()")
-dbExecute(smartformDB, "CALL `smartform`.`speed_analysis_UPDATE`()")
+dbExecute(smartformDB, "CALL `coolwed1_WP9PN`.`adv_speed_analysis_UPDATE`()")
+dbExecute(smartformDB, "CALL `coolwed1_WP9PN`.`speed_analysis_UPDATE`()")
 
 
 
