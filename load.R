@@ -31,7 +31,7 @@ print("Number of rows in races:")
 print(nrow(races))
 
 runnersQ <- paste ("
-SELECT * FROM coolwed1_WP9PN.sr_data
+SELECT * FROM SR_data
                     ", sep = "")
 runners <- dbGetQuery(smartformDB, runnersQ)
 
