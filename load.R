@@ -20,7 +20,7 @@ print("Available tables:")
 print(tables_check)
 
 racesQ <- paste ("
-SELECT * FROM coolwed1_WP9PN.sr_sample_races
+SELECT * FROM coolwed1_WP9PN.SR_sample_races
                     ", sep = "")
 races <- dbGetQuery(smartformDB, racesQ)
 
