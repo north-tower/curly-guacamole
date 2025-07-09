@@ -33,14 +33,14 @@ BEGIN
 						distance_yards AS distance_yards,
 						winning_time_secs AS winning_time_secs
 					FROM
-						historic_races_beta hracb
+						historic_races hracb
 					WHERE class IS NOT NULL
 					AND YEAR(meeting_date) between YEAR(CURDATE())-15 and YEAR(CURDATE())
 					AND race_id > 0
 					AND class < 9
 					#AND num_runners > 2
 					) hracb
-				JOIN daily_races_beta dracb ON (dracb.race_id = hracb.race_id)
+				JOIN daily_races dracb ON (dracb.race_id = hracb.race_id)
 				JOIN (SELECT race_id, MIN(age) AS min_age, age, weight_pounds
 					FROM historic_runners_beta
 					where finish_position is not null
