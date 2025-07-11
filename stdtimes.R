@@ -139,12 +139,15 @@ rm(distance_FA)
 
 
 
-class_factor_analysis <- STD_data %>% 
-  nest_by(race_type) %>% 
-  filter(nrow(data) > 0) %>%  # Skip empty groups
+class_factor_analysis <- STD_data %>%
+  nest_by(race_type) %>%
+  filter(
+    nrow(data) > 0,
+    sum(!is.na(data$adjusted_WT) & !is.na(data$class)) > 0
+  ) %>%
   mutate(class_mod = list(lm(adjusted_WT ~ class, data = data))) %>% {
-      reframe(., tidy(class_mod)) %>% 
-        cbind(test_variable = "class_coef", .)
+    reframe(., tidy(class_mod)) %>%
+      cbind(test_variable = "class_coef", .)
   }
 ##
 class_FA <- class_factor_analysis %>% 
