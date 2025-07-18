@@ -21,19 +21,19 @@ BEGIN
             (SELECT * FROM (
                 SELECT runner_id, name, foaling_date, bred, dam_id, dam_name, dam_year_born, sire_id, sire_name, sire_year_born,
                     ROW_NUMBER() OVER (PARTITION BY runner_id ORDER BY loaded_at DESC) rn
-                FROM daily_runners_beta) a
+                FROM coolwed1_WP9PN.daily_runners_beta) a
                 WHERE rn = 1) run
         LEFT JOIN
             (SELECT * FROM (
                 SELECT runner_id, name, foaling_date, bred,
                     ROW_NUMBER() OVER (PARTITION BY runner_id ORDER BY loaded_at DESC) rn
-                FROM daily_runners_beta) b
+                FROM coolwed1_WP9PN.daily_runners_beta) b
                 WHERE rn = 1) dam ON (dam.runner_id = run.dam_id)
         LEFT JOIN 
             (SELECT * FROM (
                 SELECT runner_id, name, foaling_date, bred,
                     ROW_NUMBER() OVER (PARTITION BY runner_id ORDER BY loaded_at DESC) rn
-                FROM daily_runners_beta) c
+                FROM coolwed1_WP9PN.daily_runners_beta) c
                 WHERE rn = 1) sire ON (sire.runner_id = run.sire_id);
 END$$
 

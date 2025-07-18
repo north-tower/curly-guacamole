@@ -125,21 +125,21 @@ BEGIN
         `dji`.`rc_21D_prb` AS `jky_rc_21D_prb`,
         `dji`.`rc_42D_prb` AS `jky_rc_42D_prb`,
         `dji`.`rc_5Y_prb` AS `jky_rc_5Y_prb`
-    FROM `dailyracecard14` `drc`
-        LEFT JOIN `speed_analysis` `sa` ON (`drc`.`runner_id` = `sa`.`runner_id`)
-        LEFT JOIN `daily_races_beta` `dracb` ON (`dracb`.`race_id` = `drc`.`race_id`)
-        LEFT JOIN `daily_runners_beta` `drunb` ON ((`dracb`.`race_id` = `drunb`.`race_id`) AND (`drc`.`runner_id` = `drunb`.`runner_id`))
-        LEFT JOIN `daily_comment_ratings` `dcr` ON (`drc`.`runner_id` = `dcr`.`runner_id`)
-        LEFT JOIN `daily_runners_insights` `dri` ON ((`dri`.`race_id` = `dracb`.`race_id`) AND (`dri`.`runner_id` = `drc`.`runner_id`))
-        LEFT JOIN `draw_bias` `db` ON ((`drc`.`course` = `db`.`course`)
+    FROM `coolwed1_WP9PN`.`dailyracecard14` `drc`
+        LEFT JOIN `coolwed1_WP9PN`.`speed_analysis` `sa` ON (`drc`.`runner_id` = `sa`.`runner_id`)
+        LEFT JOIN `coolwed1_WP9PN`.`daily_races_beta` `dracb` ON (`dracb`.`race_id` = `drc`.`race_id`)
+        LEFT JOIN `coolwed1_WP9PN`.`daily_runners_beta` `drunb` ON ((`dracb`.`race_id` = `drunb`.`race_id`) AND (`drc`.`runner_id` = `drunb`.`runner_id`))
+        LEFT JOIN `coolwed1_WP9PN`.`daily_comment_ratings` `dcr` ON (`drc`.`runner_id` = `dcr`.`runner_id`)
+        LEFT JOIN `coolwed1_WP9PN`.`daily_runners_insights` `dri` ON ((`dri`.`race_id` = `dracb`.`race_id`) AND (`dri`.`runner_id` = `drc`.`runner_id`))
+        LEFT JOIN `coolwed1_WP9PN`.`draw_bias` `db` ON ((`drc`.`course` = `db`.`course`)
             AND (`dracb`.`race_type` = `db`.`race_type`)
             AND (`dracb`.`track_type` = `db`.`track_type`)
             AND (`drc`.`stall_number` = `db`.`stall_number`)
             AND (`dracb`.`distance_yards` <= `db`.`distance_yards_max`)
             AND (`dracb`.`distance_yards` >= `db`.`distance_yards_min`))
-        LEFT JOIN `ancestry_records` `ar` ON (`drc`.`runner_id` = `ar`.`runner_id`)
-        LEFT JOIN `daily_trainers_insights` `dti` ON ((`dti`.`race_id` = `drc`.`race_id`) AND (`dti`.`runner_id` = `drc`.`runner_id`))
-        LEFT JOIN `daily_jockeys_insights` `dji` ON ((`dji`.`race_id` = `drc`.`race_id`) AND (`dji`.`runner_id` = `drc`.`runner_id`));
+        LEFT JOIN `coolwed1_WP9PN`.`ancestry_records` `ar` ON (`drc`.`runner_id` = `ar`.`runner_id`)
+        LEFT JOIN `coolwed1_WP9PN`.`daily_trainers_insights` `dti` ON ((`dti`.`race_id` = `drc`.`race_id`) AND (`dti`.`runner_id` = `drc`.`runner_id`))
+        LEFT JOIN `coolwed1_WP9PN`.`daily_jockeys_insights` `dji` ON ((`dji`.`race_id` = `drc`.`race_id`) AND (`dji`.`runner_id` = `drc`.`runner_id`));
 END$$
 
 DELIMITER ;

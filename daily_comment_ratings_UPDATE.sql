@@ -18,12 +18,12 @@ BEGIN
                 count(sc.runner_id) count_runner,
                 count(win_pct) count_win_pct
             FROM
-                dailyracecard14 dr
+                coolwed1_WP9PN.dailyracecard14 dr
             JOIN
-                separated_comments sc
+                coolwed1_WP9PN.separated_comments sc
                 ON (dr.runner_id = sc.runner_id)
             LEFT JOIN
-                separated_comments_win_value scwv
+                coolwed1_WP9PN.separated_comments_win_value scwv
                 ON ((sc.comment = scwv.comment) AND (sc.digit = scwv.digit))
             GROUP BY
                 sc.runner_id) n;
