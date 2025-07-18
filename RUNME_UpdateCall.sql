@@ -4,7 +4,7 @@ BEGIN
 CALL `coolwed1_WP9PN`.`SR_sample_races_UPDATE`();
 CALL `coolwed1_WP9PN`.`SR_data_UPDATE`();
 CALL `coolwed1_WP9PN`.`separated_comments_UPDATE`();
-CALL `coolwed1_WP9PN`.`todays_runners_insights_UPDATE`();
+-- CALL `coolwed1_WP9PN`.`todays_runners_insights_UPDATE`();
 CALL `coolwed1_WP9PN`.`ancestry_records_UPDATE`();
 
 CALL `coolwed1_WP9PN`.`separated_comment_count_UPDATE`();
