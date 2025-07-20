@@ -2,8 +2,8 @@ DELIMITER $$
 
 CREATE DEFINER=`smartform_user`@`localhost` PROCEDURE `SR_data_UPDATE`()
 BEGIN
-	DROP TABLE IF EXISTS SR_data;
-	CREATE TABLE SR_data AS
+	DROP TABLE IF EXISTS sr_data;
+	CREATE TABLE sr_data AS
 		SELECT 
 			hracb.race_id,
 			hracb.meeting_date AS meeting_date,
