@@ -17,7 +17,7 @@ BEGIN
 			mts.TnrRuns14d, mts.TnrWins14d, mts.TnrPlaced14d, mts.TnrWinPct14d, mts.TnrRTPPct14d, mts.TnrWinProfit14d, 
             mjs.JkyRuns14d, mjs.JkyWins14d, mjs.JkyPlaced14d, mjs.JkyWinPct14d, mjs.JkyPlcPct14d, mjs.JkyWinProfit14d,
             (mjs.JkyPlcPct14d + mts.TnrRTPPct14d) as TnrJkyPlacePct
-	FROM  my_daily_details mdd
+	FROM  my_daily_details_tb mdd
 		LEFT OUTER JOIN my_14d_trainer_stats mts ON (mdd.trainer_id = mts.trainer_id)
         LEFT OUTER JOIN my_14d_jockey_stats mjs ON (mdd.jockey_id = mjs.jockey_id);
 
