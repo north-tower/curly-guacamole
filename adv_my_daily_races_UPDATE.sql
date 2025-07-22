@@ -1,6 +1,5 @@
 DELIMITER $$
-
-CREATE DEFINER=`smartform_user`@`localhost` PROCEDURE `adv_my_daily_races_UPDATE`()
+CREATE PROCEDURE `adv_my_daily_races_UPDATE`()
 BEGIN
 DROP TABLE IF EXISTS adv_my_daily_races;
 
@@ -74,6 +73,5 @@ WHERE
     meeting_date = CURDATE()+1
 ORDER BY course, scheduled_time;
 
-END$$
-
+END $$
 DELIMITER ;

@@ -1,6 +1,5 @@
 DELIMITER $$
-
-CREATE DEFINER=`smartform_user`@`localhost` PROCEDURE `SR_sample_races_UPDATE`()
+CREATE PROCEDURE `SR_sample_races_UPDATE`()
 BEGIN
 	DROP TABLE IF EXISTS sr_sample_races;
 	CREATE TABLE sr_sample_races AS
@@ -49,6 +48,5 @@ BEGIN
 					order by finish_position asc
 					) hrunb ON hracb.race_id = hrunb.race_id
         ;
-END$$
-
+END $$
 DELIMITER ;

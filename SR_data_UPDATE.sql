@@ -1,6 +1,5 @@
 DELIMITER $$
-
-CREATE DEFINER=`smartform_user`@`localhost` PROCEDURE `SR_data_UPDATE`()
+CREATE PROCEDURE `SR_data_UPDATE`()
 BEGIN
 	DROP TABLE IF EXISTS sr_data;
 	CREATE TABLE sr_data AS
@@ -37,6 +36,5 @@ BEGIN
         AND YEAR(hracb.meeting_date) between YEAR(CURDATE())-15 and YEAR(CURDATE())
         AND hracb.winning_time_secs > 1
 	;
-END$$
-
+END $$
 DELIMITER ;
