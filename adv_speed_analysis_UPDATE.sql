@@ -36,10 +36,10 @@ BEGIN
 				sr.speed_rating,
 				ROUND(sr.wt_speed_rating, 3) AS wt_speed_rating,
 				ROW_NUMBER() OVER(PARTITION BY hrunb.runner_id ORDER BY hracb.meeting_date DESC) AS RowNumber
-			FROM smartform.adv_my_daily_details_tb amddt 
+			FROM coolwed1_WP9PN.adv_my_daily_details_tb amddt 
             JOIN historic_runners_beta hrunb ON (hrunb.runner_id = amddt.runner_id)
             JOIN historic_races_beta hracb ON (hrunb.race_id = hracb.race_id)
-				LEFT JOIN smartform.sr_results sr ON (sr.runner_id = amddt.runner_id AND sr.race_id = hrunb.race_id)
+				LEFT JOIN coolwed1_WP9PN.sr_results sr ON (sr.runner_id = amddt.runner_id AND sr.race_id = hrunb.race_id)
 			WHERE hrunb.runner_id != 'NULL'
             AND (hrunb.unfinished != 'Non-Runner' OR hrunb.unfinished IS NULL)
 			ORDER BY hracb.meeting_date DESC) a

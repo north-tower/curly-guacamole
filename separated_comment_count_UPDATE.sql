@@ -8,7 +8,7 @@ BEGIN
 			sc.digit,
 			sc.`comment`,
 			count(sc.`comment`) as count
-		FROM smartform.separated_comments sc
+		FROM coolwed1_WP9PN.separated_comments sc
 		GROUP BY
 			sc.digit,
 			sc.`comment`
