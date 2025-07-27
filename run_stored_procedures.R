@@ -17,49 +17,49 @@ smartformDB <- dbConnect(RMariaDB::MariaDB(),
 print("Running stored procedures...")
 
 tryCatch({
-  dbExecute(smartformDB, "CALL `smartform`.`SR_sample_races_UPDATE`()")
+  dbExecute(smartformDB, "CALL `fhorsitedb`.`SR_sample_races_UPDATE`()")
   print("✓ SR_sample_races_UPDATE completed")
 }, error = function(e) {
   print(paste("Error running SR_sample_races_UPDATE:", e$message))
 })
 
 tryCatch({
-  dbExecute(smartformDB, "CALL `smartform`.`SR_data_UPDATE`()")
+  dbExecute(smartformDB, "CALL `fhorsitedb`.`SR_data_UPDATE`()")
   print("✓ SR_data_UPDATE completed")
 }, error = function(e) {
   print(paste("Error running SR_data_UPDATE:", e$message))
 })
 
 tryCatch({
-  dbExecute(smartformDB, "CALL `smartform`.`my_daily_races_UPDATE`()")
+  dbExecute(smartformDB, "CALL `fhorsitedb`.`my_daily_races_UPDATE`()")
   print("✓ my_daily_races_UPDATE completed")
 }, error = function(e) {
   print(paste("Error running my_daily_races_UPDATE:", e$message))
 })
 
 tryCatch({
-  dbExecute(smartformDB, "CALL `smartform`.`my_daily_details_tb_UPDATE`()")
+  dbExecute(smartformDB, "CALL `fhorsitedb`.`my_daily_details_tb_UPDATE`()")
   print("✓ my_daily_details_tb_UPDATE completed")
 }, error = function(e) {
   print(paste("Error running my_daily_details_tb_UPDATE:", e$message))
 })
 
 tryCatch({
-  dbExecute(smartformDB, "CALL `smartform`.`adv_my_daily_races_UPDATE`()")
+  dbExecute(smartformDB, "CALL `fhorsitedb`.`adv_my_daily_races_UPDATE`()")
   print("✓ adv_my_daily_races_UPDATE completed")
 }, error = function(e) {
   print(paste("Error running adv_my_daily_races_UPDATE:", e$message))
 })
 
 tryCatch({
-  dbExecute(smartformDB, "CALL `smartform`.`adv_my_daily_details_tb_UPDATE`()")
+  dbExecute(smartformDB, "CALL `fhorsitedb`.`adv_my_daily_details_tb_UPDATE`()")
   print("✓ adv_my_daily_details_tb_UPDATE completed")
 }, error = function(e) {
   print(paste("Error running adv_my_daily_details_tb_UPDATE:", e$message))
 })
 
 # Check what tables exist now
-tables_check <- dbGetQuery(smartformDB, "SHOW TABLES FROM smartform LIKE 'sr_%'")
+tables_check <- dbGetQuery(smartformDB, "SHOW TABLES FROM fhorsitedb LIKE 'sr_%'")
 print("Available tables after running procedures:")
 print(tables_check)
 
