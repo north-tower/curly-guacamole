@@ -1,13 +1,13 @@
 [Database_Access]
-user=smartform_user
-password=your_password
 host=localhost
-port=3306
-database=coolwed1_WP9PN
+user=smartform_user
+password=your_password_here
+database=smartform
+default-character-set=utf8mb4
 
-[smartform_search]
-user=smartform_user
-password=your_password
+[smartform]
 host=localhost
-port=3306
-database=coolwed1_WP9PN
+user=smartform_user
+password=your_password_here
+database=smartform
+default-character-set=utf8mb4
