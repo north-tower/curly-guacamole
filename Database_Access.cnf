@@ -2,12 +2,12 @@
 host=localhost
 user=smartform
 password=your_password
-database=fhorsitedb
+database=coolwed1_wp364
 default-character-set=utf8mb4
 
-[fhorsitedb]
+[coolwed1_wp364]
 host=localhost
 user=smartform_user
 password=your_password_here
-database=fhorsitedb
+database=coolwed1_wp364
 default-character-set=utf8mb4

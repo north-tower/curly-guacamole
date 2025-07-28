@@ -23,11 +23,11 @@ dbExecute(smartformDB, "DROP TABLE IF EXISTS draw_bias")
 dbWriteTable(smartformDB, "draw_bias", draw_bias)
 
 print("Calling adv_speed_analysis_UPDATE and speed_analysis_UPDATE procedures")
-dbExecute(smartformDB, "CALL `fhorsitedb`.`adv_speed_analysis_UPDATE`()")
-dbExecute(smartformDB, "CALL `fhorsitedb`.`speed_analysis_UPDATE`()")
+dbExecute(smartformDB, "CALL `coolwed1_wp364`.`adv_speed_analysis_UPDATE`()")
+dbExecute(smartformDB, "CALL `coolwed1_wp364`.`speed_analysis_UPDATE`()")
 
 print("Calling speed&performance_table_UPDATE procedure")
-dbExecute(smartformDB, "CALL fhorsitedb.speed&performance_table_UPDATE()")
+dbExecute(smartformDB, "CALL coolwed1_wp364.speed&performance_table_UPDATE()")
 
 
 ## Disconnect from DB

@@ -15,12 +15,12 @@ smartformDB <- dbConnect(RMariaDB::MariaDB(),
 #######################################
 
 # First, let's check if the tables exist
-tables_check <- dbGetQuery(smartformDB, "SHOW TABLES FROM fhorsitedb LIKE 'sr_%'")
+tables_check <- dbGetQuery(smartformDB, "SHOW TABLES FROM coolwed1_wp364 LIKE 'sr_%'")
 print("Available tables:")
 print(tables_check)
 
 racesQ <- paste ("
-SELECT * FROM fhorsitedb.sr_sample_races
+SELECT * FROM coolwed1_wp364.sr_sample_races
                     ", sep = "")
 races <- dbGetQuery(smartformDB, racesQ)
 
@@ -36,7 +36,7 @@ SELECT * FROM sr_data
 runners <- dbGetQuery(smartformDB, runnersQ)
 
 daily_dataQ <- paste ("
-SELECT * FROM fhorsitedb.sr_daily_data WHERE CURDATE() = date(scheduled_time)
+SELECT * FROM coolwed1_wp364.sr_daily_data WHERE CURDATE() = date(scheduled_time)
                     ", sep = "")
 daily_data <- dbGetQuery(smartformDB, daily_dataQ)
 

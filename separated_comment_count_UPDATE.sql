@@ -8,7 +8,7 @@ BEGIN
 			sc.digit,
 			sc.`comment`,
 			count(sc.`comment`) as count
-		FROM fhorsitedb.separated_comments sc
+		FROM coolwed1_wp364.separated_comments sc
 		GROUP BY
 			sc.digit,
 			sc.`comment`
