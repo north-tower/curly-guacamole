@@ -27,7 +27,7 @@ dbExecute(smartformDB, "CALL `coolwed1_wp364`.`adv_speed_analysis_UPDATE`()")
 dbExecute(smartformDB, "CALL `coolwed1_wp364`.`speed_analysis_UPDATE`()")
 
 print("Calling speed&performance_table_UPDATE procedure")
-dbExecute(smartformDB, "CALL coolwed1_wp364.speed&performance_table_UPDATE()")
+dbExecute(smartformDB, "CALL `coolwed1_wp364`.`speed&performance_table_UPDATE`()")
 
 
 ## Disconnect from DB
