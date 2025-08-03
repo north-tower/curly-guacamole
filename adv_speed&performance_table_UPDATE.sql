@@ -1,0 +1,115 @@
+DELIMITER $$
+CREATE PROCEDURE `adv_speed&performance_table_UPDATE`()
+BEGIN
+	DROP TABLE IF EXISTS `adv_speed&performance_table`;
+    CREATE TABLE `adv_speed&performance_table` AS
+	SELECT 
+		`adrc`.`PK` AS `PK`,
+		`adrc`.`race_id` AS `race_id`,
+		`adrc`.`runner_id` AS `runner_id`,
+        `adrunb`.`trainer_id` AS `trainer_id`,
+        `adrunb`.`jockey_id` AS `jockey_id`,
+		`adrc`.`Date` AS `Date`,
+		`adrc`.`Time` AS `Time`,
+		`adrc`.`course` AS `course`,
+		`adrc`.`Distance` AS `Distance`,
+		`adracb`.`distance_yards` AS `distance_yards`,
+		`adrc`.`Furlongs` AS `Furlongs`,
+		`adrc`.`cloth_number` AS `cloth_number`,
+		`adrc`.`stall_number` AS `stall_number`,
+		ROUND(`db`.`win_percent_by_stall`, 2) AS `draw_bias_pct`,
+		`db`.`n` AS `draw_bias_reliability_~150`,
+		`adrunb`.`form_figures` AS `form_figures`,
+		`adrunb`.`days_since_ran` AS `days_since_ran`,
+		`adrunb`.`weight_pounds` AS `weight_pounds`,
+		`adrunb`.`foaling_date` AS `foaling_date`,
+		`adrunb`.`colour` AS `colour`,
+		`adrunb`.`gender` AS `gender`,
+		`adrunb`.`age` AS `age`,
+		`adrunb`.`bred` AS `bred`,
+		`adrunb`.`owner_name` AS `owner_name`,
+		`adrunb`.`dam_name` AS `dam_name`,
+		`ar`.`dam_origin` AS `dam_origin`,
+		`adrunb`.`sire_name` AS `sire_name`,
+		`ar`.`sire_origin` AS `sire_origin`,
+		`adrunb`.`course_winner` AS `course_winner`,
+		`adrunb`.`distance_winner` AS `distance_winner`,
+		`adrunb`.`candd_winner` AS `candd_winner`,
+		`adrunb`.`beaten_favourite` AS `beaten_favourite`,
+		`adrc`.`name` AS `name`,
+		`adrc`.`jockey_name` AS `jockey_name`,
+		`adrunb`.`jockey_claim` AS `jockey_claim`,
+		`adrc`.`trainer_name` AS `trainer_name`,
+		`adrunb`.`official_rating` AS `official_rating`,
+		`adrc`.`forecast_price` AS `forecast_price`,
+		`adrc`.`forecast_price_decimal` AS `forecast_price_decimal`,
+		`adrc`.`TnrRuns14d` AS `TnrRuns14d`,
+		`adrc`.`TnrWins14d` AS `TnrWins14d`,
+		`adrc`.`TnrPlaced14d` AS `TnrPlaced14d`,
+		`adrc`.`TnrWinPct14d` AS `TnrWinPct14d`,
+		`adrc`.`TnrRTPPct14d` AS `TnrRTPPct14d`,
+		`adrc`.`TnrWinProfit14d` AS `TnrWinProfit14d`,
+		`adrc`.`JkyRuns14d` AS `JkyRuns14d`,
+		`adrc`.`JkyWins14d` AS `JkyWins14d`,
+		`adrc`.`JkyPlaced14d` AS `JkyPlaced14d`,
+		`adrc`.`JkyWinPct14d` AS `JkyWinPct14d`,
+		`adrc`.`JkyPlcPct14d` AS `JkyPlcPct14d`,
+		`adrc`.`JkyWinProfit14d` AS `JkyWinProfit14d`,
+		`adrc`.`TnrJkyPlacePct` AS `TnrJkyPlacePct`,
+		`adcr`.`comment_rating` AS `fhorsite_rating`,
+		`adcr`.`comment_reliability_factor` AS `fhorsite_rating_reliability`,
+		`asa`.`meeting_date_LTO` AS `meeting_date_LTO`,
+		`asa`.`wt_speed_rating_LTO` AS `wt_speed_rating_LTO`,
+		`asa`.`speed_rating_LTO` AS `SR_LTO`,
+		`asa`.`SR_2` AS `SR_2`,
+		`asa`.`SR_3` AS `SR_3`,
+		`asa`.`SR_4` AS `SR_4`,
+		`asa`.`SR_5` AS `SR_5`,
+		`asa`.`SR_6` AS `SR_6`,
+		`asa`.`class_LTO` AS `class_LTO`,
+		`asa`.`CL_2` AS `CL_2`,
+		`asa`.`CL_3` AS `CL_3`,
+		`asa`.`CL_4` AS `CL_4`,
+		`asa`.`CL_5` AS `CL_5`,
+		`asa`.`CL_6` AS `CL_6`,
+		`asa`.`distance_furlongs_LTO` AS `distance_furlongs_LTO`,
+		`asa`.`DF_2` AS `DF_2`,
+		`asa`.`DF_3` AS `DF_3`,
+		`asa`.`DF_4` AS `DF_4`,
+		`asa`.`DF_5` AS `DF_5`,
+		`asa`.`DF_6` AS `DF_6`,
+		`adracb`.`race_title` AS `race_title`,
+		`adracb`.`weather` AS `weather`,
+		`adracb`.`draw_advantage` AS `draw_advantage`,
+		`adracb`.`race_type` AS `race_type`,
+		`adracb`.`track_type` AS `track_type`,
+		`adracb`.`advanced_going` AS `advanced_going`,
+		`adracb`.`class` AS `class`,
+		IF((`adracb`.`handicap` = 1),
+			'Handicap',
+			'Non-Handicap') AS `handicap`,
+		`adracb`.`age_range` AS `age_range`,
+		`adracb`.`prize_pos_1` AS `prize_pos_1`,
+		`adracb`.`last_winner_year` AS `last_winner_year`,
+		`adracb`.`last_winner_runners` AS `last_winner_runners`,
+		`adracb`.`last_winner_name` AS `last_winner_name`,
+		`adracb`.`last_winner_age` AS `last_winner_age`,
+		`adracb`.`last_winner_bred` AS `last_winner_bred`,
+		`adracb`.`last_winner_weight` AS `last_winner_weight`,
+		`adracb`.`last_winner_trainer` AS `last_winner_trainer`,
+		`adracb`.`last_winner_jockey` AS `last_winner_jockey`
+	FROM `adv_dailyracecard14` `adrc`
+		LEFT JOIN `adv_speed_analysis` `asa` ON (`adrc`.`runner_id` = `asa`.`runner_id`)
+		LEFT JOIN `advance_daily_races_beta` `adracb` ON (`adracb`.`race_id` = `adrc`.`race_id`)
+		LEFT JOIN `advance_daily_runners_beta` `adrunb` ON ((`adracb`.`race_id` = `adrunb`.`race_id`) AND (`adrc`.`runner_id` = `adrunb`.`runner_id`))
+		LEFT JOIN `adv_daily_comment_ratings` `adcr` ON (`adrc`.`runner_id` = `adcr`.`runner_id`)
+		LEFT JOIN `draw_bias` `db` ON ((`adrc`.`course` = `db`.`course`)
+			AND (`adracb`.`race_type` = `db`.`race_type`)
+			AND (`adracb`.`track_type` = `db`.`track_type`)
+			AND (`adrc`.`stall_number` = `db`.`stall_number`)
+			AND (`adracb`.`distance_yards` <= `db`.`distance_yards_max`)
+			AND (`adracb`.`distance_yards` >= `db`.`distance_yards_min`))
+		LEFT JOIN `ancestry_records` `ar` ON (`adrc`.`runner_id` = `ar`.`runner_id`)
+;
+END $$
+DELIMITER ;

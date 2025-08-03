@@ -18,8 +18,11 @@ CALL `adv_my_daily_details_tb_UPDATE`();
 CALL `my_daily_details_tb_UPDATE`();
 
 CALL `DailyRacecard14_UPDATE`();
+CALL `adv_DailyRacecard14_UPDATE`();
 
+CALL `daily_comment_history_UPDATE`();
 CALL `daily_comment_ratings_UPDATE`();
+CALL `adv_daily_comment_ratings_UPDATE`();
 CALL `SR_daily_data_UPDATE`();
 
 CALL `daily_race_comment_history_UPDATE`();
