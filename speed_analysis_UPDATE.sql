@@ -40,7 +40,7 @@ BEGIN
             JOIN historic_runners_beta hrunb ON (hrunb.runner_id = mddt.runner_id)
             JOIN historic_races_beta hracb ON (hrunb.race_id = hracb.race_id)
 				LEFT JOIN sr_results sr ON (sr.runner_id = mddt.runner_id AND sr.race_id = hrunb.race_id)
-			WHERE hrunb.runner_id != 'NULL'
+			WHERE hrunb.runner_id IS NOT NULL
             AND (hrunb.unfinished != 'Non-Runner' OR hrunb.unfinished IS NULL)
 			ORDER BY hracb.meeting_date DESC) a
 		WHERE RowNumber <= 6
