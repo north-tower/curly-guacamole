@@ -1,20 +1,6 @@
 DELIMITER $$
 CREATE PROCEDURE `RUNME_UpdateCall` ()
 BEGIN
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION
-    BEGIN
-        ROLLBACK;
-        RESIGNAL;
-    END;
-    
-    DECLARE EXIT HANDLER FOR SQLWARNING
-    BEGIN
-        ROLLBACK;
-        RESIGNAL;
-    END;
-    
-    START TRANSACTION;
-    
     -- Log start time
     SELECT CONCAT('Starting RUNME_UpdateCall at ', NOW()) AS status;
     
@@ -103,7 +89,6 @@ BEGIN
     CALL `daily_race_comment_history_UPDATE`();
     SELECT 'daily_race_comment_history_UPDATE completed' AS status;
     
-    COMMIT;
     SELECT CONCAT('RUNME_UpdateCall completed successfully at ', NOW()) AS status;
     
 END$$
