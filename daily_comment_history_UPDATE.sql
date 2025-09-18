@@ -1,7 +1,22 @@
 DELIMITER $$
 CREATE PROCEDURE `daily_comment_history_UPDATE`()
 BEGIN
-DROP TABLE IF EXISTS daily_comment_history;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+    
+    DECLARE EXIT HANDLER FOR SQLWARNING
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+    
+    START TRANSACTION;
+    
+    -- Drop and recreate table
+    DROP TABLE IF EXISTS daily_comment_history;
 
 	CREATE TABLE daily_comment_history AS SELECT `hrunb`.`runner_id` AS `runner_id`,
     `hrunb`.`race_id` AS `race_id`,
@@ -118,5 +133,9 @@ DROP TABLE IF EXISTS daily_comment_history;
     LEFT JOIN `course_features` `cf` ON (`ahracb`.`course` = `cf`.`course`) AND (`ahracb`.`race_type` = `cf`.`race_type`)
 GROUP BY `runner_id`, `race_id`
 ORDER BY `meeting_date` DESC;
+    
+    COMMIT;
+    SELECT CONCAT('daily_comment_history_UPDATE completed successfully at ', NOW()) AS status;
+    
 END $$
 DELIMITER ;
