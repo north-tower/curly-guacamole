@@ -12,7 +12,7 @@ BEGIN
 		100*count(if(finish_position=1,1,null))/count as win_pct
 	FROM
 		separated_comment_count scc
-	JOIN separated_comments sc
+	JOIN coolwed1_wp364.separated_comments sc
 		ON ((`sc`.`comment` = `scc`.`comment`) AND (`sc`.`digit` = `scc`.`digit`))
 		
 	WHERE count >= 50
