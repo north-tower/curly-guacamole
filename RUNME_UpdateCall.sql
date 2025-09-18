@@ -48,7 +48,7 @@ BEGIN
     SELECT '14DayJockeyStats_UPDATE completed' AS status;
     
     SELECT 'Starting separated_comments_win_value_UPDATE...' AS status;
-    CALL `separated_comments_win_value_UPDATE`();
+    CALL `separated_comments_win_value_UPDATE_SIMPLE`();
     SELECT 'separated_comments_win_value_UPDATE completed' AS status;
     
     SELECT 'Starting adv_my_daily_details_tb_UPDATE...' AS status;
