@@ -3,7 +3,7 @@ CREATE PROCEDURE `separated_comments_win_value_UPDATE_SIMPLE`()
 BEGIN
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        SELECT CONCAT('Error in separated_comments_win_value_UPDATE_SIMPLE: ', SQLSTATE, ' - ', SQL_MESSAGE_TEXT) AS error_message;
+        SELECT 'Error in separated_comments_win_value_UPDATE_SIMPLE' AS error_message;
         RESIGNAL;
     END;
     
