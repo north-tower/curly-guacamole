@@ -7,18 +7,18 @@ BEGIN
 	SELECT
 		scc.`comment`,
 		scc.digit,
-		count(if(finish_position=1,1,null)) as win_count,
-		count,
-		100*count(if(finish_position=1,1,null))/count as win_pct
-	FROM
-		separated_comment_count scc
-	JOIN separated_comments sc
-		ON ((`sc`.`comment` = `scc`.`comment`) AND (`sc`.`digit` = `scc`.`digit`))
-		
-	WHERE count >= 50
-	GROUP BY
-		scc.digit,
-		scc.`comment`
-;
+		(SELECT COUNT(*) 
+		 FROM separated_comments sc2 
+		 WHERE sc2.comment = scc.comment 
+		 AND sc2.digit = scc.digit 
+		 AND sc2.finish_position = 1) as win_count,
+		scc.count,
+		(SELECT 100 * COUNT(*) / scc.count
+		 FROM separated_comments sc3 
+		 WHERE sc3.comment = scc.comment 
+		 AND sc3.digit = scc.digit 
+		 AND sc3.finish_position = 1) as win_pct
+	FROM separated_comment_count scc
+	WHERE scc.count >= 50;
 END $$
 DELIMITER ;
