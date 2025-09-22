@@ -37,7 +37,7 @@ CREATE TABLE daily_comment_history (
     prize_pos_4 DECIMAL(10,2),
     last_winner_no_race VARCHAR(100),
     last_winner_name VARCHAR(100),
-    last_winner_sp DECIMAL(8,2),
+    last_winner_sp VARCHAR(32),
     last_winner_trainer VARCHAR(100),
     scheduled_time TIME,
     age_range VARCHAR(20),
