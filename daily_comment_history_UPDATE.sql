@@ -54,7 +54,7 @@ CREATE TABLE daily_comment_history (
 
 -- Insert data from dailyracecard14 (first part of UNION)
 INSERT IGNORE INTO daily_comment_history
-SELECT 
+SELECT STRAIGHT_JOIN 
     hrunb.runner_id,
     hrunb.race_id,
     hracb.meeting_date,
@@ -102,7 +102,7 @@ SELECT
     hrunb.form_figures,    
     ROUND(sr.wt_speed_rating, 2) AS wt_speed_rating,
     hrunb.legacy_speed_rating 
-FROM STRAIGHT_JOIN dailyracecard14 drc
+FROM dailyracecard14 drc
 JOIN historic_runners_beta hrunb ON drc.runner_id = hrunb.runner_id
 LEFT JOIN historic_races_beta hracb ON hracb.race_id = hrunb.race_id
 LEFT JOIN daily_races_beta dracb ON dracb.race_id = hrunb.race_id
@@ -111,7 +111,7 @@ LEFT JOIN course_features cf ON hracb.course = cf.course AND hracb.race_type = c
 
 -- Insert data from adv_dailyracecard14 (second part of UNION)
 INSERT IGNORE INTO daily_comment_history
-SELECT 
+SELECT STRAIGHT_JOIN 
     ahrunb.runner_id,
     ahrunb.race_id,
     ahracb.meeting_date,
@@ -159,7 +159,7 @@ SELECT
     ahrunb.form_figures,    
     ROUND(asr.wt_speed_rating, 2) AS wt_speed_rating,
     ahrunb.legacy_speed_rating 
-FROM STRAIGHT_JOIN adv_dailyracecard14 adrc
+FROM adv_dailyracecard14 adrc
 JOIN historic_runners_beta ahrunb ON adrc.runner_id = ahrunb.runner_id
 LEFT JOIN historic_races_beta ahracb ON ahracb.race_id = ahrunb.race_id
 LEFT JOIN daily_races_beta adracb ON adracb.race_id = ahrunb.race_id
