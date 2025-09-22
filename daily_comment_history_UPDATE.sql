@@ -48,12 +48,12 @@ CREATE TABLE daily_comment_history (
     form_figures VARCHAR(50),
     wt_speed_rating DECIMAL(8,2),
     legacy_speed_rating INT,
-    INDEX idx_runner_race (runner_id, race_id),
-    INDEX idx_meeting_date (meeting_date)
+    INDEX idx_meeting_date (meeting_date),
+    PRIMARY KEY (runner_id, race_id)
 );
 
 -- Insert data from dailyracecard14 (first part of UNION)
-INSERT INTO daily_comment_history
+INSERT IGNORE INTO daily_comment_history
 SELECT 
     hrunb.runner_id,
     hrunb.race_id,
@@ -102,7 +102,7 @@ SELECT
     hrunb.form_figures,    
     ROUND(sr.wt_speed_rating, 2) AS wt_speed_rating,
     hrunb.legacy_speed_rating 
-FROM dailyracecard14 drc
+FROM STRAIGHT_JOIN dailyracecard14 drc
 JOIN historic_runners_beta hrunb ON drc.runner_id = hrunb.runner_id
 LEFT JOIN historic_races_beta hracb ON hracb.race_id = hrunb.race_id
 LEFT JOIN daily_races_beta dracb ON dracb.race_id = hrunb.race_id
@@ -110,7 +110,7 @@ LEFT JOIN sr_results sr ON hrunb.race_id = sr.race_id AND drc.runner_id = sr.run
 LEFT JOIN course_features cf ON hracb.course = cf.course AND hracb.race_type = cf.race_type;
 
 -- Insert data from adv_dailyracecard14 (second part of UNION)
-INSERT INTO daily_comment_history
+INSERT IGNORE INTO daily_comment_history
 SELECT 
     ahrunb.runner_id,
     ahrunb.race_id,
@@ -159,19 +159,14 @@ SELECT
     ahrunb.form_figures,    
     ROUND(asr.wt_speed_rating, 2) AS wt_speed_rating,
     ahrunb.legacy_speed_rating 
-FROM adv_dailyracecard14 adrc
+FROM STRAIGHT_JOIN adv_dailyracecard14 adrc
 JOIN historic_runners_beta ahrunb ON adrc.runner_id = ahrunb.runner_id
 LEFT JOIN historic_races_beta ahracb ON ahracb.race_id = ahrunb.race_id
 LEFT JOIN daily_races_beta adracb ON adracb.race_id = ahrunb.race_id
 LEFT JOIN sr_results asr ON ahrunb.race_id = asr.race_id AND adrc.runner_id = asr.runner_id
 LEFT JOIN course_features cf ON ahracb.course = cf.course AND ahracb.race_type = cf.race_type;
 
--- Remove duplicates and order
-DELETE d1 FROM daily_comment_history d1
-INNER JOIN daily_comment_history d2 
-WHERE d1.runner_id = d2.runner_id 
-AND d1.race_id = d2.race_id 
-AND d1.meeting_date < d2.meeting_date;
+-- Duplicates avoided by PRIMARY KEY and INSERT IGNORE
 
 END $$
 DELIMITER ;
