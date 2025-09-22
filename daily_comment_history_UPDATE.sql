@@ -19,7 +19,7 @@ CREATE TABLE daily_comment_history (
     days_since_ran INT,
     distance_beaten DECIMAL(8,2),
     race_abbrev_name VARCHAR(100),
-    starting_price DECIMAL(8,2),
+    starting_price VARCHAR(32),
     official_rating INT,
     value DECIMAL(10,2),
     Runner_Count INT,
