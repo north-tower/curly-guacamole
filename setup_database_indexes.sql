@@ -132,6 +132,48 @@ BEGIN
         SELECT 'Added idx_runner_id to adv_dailyracecard14' as message;
     END IF;
     
+    -- Indexes for separated_comments used by comment ratings and win value
+    SELECT COUNT(*) INTO @idx_count 
+    FROM information_schema.statistics 
+    WHERE table_schema = DATABASE() 
+    AND table_name = 'separated_comments' 
+    AND index_name = 'idx_runner_id';
+    IF @idx_count = 0 THEN
+        ALTER TABLE separated_comments ADD INDEX idx_runner_id (runner_id);
+        SELECT 'Added idx_runner_id to separated_comments' as message;
+    END IF;
+
+    SELECT COUNT(*) INTO @idx_count 
+    FROM information_schema.statistics 
+    WHERE table_schema = DATABASE() 
+    AND table_name = 'separated_comments' 
+    AND index_name = 'idx_comment_digit';
+    IF @idx_count = 0 THEN
+        ALTER TABLE separated_comments ADD INDEX idx_comment_digit (comment, digit);
+        SELECT 'Added idx_comment_digit to separated_comments' as message;
+    END IF;
+
+    SELECT COUNT(*) INTO @idx_count 
+    FROM information_schema.statistics 
+    WHERE table_schema = DATABASE() 
+    AND table_name = 'separated_comments' 
+    AND index_name = 'idx_comment_digit_finish';
+    IF @idx_count = 0 THEN
+        ALTER TABLE separated_comments ADD INDEX idx_comment_digit_finish (comment, digit, finish_position);
+        SELECT 'Added idx_comment_digit_finish to separated_comments' as message;
+    END IF;
+
+    -- Indexes for separated_comment_count used in joins
+    SELECT COUNT(*) INTO @idx_count 
+    FROM information_schema.statistics 
+    WHERE table_schema = DATABASE() 
+    AND table_name = 'separated_comment_count' 
+    AND index_name = 'idx_comment_digit';
+    IF @idx_count = 0 THEN
+        ALTER TABLE separated_comment_count ADD INDEX idx_comment_digit (comment, digit);
+        SELECT 'Added idx_comment_digit to separated_comment_count' as message;
+    END IF;
+
     -- Index on distance_yards for temp table optimization
     SELECT COUNT(*) INTO @idx_count 
     FROM information_schema.statistics 
