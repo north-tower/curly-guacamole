@@ -132,6 +132,85 @@ BEGIN
         SELECT 'Added idx_runner_id to adv_dailyracecard14' as message;
     END IF;
     
+    -- race_id on adv_dailyracecard14
+    SELECT COUNT(*) INTO @idx_count 
+    FROM information_schema.statistics 
+    WHERE table_schema = DATABASE() 
+    AND table_name = 'adv_dailyracecard14' 
+    AND index_name = 'idx_race_id';
+    IF @idx_count = 0 THEN
+        ALTER TABLE adv_dailyracecard14 ADD INDEX idx_race_id (race_id);
+        SELECT 'Added idx_race_id to adv_dailyracecard14' as message;
+    ELSE
+        SELECT 'Index idx_race_id already exists on adv_dailyracecard14' as message;
+    END IF;
+
+    -- race_id on advance_daily_races_beta
+    SELECT COUNT(*) INTO @idx_count 
+    FROM information_schema.statistics 
+    WHERE table_schema = DATABASE() 
+    AND table_name = 'advance_daily_races_beta' 
+    AND index_name = 'idx_race_id';
+    IF @idx_count = 0 THEN
+        ALTER TABLE advance_daily_races_beta ADD INDEX idx_race_id (race_id);
+        SELECT 'Added idx_race_id to advance_daily_races_beta' as message;
+    ELSE
+        SELECT 'Index idx_race_id already exists on advance_daily_races_beta' as message;
+    END IF;
+
+    -- (race_id, runner_id) on advance_daily_runners_beta
+    SELECT COUNT(*) INTO @idx_count 
+    FROM information_schema.statistics 
+    WHERE table_schema = DATABASE() 
+    AND table_name = 'advance_daily_runners_beta' 
+    AND index_name = 'idx_race_runner';
+    IF @idx_count = 0 THEN
+        ALTER TABLE advance_daily_runners_beta ADD INDEX idx_race_runner (race_id, runner_id);
+        SELECT 'Added idx_race_runner to advance_daily_runners_beta' as message;
+    ELSE
+        SELECT 'Index idx_race_runner already exists on advance_daily_runners_beta' as message;
+    END IF;
+
+    -- runner_id on adv_daily_comment_ratings
+    SELECT COUNT(*) INTO @idx_count 
+    FROM information_schema.statistics 
+    WHERE table_schema = DATABASE() 
+    AND table_name = 'adv_daily_comment_ratings' 
+    AND index_name = 'idx_runner_id';
+    IF @idx_count = 0 THEN
+        ALTER TABLE adv_daily_comment_ratings ADD INDEX idx_runner_id (runner_id);
+        SELECT 'Added idx_runner_id to adv_daily_comment_ratings' as message;
+    ELSE
+        SELECT 'Index idx_runner_id already exists on adv_daily_comment_ratings' as message;
+    END IF;
+
+    -- ancestry_records runner_id
+    SELECT COUNT(*) INTO @idx_count 
+    FROM information_schema.statistics 
+    WHERE table_schema = DATABASE() 
+    AND table_name = 'ancestry_records' 
+    AND index_name = 'idx_runner_id';
+    IF @idx_count = 0 THEN
+        ALTER TABLE ancestry_records ADD INDEX idx_runner_id (runner_id);
+        SELECT 'Added idx_runner_id to ancestry_records' as message;
+    ELSE
+        SELECT 'Index idx_runner_id already exists on ancestry_records' as message;
+    END IF;
+
+    -- draw_bias composite index
+    SELECT COUNT(*) INTO @idx_count 
+    FROM information_schema.statistics 
+    WHERE table_schema = DATABASE() 
+    AND table_name = 'draw_bias' 
+    AND index_name = 'idx_course_rtype_ttype_stall';
+    IF @idx_count = 0 THEN
+        ALTER TABLE draw_bias 
+          ADD INDEX idx_course_rtype_ttype_stall (course, race_type, track_type, stall_number);
+        SELECT 'Added idx_course_rtype_ttype_stall to draw_bias' as message;
+    ELSE
+        SELECT 'Index idx_course_rtype_ttype_stall already exists on draw_bias' as message;
+    END IF;
+    
     -- Indexes for separated_comments used by comment ratings and win value
     SELECT COUNT(*) INTO @idx_count 
     FROM information_schema.statistics 
