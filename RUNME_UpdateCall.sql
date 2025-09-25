@@ -56,9 +56,6 @@ SELECT CONCAT('daily_comment_ratings_UPDATE completed at ', NOW()) AS status;
 CALL `adv_daily_comment_ratings_UPDATE`();
 SELECT CONCAT('adv_daily_comment_ratings_UPDATE completed at ', NOW()) AS status;
 
-CALL `adv_speed&performance_table_UPDATE`();
-SELECT CONCAT('adv_speed&performance_table_UPDATE completed at ', NOW()) AS status;
-
 CALL `SR_daily_data_UPDATE`();
 SELECT CONCAT('SR_daily_data_UPDATE completed at ', NOW()) AS status;
 
