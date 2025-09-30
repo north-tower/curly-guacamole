@@ -264,6 +264,35 @@ BEGIN
         ALTER TABLE historic_races_beta ADD INDEX idx_distance_yards (distance_yards);
         SELECT 'Added idx_distance_yards to historic_races_beta' as message;
     END IF;
+
+    SELECT 'Creating indexes for daily_comment_history (horse history)...' as status;
+
+    -- Simple index to accelerate lookups by horse name
+    SELECT COUNT(*) INTO @idx_count 
+    FROM information_schema.statistics 
+    WHERE table_schema = DATABASE() 
+    AND table_name = 'daily_comment_history' 
+    AND index_name = 'idx_dch_name';
+    IF @idx_count = 0 THEN
+        ALTER TABLE daily_comment_history ADD INDEX idx_dch_name (name);
+        SELECT 'Added idx_dch_name to daily_comment_history' as message;
+    ELSE
+        SELECT 'Index idx_dch_name already exists on daily_comment_history' as message;
+    END IF;
+
+    -- Composite index to cover WHERE name = ? ORDER BY meeting_date DESC, scheduled_time DESC
+    SELECT COUNT(*) INTO @idx_count 
+    FROM information_schema.statistics 
+    WHERE table_schema = DATABASE() 
+    AND table_name = 'daily_comment_history' 
+    AND index_name = 'idx_dch_name_date_time';
+    IF @idx_count = 0 THEN
+        ALTER TABLE daily_comment_history 
+            ADD INDEX idx_dch_name_date_time (name, meeting_date, scheduled_time);
+        SELECT 'Added idx_dch_name_date_time to daily_comment_history' as message;
+    ELSE
+        SELECT 'Index idx_dch_name_date_time already exists on daily_comment_history' as message;
+    END IF;
     
     COMMIT;
     
