@@ -17,6 +17,9 @@ smartformDB <- dbConnect(RMariaDB::MariaDB(),
 print(paste("Writing", nrow(SR_data), "rows to sr_results"))
 dbExecute(smartformDB, "DROP TABLE IF EXISTS sr_results")
 dbWriteTable(smartformDB, "sr_results", SR_data)
+dbExecute(smartformDB, "CREATE INDEX idx_race_runner_id ON sr_results(race_id, runner_id)")
+
+
 
 print(paste("Writing", nrow(draw_bias), "rows to draw_bias"))
 dbExecute(smartformDB, "DROP TABLE IF EXISTS draw_bias")
