@@ -25,7 +25,14 @@ BEGIN
 			MAX(CASE WHEN RowNumber = 3 THEN distance_furlongs END) as DF_3,
 			MAX(CASE WHEN RowNumber = 4 THEN distance_furlongs END) as DF_4,
             MAX(CASE WHEN RowNumber = 5 THEN distance_furlongs END) as DF_5,
-            MAX(CASE WHEN RowNumber = 6 THEN distance_furlongs END) as DF_6
+            MAX(CASE WHEN RowNumber = 6 THEN distance_furlongs END) as DF_6,
+			MAX(CASE WHEN RowNumber = 1 THEN going END) as going_LTO,
+			MAX(CASE WHEN RowNumber = 1 THEN going END) as going_1,
+			MAX(CASE WHEN RowNumber = 2 THEN going END) as going_2,
+			MAX(CASE WHEN RowNumber = 3 THEN going END) as going_3,
+			MAX(CASE WHEN RowNumber = 4 THEN going END) as going_4,
+            MAX(CASE WHEN RowNumber = 5 THEN going END) as going_5,
+            MAX(CASE WHEN RowNumber = 6 THEN going END) as going_6
 		FROM
 			(SELECT
 				hrunb.runner_id,
@@ -33,6 +40,7 @@ BEGIN
 				hracb.meeting_date,
 				ROUND((CAST(hracb.distance_yards/220 AS CHAR) + 0), 1) as distance_furlongs,
 				hracb.class,
+				hracb.going,
 				sr.speed_rating,
 				ROUND(sr.wt_speed_rating, 3) AS wt_speed_rating,
 				ROW_NUMBER() OVER(PARTITION BY hrunb.runner_id ORDER BY hracb.meeting_date DESC) AS RowNumber
