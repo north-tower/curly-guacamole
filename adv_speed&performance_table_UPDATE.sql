@@ -14,6 +14,28 @@ BEGIN
 		`adrc`.`course` AS `course`,
 		`adrc`.`Distance` AS `Distance`,
 		`adracb`.`distance_yards` AS `distance_yards`,
+		`dri`.`prev_runner_win_strike` AS `prev_runner_win_strike`,
+		`dri`.`prev_runner_place_strike` AS `prev_runner_place_strike`,
+		`dri`.`going_prev_win_strike` AS `going_prev_win_strike`,
+		`dri`.`going_prev_place_strike` AS `going_prev_place_strike`,
+		`dri`.`distance_prev_win_strike` AS `distance_prev_win_strike`,
+		`dri`.`distance_prev_place_strike` AS `distance_prev_place_strike`,
+		`dri`.`course_prev_win_strike` AS `course_prev_win_strike`,
+		`dri`.`course_prev_place_strike` AS `course_prev_place_strike`,
+		`dri`.`class_prev_win_strike` AS `class_prev_win_strike`,
+		`dri`.`class_prev_place_strike` AS `class_prev_place_strike`,
+		`dri`.`direction_prev_runs` AS `direction_prev_runs`,
+		`dri`.`direction_prev_place_strike` AS `direction_prev_place_strike`,
+		`dri`.`direction_prev_win_strike` AS `direction_prev_win_strike`,
+		`dri`.`all_prev_useful_runs_strike` AS `all_prev_useful_runs_strike`,
+		`dri`.`speed_rating_LTO_in_race` AS `Betwise_speed_rating_LTO_in_race`,
+		`dri`.`speed_rating_LTO` AS `Betwise_speed_rating_LTO`,
+		`dri`.`speed_rating_PTO` AS `Betwise_speed_rating_PTO`,
+		`dri`.`speed_rating_ATO` AS `Betwise_speed_rating_ATO`,
+		`dri`.`going_prev_wins` AS `going_prev_wins`,
+		`dri`.`class_diff` AS `class_diff`,
+		`dri`.`distance_diff` AS `distance_diff`,
+		`dri`.`official_rating_diff` AS `official_rating_diff`,
 		`adrc`.`Furlongs` AS `Furlongs`,
 		`adrc`.`cloth_number` AS `cloth_number`,
 		`adrc`.`stall_number` AS `stall_number`,
@@ -110,6 +132,7 @@ BEGIN
 		LEFT JOIN `advance_daily_races_beta` `adracb` ON (`adracb`.`race_id` = `adrc`.`race_id`)
 		LEFT JOIN `advance_daily_runners_beta` `adrunb` ON ((`adracb`.`race_id` = `adrunb`.`race_id`) AND (`adrc`.`runner_id` = `adrunb`.`runner_id`))
 		LEFT JOIN `adv_daily_comment_ratings` `adcr` ON (`adrc`.`runner_id` = `adcr`.`runner_id`)
+		LEFT JOIN `daily_runners_insights` `dri` ON ((`dri`.`race_id` = `adracb`.`race_id`) AND (`dri`.`runner_id` = `adrc`.`runner_id`))
 		LEFT JOIN `draw_bias` `db` ON ((`adrc`.`course` = `db`.`course`)
 			AND (`adracb`.`race_type` = `db`.`race_type`)
 			AND (`adracb`.`track_type` = `db`.`track_type`)
