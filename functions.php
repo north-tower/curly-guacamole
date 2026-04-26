@@ -5596,6 +5596,7 @@ jQuery(document).on('click', '.toggle-details-btn', function() {
                     'place_pct': 'placePct',
                     'fsr': 'fsr',
                     'fsrr': 'fsrr',
+                    'model_points': 'model_points',
                     'comb': 'comb',
                     'dslr': 'dslr',
                     'weight': 'weight',
