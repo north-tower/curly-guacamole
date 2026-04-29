@@ -175,6 +175,48 @@ function bricks_ajax_delete_tracker_note() {
 }
 add_action('wp_ajax_bricks_delete_tracker_note', 'bricks_ajax_delete_tracker_note');
 
+if (!function_exists('bricks_tracker_should_load_frontend_assets')) {
+    function bricks_tracker_should_load_frontend_assets() {
+        $has_route_match = false;
+        if (function_exists('bricks_request_uri_contains')) {
+            $has_route_match = bricks_request_uri_contains([
+                '/my-tracker',
+                '/points-backtest',
+                '/race/',
+                '/horse-history/',
+                '/race-comments/',
+                '/daily',
+                '/speed',
+            ]);
+        }
+
+        $has_shortcode_match = false;
+        if (function_exists('bricks_current_post_has_shortcode')) {
+            $has_shortcode_match = bricks_current_post_has_shortcode([
+                'my_tracker_dashboard',
+                'race_table',
+                'race_table_full',
+                'speed_performance_table',
+                'horse_history',
+                'race_comment_history',
+                'race_detail',
+                'points_backtest',
+            ]);
+        }
+
+        return (
+            get_query_var('race_id') ||
+            get_query_var('runner_id') ||
+            get_query_var('horse_name') ||
+            get_query_var('race_comment_id') ||
+            get_query_var('my_tracker_page') ||
+            get_query_var('my_points_backtest') ||
+            $has_route_match ||
+            $has_shortcode_match
+        );
+    }
+}
+
 if (!function_exists('bricks_tracker_get_notes_for_horse')) {
     function bricks_tracker_get_notes_for_horse($horse_name, $user_id = 0) {
         $horse_key = bricks_tracker_normalize_horse_key($horse_name);
@@ -263,6 +305,9 @@ if (!function_exists('bricks_tracker_render_horse_widget')) {
 }
 
 function bricks_tracker_inline_js() {
+    if (is_admin() || !bricks_tracker_should_load_frontend_assets()) {
+        return;
+    }
     ?>
     <script>
     jQuery(document).ready(function($) {
@@ -388,6 +433,9 @@ function bricks_tracker_inline_js() {
 add_action('wp_footer', 'bricks_tracker_inline_js', 1000);
 
 function bricks_tracker_inline_styles() {
+    if (is_admin() || !bricks_tracker_should_load_frontend_assets()) {
+        return;
+    }
     ?>
     <style>
     [title] { cursor: pointer; }
@@ -457,7 +505,13 @@ function bricks_tracker_inline_styles() {
 add_action('wp_head', 'bricks_tracker_inline_styles', 1000);
 
 function bricks_tracker_floating_quick_link() {
-    if (!is_user_logged_in() || is_admin() || get_query_var('my_tracker_page') || get_query_var('my_points_backtest')) {
+    if (
+        !is_user_logged_in() ||
+        is_admin() ||
+        !bricks_tracker_should_load_frontend_assets() ||
+        get_query_var('my_tracker_page') ||
+        get_query_var('my_points_backtest')
+    ) {
         return;
     }
     ?>
