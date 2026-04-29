@@ -3,21 +3,63 @@
  * Frontend enqueue and localization hooks.
  */
 
+if (!function_exists('bricks_request_uri_contains')) {
+    function bricks_request_uri_contains($needles) {
+        $uri = strtolower((string) ($_SERVER['REQUEST_URI'] ?? ''));
+        foreach ((array) $needles as $needle) {
+            if ($needle !== '' && strpos($uri, strtolower((string) $needle)) !== false) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+if (!function_exists('bricks_current_post_has_shortcode')) {
+    function bricks_current_post_has_shortcode($tags) {
+        if (!is_singular()) {
+            return false;
+        }
+
+        $post = get_post();
+        if (!$post || empty($post->post_content)) {
+            return false;
+        }
+
+        foreach ((array) $tags as $tag) {
+            if ($tag !== '' && has_shortcode($post->post_content, $tag)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
 function bricks_race_table_enqueue_scripts() {
-    // Only skip loading on specific horse pages, not on the daily races page
-    $current_url = $_SERVER['REQUEST_URI'] ?? '';
-    if ((get_query_var('horse_name') || get_query_var('runner_id')) &&
-        strpos($current_url, '/daily') === false) {
+    $is_daily_route = bricks_request_uri_contains(['/daily']);
+    $has_race_shortcode = bricks_current_post_has_shortcode(['race_table', 'race_table_full']);
+    if (!$is_daily_route && !$has_race_shortcode) {
         return;
     }
 
-    // Enqueue JavaScript inline if file doesn't exist
     wp_enqueue_script('jquery');
 
-    // FORCE inline JavaScript for debugging
-    add_action('wp_footer', 'bricks_race_table_inline_js', 999); // High priority
+    $race_js_file = get_stylesheet_directory() . '/race-table.js';
+    if (file_exists($race_js_file)) {
+        wp_enqueue_script(
+            'race-table-ajax',
+            get_stylesheet_directory_uri() . '/race-table.js',
+            ['jquery'],
+            filemtime($race_js_file),
+            true
+        );
+    } else {
+        add_action('wp_footer', 'bricks_race_table_inline_js', 999);
+    }
 
-    wp_localize_script('jquery', 'race_ajax_obj', [
+    $localize_handle = wp_script_is('race-table-ajax', 'enqueued') ? 'race-table-ajax' : 'jquery';
+    wp_localize_script($localize_handle, 'race_ajax_obj', [
         'ajax_url' => admin_url('admin-ajax.php'),
         'default_date' => date('Y-m-d'),
         'version' => time()
@@ -26,7 +68,9 @@ function bricks_race_table_enqueue_scripts() {
 add_action('wp_enqueue_scripts', 'bricks_race_table_enqueue_scripts');
 
 function bricks_speed_performance_enqueue_scripts() {
-    if (get_query_var('horse_name') || get_query_var('runner_id')) {
+    $is_speed_route = bricks_request_uri_contains(['/speed']);
+    $has_speed_shortcode = bricks_current_post_has_shortcode(['speed_performance_table']);
+    if (!$is_speed_route && !$has_speed_shortcode) {
         return;
     }
 
@@ -62,6 +106,29 @@ function horse_history_enqueue_scripts() {
 add_action('wp_enqueue_scripts', 'horse_history_enqueue_scripts');
 
 function bricks_tracker_enqueue_scripts() {
+    $needs_tracker_assets =
+        get_query_var('race_id') ||
+        get_query_var('runner_id') ||
+        get_query_var('horse_name') ||
+        get_query_var('race_comment_id') ||
+        get_query_var('my_tracker_page') ||
+        get_query_var('my_points_backtest') ||
+        bricks_request_uri_contains(['/my-tracker', '/points-backtest', '/race/', '/horse-history/', '/race-comments/']) ||
+        bricks_current_post_has_shortcode([
+            'my_tracker_dashboard',
+            'race_table',
+            'race_table_full',
+            'speed_performance_table',
+            'horse_history',
+            'race_comment_history',
+            'race_detail',
+            'points_backtest',
+        ]);
+
+    if (!$needs_tracker_assets) {
+        return;
+    }
+
     wp_enqueue_script('jquery');
     wp_localize_script('jquery', 'bricks_tracker_obj', [
         'ajax_url' => admin_url('admin-ajax.php'),

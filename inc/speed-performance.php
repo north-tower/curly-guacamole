@@ -301,9 +301,6 @@ function bricks_ajax_load_speed_performance_table() {
     $date_dmy = convert_date_format($date, 'd-m-Y');
     $date_ymd = convert_date_format($date, 'Y-m-d');
     
-    // Debug logging
-    error_log("Speed Performance Debug - Date received: $date, Date d-m-Y: $date_dmy, Date Y-m-d: $date_ymd");
-    
     // Build date condition using IN clause for better compatibility
     $date_dmy_escaped = esc_sql($date_dmy);
     $date_ymd_escaped = esc_sql($date_ymd);
@@ -334,20 +331,10 @@ function bricks_ajax_load_speed_performance_table() {
 
     $table = '`speed&performance_table`';
     
-    // Debug: Check what dates exist in the table
-    $sample_dates = $wpdb->get_col("SELECT DISTINCT `Date` FROM $table ORDER BY `Date` DESC LIMIT 5");
-    error_log("Speed Performance Debug - Sample dates in table: " . print_r($sample_dates, true));
-    
-    // Build the full query for debugging
+    // Build the full query
     $full_query = "SELECT COUNT(*) FROM $table WHERE $where";
-    error_log("Speed Performance Debug - Full query: $full_query");
     
     $total_records = $wpdb->get_var($full_query);
-    error_log("Speed Performance Debug - Total records found: $total_records");
-    
-    // Also test a simple query to see if any records exist at all
-    $all_count = $wpdb->get_var("SELECT COUNT(*) FROM $table");
-    error_log("Speed Performance Debug - Total records in table: $all_count");
     
     $order_by = '`Time`, `course`';
     $allowed_sorts = [

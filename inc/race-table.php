@@ -269,14 +269,10 @@ function bricks_get_race_filter_options() {
     $today = date('Y-m-d');
     $tomorrow = date('Y-m-d', strtotime('+1 day'));
     
-    error_log("Filter Debug - Today: $today, Tomorrow: $tomorrow, Requested date: $date");
-    
     if ($date === $tomorrow) {
         $table = 'advance_daily_races';
-        error_log("Filter Debug - Using advance_daily_races table");
     } else {
         $table = 'advance_daily_races_beta';
-        error_log("Filter Debug - Using advance_daily_races_beta table");
     }
 
     // Continue with the rest of the function...
@@ -354,7 +350,6 @@ if (isset($_POST['runners_from']) && $_POST['runners_from'] !== '' && is_numeric
     $runners_from = intval($_POST['runners_from']);
     if ($runners_from >= 0) {  // Allow 0 as minimum
         $having_conditions[] = "runner_count >= $runners_from";
-        error_log("Debug - Applied runners_from filter: >= $runners_from");
     }
 }
 
@@ -362,7 +357,6 @@ if (isset($_POST['runners_to']) && $_POST['runners_to'] !== '' && is_numeric($_P
     $runners_to = intval($_POST['runners_to']);
     if ($runners_to > 0) {  // Must be greater than 0 for maximum
         $having_conditions[] = "runner_count <= $runners_to";
-        error_log("Debug - Applied runners_to filter: <= $runners_to");
     }
 }
 
@@ -370,7 +364,6 @@ if (isset($_POST['runners_to']) && $_POST['runners_to'] !== '' && is_numeric($_P
 $having_clause = '';
 if (!empty($having_conditions)) {
     $having_clause = 'HAVING ' . implode(' AND ', $having_conditions);
-    error_log("Debug - Final HAVING clause: $having_clause");
 }
 
 
@@ -378,16 +371,12 @@ if (!empty($having_conditions)) {
     $today = date('Y-m-d');
     $tomorrow = date('Y-m-d', strtotime('+1 day'));
     
-    error_log("AJAX Debug - Today: $today, Tomorrow: $tomorrow, Requested date: $date");
-    
     if ($date === $tomorrow) {
         $table = 'advance_daily_races';
         $runners_table = 'advance_daily_runners';
-        error_log("AJAX Debug - Using advance_daily_races table for tomorrow");
     } else {
         $table = 'advance_daily_races_beta';
         $runners_table = 'advance_daily_runners_beta';
-        error_log("AJAX Debug - Using advance_daily_races_beta table for today/other");
     }
 
     // CORRECTED: Count query with HAVING clause
@@ -474,16 +463,6 @@ if (!empty($having_conditions)) {
         }
     }
     
-    // Debug: Log the query and results
-    error_log("Debug - Query table: $table, Total races found: $total_races");
-    error_log("Debug - HAVING clause: $having_clause");
-    error_log("Debug - Results count: " . count($results));
-// Add this debug logging right after building the HAVING clause:
-error_log("Debug - runners_from: " . ($_POST['runners_from'] ?? 'not set'));
-error_log("Debug - runners_to: " . ($_POST['runners_to'] ?? 'not set'));
-error_log("Debug - HAVING conditions: " . print_r($having_conditions, true));
-error_log("Debug - HAVING clause: $having_clause");
-
     $total_pages = ceil($total_races / $per_page);
 
     // Rest of your function continues as before...
