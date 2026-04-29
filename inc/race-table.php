@@ -275,9 +275,12 @@ function bricks_get_race_filter_options() {
         $table = 'advance_daily_races_beta';
     }
 
-    // Continue with the rest of the function...
-
-
+    $cache_key = bricks_cache_key('race_filters', [$table, $date]);
+    $cached = get_transient($cache_key);
+    if ($cached !== false && is_array($cached)) {
+        wp_send_json($cached);
+        return;
+    }
 
     $countries = $wpdb->get_col($wpdb->prepare(
         "SELECT DISTINCT country FROM $table WHERE meeting_date = %s ORDER BY country", $date
@@ -298,14 +301,17 @@ function bricks_get_race_filter_options() {
         "SELECT DISTINCT handicap FROM $table WHERE meeting_date = %s AND handicap IS NOT NULL ORDER BY handicap", $date
     ));
 
-    wp_send_json([
+    $payload = [
         'countries' => $countries,
         'courses' => $courses,
         'types' => $types,
         'classes' => $classes,
         'ages' => $ages,
         'handicaps' => $handicaps,
-    ]);
+    ];
+
+    set_transient($cache_key, $payload, 10 * MINUTE_IN_SECONDS);
+    wp_send_json($payload);
 }
 
 
@@ -1154,34 +1160,6 @@ $dates[] = [
         </div>
     </div>
   
-<!-- Add this right before the closing </div> of race-table-wrapper -->
-<script>
-console.log('=== RACE TABLE DEBUG ===');
-console.log('Page loaded, checking if JavaScript is working...');
-console.log('jQuery available:', typeof jQuery !== 'undefined');
-console.log('race_ajax_obj available:', typeof race_ajax_obj !== 'undefined');
-if (typeof race_ajax_obj !== 'undefined') {
-    console.log('race_ajax_obj.default_date:', race_ajax_obj.default_date);
-}
-</script>
-<!-- Add this right after your existing debug script -->
-<script>
-console.log('=== TESTING CLICK HANDLERS ===');
-jQuery(document).ready(function($) {
-    console.log('Available tabs:', $('.race-date-tab').length);
-    $('.race-date-tab').each(function(i) {
-        console.log('Tab ' + i + ':', $(this).text().trim(), 'Date:', $(this).data('date'));
-    });
-    
-    // Test if click handlers are working
-    $('.race-date-tab').on('click', function() {
-        console.log('SIMPLE CLICK TEST: Tab clicked!', $(this).text().trim());
-    });
-});
-</script>
-
-
-
     </div>
     <?php
       $content = ob_get_clean();

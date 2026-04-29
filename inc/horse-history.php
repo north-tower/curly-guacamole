@@ -239,6 +239,13 @@ function get_horse_history_filter_options() {
         wp_send_json_error('Runner ID or horse name required');
         return;
     }
+
+    $cache_key = bricks_cache_key('horse_filters', [$runner_id, strtolower($horse_name)]);
+    $cached = get_transient($cache_key);
+    if ($cached !== false && is_array($cached)) {
+        wp_send_json($cached);
+        return;
+    }
     
     $where = '';
     if ($runner_id) {
@@ -284,14 +291,17 @@ function get_horse_history_filter_options() {
          ORDER BY going"
     );
     
-    wp_send_json([
+    $payload = [
         'profiles' => $profiles,
         'general_features' => $general_features,
         'specific_features' => $specific_features,
         'distances' => $distances,
         'classes' => $classes,
         'goings' => $goings
-    ]);
+    ];
+
+    set_transient($cache_key, $payload, 10 * MINUTE_IN_SECONDS);
+    wp_send_json($payload);
 }
 add_action('wp_ajax_get_horse_history_filter_options', 'get_horse_history_filter_options');
 add_action('wp_ajax_nopriv_get_horse_history_filter_options', 'get_horse_history_filter_options');

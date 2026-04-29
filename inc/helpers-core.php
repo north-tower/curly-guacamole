@@ -126,3 +126,114 @@ if (!function_exists('bricks_race_comment_url')) {
         return home_url('/race-comments/' . intval($race_id) . '/');
     }
 }
+
+if (!function_exists('bricks_cache_namespace_version')) {
+    function bricks_cache_namespace_version($namespace) {
+        $namespace = sanitize_key((string) $namespace);
+        if ($namespace === '') {
+            return 1;
+        }
+
+        $option_key = 'bricks_cache_ver_' . $namespace;
+        $version = intval(get_option($option_key, 1));
+        return $version > 0 ? $version : 1;
+    }
+}
+
+if (!function_exists('bricks_bump_cache_namespace_version')) {
+    function bricks_bump_cache_namespace_version($namespace) {
+        $namespace = sanitize_key((string) $namespace);
+        if ($namespace === '') {
+            return 1;
+        }
+
+        $option_key = 'bricks_cache_ver_' . $namespace;
+        $next_version = bricks_cache_namespace_version($namespace) + 1;
+        update_option($option_key, $next_version, false);
+        return $next_version;
+    }
+}
+
+if (!function_exists('bricks_cache_key')) {
+    function bricks_cache_key($namespace, array $parts = []) {
+        $namespace = sanitize_key((string) $namespace);
+        if ($namespace === '') {
+            $namespace = 'default';
+        }
+
+        $version = bricks_cache_namespace_version($namespace);
+        $payload = implode('|', array_map('strval', $parts));
+        return $namespace . '_v' . $version . '_' . md5($payload);
+    }
+}
+
+if (!function_exists('bricks_flush_filter_option_caches')) {
+    function bricks_flush_filter_option_caches() {
+        bricks_bump_cache_namespace_version('race_filters');
+        bricks_bump_cache_namespace_version('speed_filters');
+        bricks_bump_cache_namespace_version('horse_filters');
+    }
+}
+
+if (!function_exists('bricks_get_filter_cache_versions')) {
+    function bricks_get_filter_cache_versions() {
+        return [
+            'race_filters' => bricks_cache_namespace_version('race_filters'),
+            'speed_filters' => bricks_cache_namespace_version('speed_filters'),
+            'horse_filters' => bricks_cache_namespace_version('horse_filters'),
+        ];
+    }
+}
+
+if (!function_exists('bricks_ajax_flush_filter_caches')) {
+    function bricks_ajax_flush_filter_caches() {
+        check_ajax_referer('bricks_flush_filter_caches', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'Forbidden'], 403);
+            return;
+        }
+
+        bricks_flush_filter_option_caches();
+
+        wp_send_json_success([
+            'message' => 'Filter caches flushed',
+            'versions' => bricks_get_filter_cache_versions(),
+            'flushed_at_gmt' => gmdate('c'),
+        ]);
+    }
+}
+add_action('wp_ajax_bricks_flush_filter_caches', 'bricks_ajax_flush_filter_caches');
+
+if (!function_exists('bricks_next_daily_8am_gmt_timestamp')) {
+    function bricks_next_daily_8am_gmt_timestamp() {
+        $now = time();
+        $next = strtotime(gmdate('Y-m-d') . ' 08:00:00 UTC');
+        if ($next <= $now) {
+            $next = strtotime('+1 day', $next);
+        }
+        return $next;
+    }
+}
+
+if (!function_exists('bricks_schedule_daily_filter_cache_flush')) {
+    function bricks_schedule_daily_filter_cache_flush() {
+        if (wp_next_scheduled('bricks_daily_filter_cache_flush')) {
+            return;
+        }
+
+        wp_schedule_event(
+            bricks_next_daily_8am_gmt_timestamp(),
+            'daily',
+            'bricks_daily_filter_cache_flush'
+        );
+    }
+}
+add_action('init', 'bricks_schedule_daily_filter_cache_flush', 20);
+
+if (!function_exists('bricks_run_daily_filter_cache_flush')) {
+    function bricks_run_daily_filter_cache_flush() {
+        bricks_flush_filter_option_caches();
+    }
+}
+add_action('bricks_daily_filter_cache_flush', 'bricks_run_daily_filter_cache_flush');

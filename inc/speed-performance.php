@@ -246,6 +246,13 @@ function bricks_get_speed_performance_filter_options() {
         wp_send_json_error('Table does not exist');
         return;
     }
+
+    $cache_key = bricks_cache_key('speed_filters', [$table_name, $date_dmy, $date_ymd]);
+    $cached = get_transient($cache_key);
+    if ($cached !== false && is_array($cached)) {
+        wp_send_json($cached);
+        return;
+    }
     
     $runners = $wpdb->get_col($wpdb->prepare(
         "SELECT DISTINCT `name` FROM `$table_name` WHERE (`Date` = %s OR `Date` = %s) AND `name` IS NOT NULL AND `name` != '' ORDER BY `name`", $date_dmy, $date_ymd
@@ -271,14 +278,17 @@ function bricks_get_speed_performance_filter_options() {
         "SELECT DISTINCT `race_type` FROM `$table_name` WHERE (`Date` = %s OR `Date` = %s) AND `race_type` IS NOT NULL AND `race_type` != '' ORDER BY `race_type`", $date_dmy, $date_ymd
     ));
 
-    wp_send_json([
+    $payload = [
         'runners' => $runners,
         'courses' => $courses,
         'trainers' => $trainers,
         'jockeys' => $jockeys,
         'distances' => $distances,
         'race_types' => $race_types
-    ]);
+    ];
+
+    set_transient($cache_key, $payload, 10 * MINUTE_IN_SECONDS);
+    wp_send_json($payload);
 }
 add_action('wp_ajax_get_speed_performance_filter_options', 'bricks_get_speed_performance_filter_options');
 add_action('wp_ajax_nopriv_get_speed_performance_filter_options', 'bricks_get_speed_performance_filter_options');
