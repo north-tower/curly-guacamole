@@ -173,6 +173,7 @@ if (!function_exists('bricks_flush_filter_option_caches')) {
         bricks_bump_cache_namespace_version('speed_filters');
         bricks_bump_cache_namespace_version('horse_filters');
         bricks_bump_cache_namespace_version('sire_filters');
+        bricks_bump_cache_namespace_version('yesterday_winners');
     }
 }
 
@@ -183,6 +184,7 @@ if (!function_exists('bricks_get_filter_cache_versions')) {
             'speed_filters' => bricks_cache_namespace_version('speed_filters'),
             'horse_filters' => bricks_cache_namespace_version('horse_filters'),
             'sire_filters' => bricks_cache_namespace_version('sire_filters'),
+            'yesterday_winners' => bricks_cache_namespace_version('yesterday_winners'),
         ];
     }
 }
