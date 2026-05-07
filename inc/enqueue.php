@@ -97,6 +97,34 @@ function bricks_speed_performance_enqueue_scripts() {
 }
 add_action('wp_enqueue_scripts', 'bricks_speed_performance_enqueue_scripts');
 
+function bricks_sire_insights_enqueue_scripts() {
+    $is_sire_route = bricks_request_uri_contains(['/sire-insights', '/daily-sire-insights']);
+    $has_sire_shortcode = bricks_current_post_has_shortcode(['daily_sires_insights']);
+    if (!$is_sire_route && !$has_sire_shortcode) {
+        return;
+    }
+
+    wp_enqueue_script('jquery');
+
+    $js_file = get_stylesheet_directory() . '/sire-insights.js';
+    if (file_exists($js_file)) {
+        wp_enqueue_script(
+            'sire-insights-ajax',
+            get_stylesheet_directory_uri() . '/sire-insights.js',
+            ['jquery'],
+            filemtime($js_file),
+            true
+        );
+    }
+
+    $localize_handle = wp_script_is('sire-insights-ajax', 'enqueued') ? 'sire-insights-ajax' : 'jquery';
+    wp_localize_script($localize_handle, 'sire_insights_ajax_obj', [
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'default_date' => date('Y-m-d'),
+    ]);
+}
+add_action('wp_enqueue_scripts', 'bricks_sire_insights_enqueue_scripts');
+
 function horse_history_enqueue_scripts() {
     // Only load on horse history pages
     if (get_query_var('horse_name') || get_query_var('runner_id')) {

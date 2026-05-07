@@ -58,6 +58,26 @@ tryCatch({
   print(paste("Error running adv_my_daily_details_tb_UPDATE:", e$message))
 })
 
+tryCatch({
+  routine_exists <- dbGetQuery(
+    smartformDB,
+    "SELECT COUNT(*) AS cnt
+     FROM information_schema.ROUTINES
+     WHERE ROUTINE_SCHEMA = 'fhorsitedb'
+       AND ROUTINE_TYPE = 'PROCEDURE'
+       AND ROUTINE_NAME = 'daily_sires_insights_UPDATE'"
+  )
+
+  if (nrow(routine_exists) > 0 && as.integer(routine_exists$cnt[1]) > 0) {
+    dbExecute(smartformDB, "CALL `fhorsitedb`.`daily_sires_insights_UPDATE`()")
+    print("✓ daily_sires_insights_UPDATE completed")
+  } else {
+    print("ℹ daily_sires_insights_UPDATE not found in fhorsitedb, skipped")
+  }
+}, error = function(e) {
+  print(paste("Error running daily_sires_insights_UPDATE:", e$message))
+})
+
 # Check what tables exist now
 tables_check <- dbGetQuery(smartformDB, "SHOW TABLES FROM fhorsitedb LIKE 'sr_%'")
 print("Available tables after running procedures:")

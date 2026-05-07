@@ -34,6 +34,22 @@ dbExecute(smartformDB, "CALL `coolwed1_wp364`.`speed&performance_table_UPDATE`()
 
 print("Calling adv_speed&performance_table_UPDATE procedure")
 dbExecute(smartformDB, "CALL `coolwed1_wp364`.`adv_speed&performance_table_UPDATE`()")
+
+routine_exists <- dbGetQuery(
+  smartformDB,
+  "SELECT COUNT(*) AS cnt
+   FROM information_schema.ROUTINES
+   WHERE ROUTINE_SCHEMA = 'coolwed1_wp364'
+     AND ROUTINE_TYPE = 'PROCEDURE'
+     AND ROUTINE_NAME = 'daily_sires_insights_UPDATE'"
+)
+
+if (nrow(routine_exists) > 0 && as.integer(routine_exists$cnt[1]) > 0) {
+  print("Calling daily_sires_insights_UPDATE procedure")
+  dbExecute(smartformDB, "CALL `coolwed1_wp364`.`daily_sires_insights_UPDATE`()")
+} else {
+  print("daily_sires_insights_UPDATE not found in coolwed1_wp364, skipped")
+}
 ## Disconnect from DB
 #######################################
 

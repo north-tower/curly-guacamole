@@ -182,6 +182,7 @@ if (!function_exists('bricks_tracker_should_load_frontend_assets')) {
             $has_route_match = bricks_request_uri_contains([
                 '/my-tracker',
                 '/points-backtest',
+                '/daily_sires_insights',
                 '/race/',
                 '/horse-history/',
                 '/race-comments/',
@@ -201,6 +202,7 @@ if (!function_exists('bricks_tracker_should_load_frontend_assets')) {
                 'race_comment_history',
                 'race_detail',
                 'points_backtest',
+                'daily_sires_insights',
             ]);
         }
 
@@ -526,6 +528,11 @@ function bricks_tracker_floating_quick_link() {
             title="Open Points Backtest"
             style="display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);color:#fff;font-weight:700;font-size:13px;text-decoration:none;box-shadow:0 8px 20px rgba(30,64,175,0.35);"
         >📊 Points Backtest</a>
+        <a
+            href="<?php echo esc_url(home_url('/daily_sires_insights/')); ?>"
+            title="Open Daily Sires Insights"
+            style="display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:linear-gradient(135deg, #059669 0%, #047857 100%);color:#fff;font-weight:700;font-size:13px;text-decoration:none;box-shadow:0 8px 20px rgba(4,120,87,0.35);"
+        >🧬 Daily Sires</a>
     </div>
     <?php
 }

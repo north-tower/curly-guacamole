@@ -62,6 +62,19 @@ SELECT CONCAT('SR_daily_data_UPDATE completed at ', NOW()) AS status;
 CALL `daily_race_comment_history_UPDATE`();
 SELECT CONCAT('daily_race_comment_history_UPDATE completed at ', NOW()) AS status;
 
+IF EXISTS (
+  SELECT 1
+  FROM information_schema.ROUTINES
+  WHERE ROUTINE_SCHEMA = DATABASE()
+    AND ROUTINE_TYPE = 'PROCEDURE'
+    AND ROUTINE_NAME = 'daily_sires_insights_UPDATE'
+) THEN
+  CALL `daily_sires_insights_UPDATE`();
+  SELECT CONCAT('daily_sires_insights_UPDATE completed at ', NOW()) AS status;
+ELSE
+  SELECT CONCAT('daily_sires_insights_UPDATE not found in ', DATABASE(), ', skipped at ', NOW()) AS status;
+END IF;
+
 SELECT CONCAT('RUNME_UpdateCall completed at ', NOW()) AS status;
 END$$
 DELIMITER ;
