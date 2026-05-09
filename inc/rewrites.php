@@ -6,12 +6,14 @@
 function bricks_my_tracker_rewrite_rules() {
     add_rewrite_rule('my-tracker/?$', 'index.php?my_tracker_page=1', 'top');
     add_rewrite_rule('points-backtest/?$', 'index.php?my_points_backtest=1', 'top');
+    add_rewrite_rule('admin-pnl/?$', 'index.php?my_admin_pnl_page=1', 'top');
 }
 add_action('init', 'bricks_my_tracker_rewrite_rules', 10);
 
 function bricks_my_tracker_query_vars($vars) {
     $vars[] = 'my_tracker_page';
     $vars[] = 'my_points_backtest';
+    $vars[] = 'my_admin_pnl_page';
     return $vars;
 }
 add_filter('query_vars', 'bricks_my_tracker_query_vars');
@@ -20,20 +22,31 @@ function bricks_my_tracker_template_redirect() {
     $request_uri = $_SERVER['REQUEST_URI'] ?? '';
     $is_tracker_uri = strpos($request_uri, '/my-tracker') !== false;
     $is_backtest_uri = strpos($request_uri, '/points-backtest') !== false;
+    $is_admin_pnl_uri = strpos($request_uri, '/admin-pnl') !== false;
     $is_tracker_qv = (bool) get_query_var('my_tracker_page');
     $is_backtest_qv = (bool) get_query_var('my_points_backtest');
+    $is_admin_pnl_qv = (bool) get_query_var('my_admin_pnl_page');
 
-    if ((!$is_tracker_qv && !$is_backtest_qv && !$is_tracker_uri && !$is_backtest_uri) || is_admin()) {
+    if ((!$is_tracker_qv && !$is_backtest_qv && !$is_admin_pnl_qv && !$is_tracker_uri && !$is_backtest_uri && !$is_admin_pnl_uri) || is_admin()) {
         return;
     }
 
     // Render points backtest in an isolated template to avoid third-party theme JS crashes.
-    if ($is_backtest_qv || $is_backtest_uri) {
+    if ($is_backtest_qv || $is_backtest_uri || $is_admin_pnl_qv || $is_admin_pnl_uri) {
+        if (($is_admin_pnl_qv || $is_admin_pnl_uri) && (!is_user_logged_in() || !current_user_can('manage_options'))) {
+            status_header(403);
+            nocache_headers();
+            echo '<!doctype html><html ' . get_language_attributes() . '><head><meta charset="' . esc_attr(get_bloginfo('charset')) . '"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . esc_html(get_bloginfo('name') . ' - Admin P&L') . '</title></head><body style="margin:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;"><main style="max-width:980px;margin:0 auto;padding:28px 12px;"><div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;"><h1 style="margin:0 0 8px;font-size:24px;color:#111827;">Admin P&amp;L</h1><p style="margin:0;color:#6b7280;">This page is available to admins only.</p></div></main></body></html>';
+            exit;
+        }
+
+        $title_suffix = ($is_admin_pnl_qv || $is_admin_pnl_uri) ? 'Admin P&L' : 'Points Backtest';
+        $shortcode = ($is_admin_pnl_qv || $is_admin_pnl_uri) ? '[admin_pnl_dashboard]' : '[points_backtest]';
         status_header(200);
         nocache_headers();
-        echo '<!doctype html><html ' . get_language_attributes() . '><head><meta charset="' . esc_attr(get_bloginfo('charset')) . '"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . esc_html(get_bloginfo('name') . ' - Points Backtest') . '</title></head><body style="margin:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;">';
+        echo '<!doctype html><html ' . get_language_attributes() . '><head><meta charset="' . esc_attr(get_bloginfo('charset')) . '"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . esc_html(get_bloginfo('name') . ' - ' . $title_suffix) . '</title></head><body style="margin:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;">';
         echo '<main style="max-width:1280px;margin:0 auto;padding:18px 12px 30px;">';
-        echo do_shortcode('[points_backtest]');
+        echo do_shortcode($shortcode);
         echo '</main></body></html>';
         exit;
     }
@@ -61,7 +74,7 @@ add_action('template_redirect', 'bricks_my_tracker_template_redirect', 1);
 function bricks_flush_my_tracker_rewrite_rules_if_needed() {
     if (get_option('my_tracker_rewrite_rules_flushed') !== '4') {
         flush_rewrite_rules();
-        update_option('my_tracker_rewrite_rules_flushed', '4');
+        update_option('my_tracker_rewrite_rules_flushed', '5');
     }
 }
 add_action('init', 'bricks_flush_my_tracker_rewrite_rules_if_needed', 999);
@@ -121,8 +134,10 @@ function bricks_setup_virtual_page_post() {
         || get_query_var('race_comment_id')
         || get_query_var('my_tracker_page')
         || get_query_var('my_points_backtest')
+        || get_query_var('my_admin_pnl_page')
         || (strpos($request_uri, '/my-tracker') !== false)
-        || (strpos($request_uri, '/points-backtest') !== false);
+        || (strpos($request_uri, '/points-backtest') !== false)
+        || (strpos($request_uri, '/admin-pnl') !== false);
     if (!$is_virtual) {
         return;
     }

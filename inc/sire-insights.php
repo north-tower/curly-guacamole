@@ -3,12 +3,49 @@
  * Daily sire insights feature: shortcode, AJAX filters, and table render.
  */
 
+if (!function_exists('bricks_sire_insights_table_candidates')) {
+    function bricks_sire_insights_table_candidates() {
+        return [
+            'daily_sires_insights',
+            'daily_sire_insights',
+            'daily_sires_insights_table',
+            'daily_sire_insights_table',
+            'sires_insights',
+            'sire_insights',
+        ];
+    }
+}
+
+if (!function_exists('bricks_sire_insights_resolve_table')) {
+    function bricks_sire_insights_resolve_table() {
+        global $wpdb;
+        static $resolved = null;
+        if ($resolved !== null) {
+            return $resolved;
+        }
+
+        foreach (bricks_sire_insights_table_candidates() as $candidate) {
+            $exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $candidate));
+            if ($exists === $candidate) {
+                $resolved = $candidate;
+                return $resolved;
+            }
+        }
+
+        $pattern_matches = $wpdb->get_col("SHOW TABLES LIKE '%sire%insight%'");
+        if (!empty($pattern_matches) && is_array($pattern_matches)) {
+            $resolved = (string) $pattern_matches[0];
+            return $resolved;
+        }
+
+        $resolved = '';
+        return $resolved;
+    }
+}
+
 if (!function_exists('bricks_sire_insights_table_exists')) {
     function bricks_sire_insights_table_exists() {
-        global $wpdb;
-        $table = 'daily_sires_insights';
-        $exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table));
-        return $exists === $table;
+        return bricks_sire_insights_resolve_table() !== '';
     }
 }
 
@@ -25,7 +62,13 @@ if (!function_exists('bricks_sire_insights_get_columns')) {
             return $columns;
         }
 
-        $rows = $wpdb->get_results("SHOW COLUMNS FROM `daily_sires_insights`");
+        $table = bricks_sire_insights_resolve_table();
+        if ($table === '') {
+            $columns = [];
+            return $columns;
+        }
+
+        $rows = $wpdb->get_results("SHOW COLUMNS FROM `" . esc_sql($table) . "`");
         $columns = [];
         foreach ((array) $rows as $row) {
             if (!empty($row->Field)) {
@@ -101,16 +144,19 @@ if (!function_exists('bricks_sire_insights_date_where_sql')) {
     function bricks_sire_insights_date_where_sql($column, $date_ymd, &$params) {
         $params[] = $date_ymd;
         $params[] = convert_date_format($date_ymd, 'd-m-Y');
-        return "($column = %s OR $column = %s)";
+        $params[] = $date_ymd;
+        $params[] = $date_ymd;
+        return "($column = %s OR $column = %s OR DATE($column) = %s OR DATE(STR_TO_DATE($column, '%d-%m-%Y')) = %s)";
     }
 }
 
 if (!function_exists('bricks_sire_insights_get_filter_options')) {
     function bricks_sire_insights_get_filter_options() {
         global $wpdb;
+        $table = bricks_sire_insights_resolve_table();
 
-        if (!bricks_sire_insights_table_exists()) {
-            wp_send_json_error(['message' => 'daily_sires_insights table not found']);
+        if ($table === '') {
+            wp_send_json_error(['message' => 'Sire insights table not found']);
             return;
         }
 
@@ -120,7 +166,7 @@ if (!function_exists('bricks_sire_insights_get_filter_options')) {
             return;
         }
         $date = bricks_sire_insights_parse_date_for_query($_POST['date'] ?? '');
-        $cache_key = bricks_cache_key('sire_filters', [$date]);
+        $cache_key = bricks_cache_key('sire_filters', [$table, $date]);
         $cached = get_transient($cache_key);
         if ($cached !== false && is_array($cached)) {
             wp_send_json($cached);
@@ -130,13 +176,13 @@ if (!function_exists('bricks_sire_insights_get_filter_options')) {
         $params = [];
         $where = bricks_sire_insights_date_where_sql('`' . esc_sql($cfg['date_col']) . '`', $date, $params);
 
-        $fetch_distinct = function($column) use ($wpdb, $where, $params) {
+        $fetch_distinct = function($column) use ($wpdb, $where, $params, $table) {
             if (empty($column)) {
                 return [];
             }
             $safe_col = '`' . esc_sql($column) . '`';
             $sql = "SELECT DISTINCT $safe_col AS v
-                    FROM `daily_sires_insights`
+                    FROM `" . esc_sql($table) . "`
                     WHERE $where
                       AND $safe_col IS NOT NULL
                       AND $safe_col != ''
@@ -243,9 +289,10 @@ if (!function_exists('bricks_sire_insights_render_table_html')) {
 if (!function_exists('bricks_ajax_load_sire_insights_table')) {
     function bricks_ajax_load_sire_insights_table() {
         global $wpdb;
+        $table = bricks_sire_insights_resolve_table();
 
-        if (!bricks_sire_insights_table_exists()) {
-            echo '<div style="padding:16px;color:#991b1b;background:#fee2e2;border-radius:8px;">Sire insights table not found.</div>';
+        if ($table === '') {
+            echo '<div style="padding:16px;color:#991b1b;background:#fee2e2;border-radius:8px;">Sire insights table not found in this WordPress database connection.</div>';
             wp_die();
         }
 
@@ -305,7 +352,7 @@ if (!function_exists('bricks_ajax_load_sire_insights_table')) {
 
         $where_sql = !empty($where_parts) ? ('WHERE ' . implode(' AND ', $where_parts)) : '';
         $sql = "SELECT " . implode(', ', $select_parts) . "
-                FROM `daily_sires_insights`
+                FROM `" . esc_sql($table) . "`
                 $where_sql
                 ORDER BY `" . esc_sql($selected_sort_col) . "` $sort_direction
                 LIMIT 300";
@@ -321,7 +368,7 @@ add_action('wp_ajax_nopriv_load_sire_insights_table', 'bricks_ajax_load_sire_ins
 if (!function_exists('bricks_daily_sires_insights_shortcode')) {
     function bricks_daily_sires_insights_shortcode($atts = []) {
         if (!bricks_sire_insights_table_exists()) {
-            return '<div style="padding:16px;color:#991b1b;background:#fee2e2;border-radius:8px;">Sire insights data is not available yet.</div>';
+            return '<div style="padding:16px;color:#991b1b;background:#fee2e2;border-radius:8px;">Sire insights data table is not available on the current WP DB connection yet. If the table exists in another schema, copy/sync it into this site DB.</div>';
         }
 
         $default_date = date('Y-m-d');

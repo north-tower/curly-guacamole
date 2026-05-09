@@ -51,69 +51,75 @@ if (!function_exists('bricks_yw_fetch_rows')) {
     function bricks_yw_fetch_rows($limit = 12) {
         global $wpdb;
 
-        $table = '';
-        if (bricks_yw_table_exists('daily_comment_history')) {
-            $table = 'daily_comment_history';
-        } elseif (bricks_yw_table_exists('daily_race_comment_history')) {
-            $table = 'daily_race_comment_history';
+        $historic_runners = 'historic_runners_beta';
+        $historic_races = 'historic_races_beta';
+        if (!bricks_yw_table_exists($historic_runners) || !bricks_yw_table_exists($historic_races)) {
+            return ['rows' => [], 'error' => 'Historic results tables not found'];
         }
 
-        if ($table === '') {
-            return ['rows' => [], 'error' => 'No results table found'];
-        }
-
-        $cols = bricks_yw_table_columns($table);
-        $date_col = bricks_yw_pick_col($cols, ['meeting_date', 'date', 'race_date', 'Date']);
-        $horse_col = bricks_yw_pick_col($cols, ['name', 'horse_name', 'runner_name']);
-        $course_col = bricks_yw_pick_col($cols, ['course']);
-        $time_col = bricks_yw_pick_col($cols, ['scheduled_time', 'race_time', 'time']);
-        $sp_col = bricks_yw_pick_col($cols, ['starting_price', 'sp', 'forecast_price']);
-        $pos_col = bricks_yw_pick_col($cols, ['finish_position', 'position']);
-
-        if ($date_col === '' || $horse_col === '' || $pos_col === '') {
-            return ['rows' => [], 'error' => 'Required winner columns missing'];
-        }
-
-        $yesterday_ymd = gmdate('Y-m-d', strtotime('-1 day'));
-        $yesterday_dmy = convert_date_format($yesterday_ymd, 'd-m-Y');
-        $cache_key = bricks_cache_key('yesterday_winners', [$table, $yesterday_ymd, intval($limit)]);
+        $site_today = wp_date('Y-m-d', current_time('timestamp'));
+        $yesterday_ymd = wp_date('Y-m-d', strtotime('-1 day', strtotime($site_today)));
+        $cache_key = bricks_cache_key('yesterday_winners', [$historic_runners, $historic_races, $yesterday_ymd, intval($limit)]);
         $cached = get_transient($cache_key);
         if ($cached !== false && is_array($cached)) {
-            return ['rows' => $cached, 'error' => ''];
+            return ['rows' => $cached, 'error' => '', 'effective_date' => $yesterday_ymd, 'is_fallback' => false];
         }
 
-        $select = [];
-        $select[] = '`' . esc_sql($horse_col) . '` AS horse_name';
-        $select[] = $course_col !== '' ? '`' . esc_sql($course_col) . '` AS course_name' : "'' AS course_name";
-        $select[] = $time_col !== '' ? '`' . esc_sql($time_col) . '` AS race_time' : "'' AS race_time";
-        $select[] = $sp_col !== '' ? '`' . esc_sql($sp_col) . '` AS starting_price' : "'' AS starting_price";
-        $select[] = '`' . esc_sql($date_col) . '` AS meeting_date';
-
-        $date_expr = '`' . esc_sql($date_col) . '`';
-        $pos_expr = '`' . esc_sql($pos_col) . '`';
-        $sql = "SELECT " . implode(', ', $select) . "
-                FROM `" . esc_sql($table) . "`
-                WHERE (
-                    $date_expr = %s
-                    OR $date_expr = %s
-                    OR DATE($date_expr) = %s
-                    OR DATE(STR_TO_DATE($date_expr, '%d-%m-%Y')) = %s
-                )
+        $sql = "SELECT
+                    hrunb.name AS horse_name,
+                    hracb.course AS course_name,
+                    hrunb.starting_price AS starting_price,
+                    hracb.meeting_date AS meeting_date,
+                    '' AS race_time
+                FROM `" . esc_sql($historic_runners) . "` hrunb
+                INNER JOIN `" . esc_sql($historic_races) . "` hracb ON hracb.race_id = hrunb.race_id
+                WHERE hracb.meeting_date = %s
                   AND (
-                    $pos_expr = 1
-                    OR $pos_expr = '1'
-                    OR $pos_expr = '1.0'
-                    OR $pos_expr = '01'
-                    OR CAST($pos_expr AS UNSIGNED) = 1
-                    OR LOWER(TRIM($pos_expr)) IN ('1st', 'first')
-                )
-                ORDER BY " . ($time_col !== '' ? ("`" . esc_sql($time_col) . "` ASC, ") : '') . "`" . esc_sql($horse_col) . "` ASC
+                    hrunb.finish_position = 1
+                    OR hrunb.finish_position = '1'
+                    OR hrunb.finish_position = '1.0'
+                    OR hrunb.finish_position = '01'
+                    OR CAST(hrunb.finish_position AS UNSIGNED) = 1
+                    OR LOWER(TRIM(hrunb.finish_position)) IN ('1st', 'first')
+                  )
+                ORDER BY hracb.course ASC, hrunb.name ASC
                 LIMIT %d";
 
-        $rows = $wpdb->get_results($wpdb->prepare($sql, $yesterday_ymd, $yesterday_dmy, $yesterday_ymd, $yesterday_ymd, intval($limit)));
-        set_transient($cache_key, $rows, 10 * MINUTE_IN_SECONDS);
+        $rows = $wpdb->get_results($wpdb->prepare($sql, $yesterday_ymd, intval($limit)));
+        if (!empty($rows)) {
+            set_transient($cache_key, $rows, 10 * MINUTE_IN_SECONDS);
+            return ['rows' => $rows, 'error' => '', 'effective_date' => $yesterday_ymd, 'is_fallback' => false];
+        }
 
-        return ['rows' => $rows, 'error' => ''];
+        // Fallback: use most recent date in source table with winner rows.
+        $latest_date_sql = "SELECT hracb.meeting_date
+            FROM `" . esc_sql($historic_runners) . "` hrunb
+            INNER JOIN `" . esc_sql($historic_races) . "` hracb ON hracb.race_id = hrunb.race_id
+            WHERE (
+                hrunb.finish_position = 1
+                OR hrunb.finish_position = '1'
+                OR hrunb.finish_position = '1.0'
+                OR hrunb.finish_position = '01'
+                OR CAST(hrunb.finish_position AS UNSIGNED) = 1
+                OR LOWER(TRIM(hrunb.finish_position)) IN ('1st', 'first')
+            )
+            ORDER BY hracb.meeting_date DESC
+            LIMIT 1";
+        $latest_date = $wpdb->get_var($latest_date_sql);
+        if (empty($latest_date)) {
+            return ['rows' => [], 'error' => '', 'effective_date' => $yesterday_ymd, 'is_fallback' => false];
+        }
+
+        $fallback_cache_key = bricks_cache_key('yesterday_winners', [$historic_runners, $historic_races, 'latest', $latest_date, intval($limit)]);
+        $fallback_cached = get_transient($fallback_cache_key);
+        if ($fallback_cached !== false && is_array($fallback_cached)) {
+            return ['rows' => $fallback_cached, 'error' => '', 'effective_date' => $latest_date, 'is_fallback' => true];
+        }
+
+        $fallback_rows = $wpdb->get_results($wpdb->prepare($sql, $latest_date, intval($limit)));
+        set_transient($fallback_cache_key, $fallback_rows, 10 * MINUTE_IN_SECONDS);
+
+        return ['rows' => $fallback_rows, 'error' => '', 'effective_date' => $latest_date, 'is_fallback' => true];
     }
 }
 
@@ -131,14 +137,21 @@ if (!function_exists('bricks_yesterday_winners_shortcode')) {
 
         $result = bricks_yw_fetch_rows($limit);
         $rows = $result['rows'];
+        $effective_date = !empty($result['effective_date']) ? $result['effective_date'] : wp_date('Y-m-d', strtotime('-1 day', current_time('timestamp')));
+        $is_fallback = !empty($result['is_fallback']);
 
         ob_start();
         ?>
         <div class="yw-wrap">
             <div class="yw-head">
                 <h3><?php echo esc_html($title); ?></h3>
-                <span><?php echo esc_html(gmdate('d M Y', strtotime('-1 day'))); ?></span>
+                <span><?php echo esc_html(wp_date('d M Y', strtotime($effective_date))); ?></span>
             </div>
+            <?php if ($is_fallback): ?>
+                <div style="margin:0 0 10px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;padding:8px 10px;border-radius:8px;font-size:12px;">
+                    No settled winners found for yesterday. Showing latest available winner date instead.
+                </div>
+            <?php endif; ?>
 
             <?php if (!empty($result['error'])): ?>
                 <div class="yw-empty"><?php echo esc_html($result['error']); ?></div>

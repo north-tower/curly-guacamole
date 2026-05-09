@@ -42,6 +42,7 @@ require_once __DIR__ . '/inc/horse-history.php';
 require_once __DIR__ . '/inc/race-comments.php';
 require_once __DIR__ . '/inc/sire-insights.php';
 require_once __DIR__ . '/inc/yesterday-winners.php';
+require_once __DIR__ . '/inc/admin-pnl.php';
 
 
 /**

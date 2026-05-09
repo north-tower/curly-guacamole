@@ -183,6 +183,7 @@ if (!function_exists('bricks_tracker_should_load_frontend_assets')) {
                 '/my-tracker',
                 '/points-backtest',
                 '/daily_sires_insights',
+                '/admin-pnl',
                 '/race/',
                 '/horse-history/',
                 '/race-comments/',
@@ -203,6 +204,7 @@ if (!function_exists('bricks_tracker_should_load_frontend_assets')) {
                 'race_detail',
                 'points_backtest',
                 'daily_sires_insights',
+                'admin_pnl_dashboard',
             ]);
         }
 
@@ -533,6 +535,13 @@ function bricks_tracker_floating_quick_link() {
             title="Open Daily Sires Insights"
             style="display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:linear-gradient(135deg, #059669 0%, #047857 100%);color:#fff;font-weight:700;font-size:13px;text-decoration:none;box-shadow:0 8px 20px rgba(4,120,87,0.35);"
         >🧬 Daily Sires</a>
+        <?php if (current_user_can('manage_options')): ?>
+        <a
+            href="<?php echo esc_url(home_url('/admin-pnl/')); ?>"
+            title="Open Admin P&L"
+            style="display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);color:#fff;font-weight:700;font-size:13px;text-decoration:none;box-shadow:0 8px 20px rgba(185,28,28,0.35);"
+        >💷 Admin P&amp;L</a>
+        <?php endif; ?>
     </div>
     <?php
 }
