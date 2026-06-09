@@ -99,23 +99,41 @@ if (!function_exists('bricks_sire_insights_pick_column')) {
 if (!function_exists('bricks_sire_insights_config')) {
     function bricks_sire_insights_config() {
         $date_col = bricks_sire_insights_pick_column(['meeting_date', 'date', 'race_date', 'Date'], 'meeting_date');
+        $race_id_col = bricks_sire_insights_pick_column(['race_id']);
+        $runner_id_col = bricks_sire_insights_pick_column(['runner_id']);
+        $race_code_col = bricks_sire_insights_pick_column(['race_code']);
         $course_col = bricks_sire_insights_pick_column(['course']);
         $race_type_col = bricks_sire_insights_pick_column(['race_type', 'race_code']);
         $going_col = bricks_sire_insights_pick_column(['going']);
-        $distance_col = bricks_sire_insights_pick_column(['distance_band', 'distance', 'Distance']);
+        $distance_col = bricks_sire_insights_pick_column(['distance_furlongs', 'distance_band', 'distance', 'Distance']);
+        $age_col = bricks_sire_insights_pick_column(['age']);
+        $handicap_col = bricks_sire_insights_pick_column(['handicap']);
         $sire_col = bricks_sire_insights_pick_column(['sire_name', 'sire']);
-        $horse_col = bricks_sire_insights_pick_column(['name', 'horse_name', 'runner_name']);
-        $prb_col = bricks_sire_insights_pick_column(['mean_prb', 'prb', 'avg_prb']);
+        $horse_col = bricks_sire_insights_pick_column(['name', 'horse_name', 'runner_name', 'runner_id']);
+        $prb_col = bricks_sire_insights_pick_column(['rt_5Y_prb', 'rc_5Y_prb', 'mean_prb', 'prb', 'avg_prb']);
+        $rc_21d_prb_col = bricks_sire_insights_pick_column(['rc_21D_prb']);
+        $course_prb_col = bricks_sire_insights_pick_column(['rt_5Y_course_prb']);
+        $distance_prb_col = bricks_sire_insights_pick_column(['rt_5Y_distance_prb']);
+        $candd_prb_col = bricks_sire_insights_pick_column(['rt_5Y_candd_prb']);
 
         return [
             'date_col' => $date_col,
+            'race_id_col' => $race_id_col,
+            'runner_id_col' => $runner_id_col,
+            'race_code_col' => $race_code_col,
             'course_col' => $course_col,
             'race_type_col' => $race_type_col,
             'going_col' => $going_col,
             'distance_col' => $distance_col,
+            'age_col' => $age_col,
+            'handicap_col' => $handicap_col,
             'sire_col' => $sire_col,
             'horse_col' => $horse_col,
             'prb_col' => $prb_col,
+            'rc_21d_prb_col' => $rc_21d_prb_col,
+            'course_prb_col' => $course_prb_col,
+            'distance_prb_col' => $distance_prb_col,
+            'candd_prb_col' => $candd_prb_col,
         ];
     }
 }
@@ -124,7 +142,7 @@ if (!function_exists('bricks_sire_insights_parse_date_for_query')) {
     function bricks_sire_insights_parse_date_for_query($value) {
         $value = trim((string) $value);
         if ($value === '') {
-            return date('Y-m-d');
+            return wp_date('Y-m-d', current_time('timestamp'));
         }
 
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
@@ -136,7 +154,38 @@ if (!function_exists('bricks_sire_insights_parse_date_for_query')) {
             return gmdate('Y-m-d', $ts);
         }
 
-        return date('Y-m-d');
+        return wp_date('Y-m-d', current_time('timestamp'));
+    }
+}
+
+if (!function_exists('bricks_sire_insights_get_latest_date')) {
+    function bricks_sire_insights_get_latest_date($table = '', $date_col = '') {
+        global $wpdb;
+        $table = $table ?: bricks_sire_insights_resolve_table();
+        if ($table === '') {
+            return '';
+        }
+
+        if ($date_col === '') {
+            $cfg = bricks_sire_insights_config();
+            $date_col = $cfg['date_col'] ?? '';
+        }
+        if ($date_col === '') {
+            return '';
+        }
+
+        $safe_col = '`' . esc_sql($date_col) . '`';
+        $sql = "SELECT COALESCE(
+                    DATE($safe_col),
+                    DATE(STR_TO_DATE($safe_col, '%d-%m-%Y')),
+                    DATE(STR_TO_DATE($safe_col, '%d/%m/%Y'))
+                ) AS d
+                FROM `" . esc_sql($table) . "`
+                HAVING d IS NOT NULL
+                ORDER BY d DESC
+                LIMIT 1";
+        $latest = $wpdb->get_var($sql);
+        return is_string($latest) ? $latest : '';
     }
 }
 
@@ -144,9 +193,24 @@ if (!function_exists('bricks_sire_insights_date_where_sql')) {
     function bricks_sire_insights_date_where_sql($column, $date_ymd, &$params) {
         $params[] = $date_ymd;
         $params[] = convert_date_format($date_ymd, 'd-m-Y');
+        $params[] = str_replace('-', '/', convert_date_format($date_ymd, 'd-m-Y'));
         $params[] = $date_ymd;
         $params[] = $date_ymd;
-        return "($column = %s OR $column = %s OR DATE($column) = %s OR DATE(STR_TO_DATE($column, '%d-%m-%Y')) = %s)";
+        $params[] = $date_ymd;
+        return "($column = %s OR $column = %s OR $column = %s OR DATE($column) = %s OR DATE(STR_TO_DATE($column, '%d-%m-%Y')) = %s OR DATE(STR_TO_DATE($column, '%d/%m/%Y')) = %s)";
+    }
+}
+
+if (!function_exists('bricks_sire_insights_has_rows_for_date')) {
+    function bricks_sire_insights_has_rows_for_date($table, $date_col, $date_ymd) {
+        global $wpdb;
+        if ($table === '' || $date_col === '' || $date_ymd === '') {
+            return false;
+        }
+        $params = [];
+        $where = bricks_sire_insights_date_where_sql('`' . esc_sql($date_col) . '`', $date_ymd, $params);
+        $sql = "SELECT COUNT(*) FROM `" . esc_sql($table) . "` WHERE $where";
+        return intval($wpdb->get_var($wpdb->prepare($sql, ...$params))) > 0;
     }
 }
 
@@ -166,7 +230,16 @@ if (!function_exists('bricks_sire_insights_get_filter_options')) {
             return;
         }
         $date = bricks_sire_insights_parse_date_for_query($_POST['date'] ?? '');
-        $cache_key = bricks_cache_key('sire_filters', [$table, $date]);
+        $effective_date = $date;
+        $use_date_scope = bricks_sire_insights_has_rows_for_date($table, $cfg['date_col'], $date);
+        if (!$use_date_scope) {
+            $latest = bricks_sire_insights_get_latest_date($table, $cfg['date_col']);
+            if ($latest !== '') {
+                $effective_date = $latest;
+                $use_date_scope = bricks_sire_insights_has_rows_for_date($table, $cfg['date_col'], $effective_date);
+            }
+        }
+        $cache_key = bricks_cache_key('sire_filters', [$table, $effective_date, $use_date_scope ? 'date' : 'all']);
         $cached = get_transient($cache_key);
         if ($cached !== false && is_array($cached)) {
             wp_send_json($cached);
@@ -174,7 +247,10 @@ if (!function_exists('bricks_sire_insights_get_filter_options')) {
         }
 
         $params = [];
-        $where = bricks_sire_insights_date_where_sql('`' . esc_sql($cfg['date_col']) . '`', $date, $params);
+        $where = '1=1';
+        if ($use_date_scope) {
+            $where = bricks_sire_insights_date_where_sql('`' . esc_sql($cfg['date_col']) . '`', $effective_date, $params);
+        }
 
         $fetch_distinct = function($column) use ($wpdb, $where, $params, $table) {
             if (empty($column)) {
@@ -191,6 +267,8 @@ if (!function_exists('bricks_sire_insights_get_filter_options')) {
         };
 
         $payload = [
+            'effective_date' => $effective_date,
+            'use_date_scope' => $use_date_scope,
             'courses' => $fetch_distinct($cfg['course_col']),
             'race_types' => $fetch_distinct($cfg['race_type_col']),
             'goings' => $fetch_distinct($cfg['going_col']),
@@ -224,27 +302,65 @@ if (!function_exists('bricks_sire_insights_badge')) {
     }
 }
 
+if (!function_exists('bricks_sire_insights_render_pagination')) {
+    function bricks_sire_insights_render_pagination($current_page, $total_pages) {
+        $current_page = max(1, intval($current_page));
+        $total_pages = max(1, intval($total_pages));
+        if ($total_pages <= 1) {
+            return '';
+        }
+
+        $start = max(1, $current_page - 2);
+        $end = min($total_pages, $current_page + 2);
+        ob_start();
+        ?>
+        <div class="sire-pagination-wrapper" style="margin-top:12px;text-align:center;">
+            <?php if ($current_page > 1): ?>
+                <a class="sire-pagination-btn" href="#" data-page="<?php echo esc_attr($current_page - 1); ?>">&laquo; Prev</a>
+            <?php endif; ?>
+            <?php for ($i = $start; $i <= $end; $i++): ?>
+                <a class="sire-pagination-btn<?php echo $i === $current_page ? ' sire-pagination-btn-active' : ''; ?>" href="#" data-page="<?php echo esc_attr($i); ?>"><?php echo esc_html($i); ?></a>
+            <?php endfor; ?>
+            <?php if ($current_page < $total_pages): ?>
+                <a class="sire-pagination-btn" href="#" data-page="<?php echo esc_attr($current_page + 1); ?>">Next &raquo;</a>
+            <?php endif; ?>
+        </div>
+        <?php
+        return ob_get_clean();
+    }
+}
+
 if (!function_exists('bricks_sire_insights_render_table_html')) {
-    function bricks_sire_insights_render_table_html($rows) {
+    function bricks_sire_insights_render_table_html($rows, $meta = []) {
+        $current_page = intval($meta['page'] ?? 1);
+        $total_pages = intval($meta['total_pages'] ?? 1);
+        $total_rows = intval($meta['total_rows'] ?? count((array) $rows));
         ob_start();
         ?>
         <div class="sire-insights-table-wrap">
             <table class="sire-insights-table">
                 <thead>
                     <tr>
-                        <th class="sortable-sire" data-sort="horse_name">Horse <span class="sort-indicator"></span></th>
+                        <th class="sortable-sire" data-sort="race_id">Race ID <span class="sort-indicator"></span></th>
+                        <th class="sortable-sire" data-sort="runner_id">Runner ID <span class="sort-indicator"></span></th>
                         <th class="sortable-sire" data-sort="sire_name">Sire <span class="sort-indicator"></span></th>
                         <th class="sortable-sire" data-sort="course">Course <span class="sort-indicator"></span></th>
+                        <th class="sortable-sire" data-sort="race_code">Code <span class="sort-indicator"></span></th>
                         <th class="sortable-sire" data-sort="race_type">Type <span class="sort-indicator"></span></th>
-                        <th class="sortable-sire" data-sort="going">Going <span class="sort-indicator"></span></th>
-                        <th class="sortable-sire" data-sort="distance_band">Distance <span class="sort-indicator"></span></th>
-                        <th class="sortable-sire ta-right" data-sort="mean_prb">Mean PRB <span class="sort-indicator"></span></th>
+                        <th class="sortable-sire" data-sort="distance_band">Dist (f) <span class="sort-indicator"></span></th>
+                        <th class="sortable-sire" data-sort="age">Age <span class="sort-indicator"></span></th>
+                        <th class="sortable-sire" data-sort="handicap">Hcap <span class="sort-indicator"></span></th>
+                        <th class="sortable-sire ta-right" data-sort="mean_prb">RT 5Y PRB <span class="sort-indicator"></span></th>
+                        <th class="sortable-sire ta-right" data-sort="rc_21d_prb">RC 21D PRB <span class="sort-indicator"></span></th>
+                        <th class="sortable-sire ta-right" data-sort="course_prb">Course PRB <span class="sort-indicator"></span></th>
+                        <th class="sortable-sire ta-right" data-sort="distance_prb">Dist PRB <span class="sort-indicator"></span></th>
+                        <th class="sortable-sire ta-right" data-sort="candd_prb">C&D PRB <span class="sort-indicator"></span></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($rows)): ?>
                         <tr>
-                            <td colspan="7" class="sire-empty-cell">No sire insights found for current filters.</td>
+                            <td colspan="15" class="sire-empty-cell">No sire insights found for current filters.</td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($rows as $row): ?>
@@ -262,12 +378,15 @@ if (!function_exists('bricks_sire_insights_render_table_html')) {
                             }
                             ?>
                             <tr>
-                                <td class="horse-name"><?php echo esc_html($row->horse_name ?? '-'); ?></td>
+                                <td><?php echo esc_html($row->race_id ?? '-'); ?></td>
+                                <td class="horse-name"><?php echo esc_html($row->runner_id ?? '-'); ?></td>
                                 <td class="sire-name"><?php echo esc_html($row->sire_name ?? '-'); ?></td>
                                 <td><?php echo bricks_sire_insights_badge($row->course ?? '', 'blue'); ?></td>
+                                <td><?php echo bricks_sire_insights_badge($row->race_code ?? '', 'slate'); ?></td>
                                 <td><?php echo bricks_sire_insights_badge($row->race_type ?? '', 'violet'); ?></td>
-                                <td><?php echo bricks_sire_insights_badge($row->going ?? '', 'emerald'); ?></td>
-                                <td><?php echo bricks_sire_insights_badge($row->distance_band ?? '', 'amber'); ?></td>
+                                <td><?php echo esc_html($row->distance_band ?? '-'); ?></td>
+                                <td><?php echo esc_html($row->age ?? '-'); ?></td>
+                                <td><?php echo esc_html(isset($row->handicap) ? intval($row->handicap) : '-'); ?></td>
                                 <td class="ta-right">
                                     <?php if ($prb === null): ?>
                                         <span class="prb-score prb-neutral">-</span>
@@ -275,12 +394,20 @@ if (!function_exists('bricks_sire_insights_render_table_html')) {
                                         <span class="prb-score <?php echo esc_attr($prb_class); ?>"><?php echo esc_html(number_format($prb, 1)); ?></span>
                                     <?php endif; ?>
                                 </td>
+                                <td class="ta-right"><?php echo esc_html($row->rc_21d_prb !== null ? number_format((float) $row->rc_21d_prb, 1) : '-'); ?></td>
+                                <td class="ta-right"><?php echo esc_html($row->course_prb !== null ? number_format((float) $row->course_prb, 1) : '-'); ?></td>
+                                <td class="ta-right"><?php echo esc_html($row->distance_prb !== null ? number_format((float) $row->distance_prb, 1) : '-'); ?></td>
+                                <td class="ta-right"><?php echo esc_html($row->candd_prb !== null ? number_format((float) $row->candd_prb, 1) : '-'); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </tbody>
             </table>
         </div>
+        <?php if (!empty($rows)): ?>
+            <div style="margin-top:8px;font-size:12px;color:#6b7280;">Showing <?php echo esc_html(count($rows)); ?> of <?php echo esc_html($total_rows); ?> rows</div>
+            <?php echo bricks_sire_insights_render_pagination($current_page, $total_pages); ?>
+        <?php endif; ?>
         <?php
         return ob_get_clean();
     }
@@ -302,6 +429,15 @@ if (!function_exists('bricks_ajax_load_sire_insights_table')) {
             wp_die();
         }
         $date = bricks_sire_insights_parse_date_for_query($_POST['date'] ?? '');
+        $effective_date = $date;
+        $use_date_scope = bricks_sire_insights_has_rows_for_date($table, $cfg['date_col'], $date);
+        if (!$use_date_scope) {
+            $latest = bricks_sire_insights_get_latest_date($table, $cfg['date_col']);
+            if ($latest !== '') {
+                $effective_date = $latest;
+                $use_date_scope = bricks_sire_insights_has_rows_for_date($table, $cfg['date_col'], $effective_date);
+            }
+        }
         $course = sanitize_text_field($_POST['course'] ?? '');
         $race_type = sanitize_text_field($_POST['race_type'] ?? '');
         $going = sanitize_text_field($_POST['going'] ?? '');
@@ -309,10 +445,14 @@ if (!function_exists('bricks_ajax_load_sire_insights_table')) {
         $sire = sanitize_text_field($_POST['sire'] ?? '');
         $sort_column = sanitize_text_field($_POST['sort_column'] ?? 'mean_prb');
         $sort_direction = strtolower(sanitize_text_field($_POST['sort_direction'] ?? 'desc')) === 'asc' ? 'ASC' : 'DESC';
+        $page = max(1, intval($_POST['page'] ?? 1));
+        $per_page = max(10, min(200, intval($_POST['per_page'] ?? 50)));
 
         $where_parts = [];
         $params = [];
-        $where_parts[] = bricks_sire_insights_date_where_sql('`' . esc_sql($cfg['date_col']) . '`', $date, $params);
+        if ($use_date_scope) {
+            $where_parts[] = bricks_sire_insights_date_where_sql('`' . esc_sql($cfg['date_col']) . '`', $effective_date, $params);
+        }
 
         $maybe_add_filter = function($value, $column) use (&$where_parts, &$params, $wpdb) {
             if ($value === '' || $column === '') {
@@ -328,13 +468,22 @@ if (!function_exists('bricks_ajax_load_sire_insights_table')) {
         $maybe_add_filter($sire, $cfg['sire_col']);
 
         $sortable_map = [
+            'race_id' => $cfg['race_id_col'],
+            'runner_id' => $cfg['runner_id_col'],
             'horse_name' => $cfg['horse_col'],
             'sire_name' => $cfg['sire_col'],
             'course' => $cfg['course_col'],
+            'race_code' => $cfg['race_code_col'],
             'race_type' => $cfg['race_type_col'],
             'going' => $cfg['going_col'],
             'distance_band' => $cfg['distance_col'],
+            'age' => $cfg['age_col'],
+            'handicap' => $cfg['handicap_col'],
             'mean_prb' => $cfg['prb_col'],
+            'rc_21d_prb' => $cfg['rc_21d_prb_col'],
+            'course_prb' => $cfg['course_prb_col'],
+            'distance_prb' => $cfg['distance_prb_col'],
+            'candd_prb' => $cfg['candd_prb_col'],
         ];
         $selected_sort_col = $sortable_map[$sort_column] ?? $cfg['prb_col'];
         if ($selected_sort_col === '') {
@@ -342,23 +491,72 @@ if (!function_exists('bricks_ajax_load_sire_insights_table')) {
         }
 
         $select_parts = [];
+        $select_parts[] = !empty($cfg['race_id_col']) ? '`' . esc_sql($cfg['race_id_col']) . '` AS race_id' : "NULL AS race_id";
+        $select_parts[] = !empty($cfg['runner_id_col']) ? '`' . esc_sql($cfg['runner_id_col']) . '` AS runner_id' : "NULL AS runner_id";
         $select_parts[] = !empty($cfg['horse_col']) ? '`' . esc_sql($cfg['horse_col']) . '` AS horse_name' : "'' AS horse_name";
         $select_parts[] = !empty($cfg['sire_col']) ? '`' . esc_sql($cfg['sire_col']) . '` AS sire_name' : "'' AS sire_name";
         $select_parts[] = !empty($cfg['course_col']) ? '`' . esc_sql($cfg['course_col']) . '` AS course' : "'' AS course";
+        $select_parts[] = !empty($cfg['race_code_col']) ? '`' . esc_sql($cfg['race_code_col']) . '` AS race_code' : "'' AS race_code";
         $select_parts[] = !empty($cfg['race_type_col']) ? '`' . esc_sql($cfg['race_type_col']) . '` AS race_type' : "'' AS race_type";
         $select_parts[] = !empty($cfg['going_col']) ? '`' . esc_sql($cfg['going_col']) . '` AS going' : "'' AS going";
         $select_parts[] = !empty($cfg['distance_col']) ? '`' . esc_sql($cfg['distance_col']) . '` AS distance_band' : "'' AS distance_band";
+        $select_parts[] = !empty($cfg['age_col']) ? '`' . esc_sql($cfg['age_col']) . '` AS age' : "NULL AS age";
+        $select_parts[] = !empty($cfg['handicap_col']) ? '`' . esc_sql($cfg['handicap_col']) . '` AS handicap' : "NULL AS handicap";
         $select_parts[] = !empty($cfg['prb_col']) ? '`' . esc_sql($cfg['prb_col']) . '` AS mean_prb' : "NULL AS mean_prb";
+        $select_parts[] = !empty($cfg['rc_21d_prb_col']) ? '`' . esc_sql($cfg['rc_21d_prb_col']) . '` AS rc_21d_prb' : "NULL AS rc_21d_prb";
+        $select_parts[] = !empty($cfg['course_prb_col']) ? '`' . esc_sql($cfg['course_prb_col']) . '` AS course_prb' : "NULL AS course_prb";
+        $select_parts[] = !empty($cfg['distance_prb_col']) ? '`' . esc_sql($cfg['distance_prb_col']) . '` AS distance_prb' : "NULL AS distance_prb";
+        $select_parts[] = !empty($cfg['candd_prb_col']) ? '`' . esc_sql($cfg['candd_prb_col']) . '` AS candd_prb' : "NULL AS candd_prb";
 
         $where_sql = !empty($where_parts) ? ('WHERE ' . implode(' AND ', $where_parts)) : '';
+        $count_sql = "SELECT COUNT(*) FROM `" . esc_sql($table) . "` $where_sql";
+        $total_rows = intval($wpdb->get_var($wpdb->prepare($count_sql, ...$params)));
+        $total_pages = max(1, (int) ceil($total_rows / $per_page));
+        $page = min($page, $total_pages);
+        $offset = ($page - 1) * $per_page;
         $sql = "SELECT " . implode(', ', $select_parts) . "
                 FROM `" . esc_sql($table) . "`
                 $where_sql
                 ORDER BY `" . esc_sql($selected_sort_col) . "` $sort_direction
-                LIMIT 300";
+                LIMIT %d OFFSET %d";
 
-        $rows = $wpdb->get_results($wpdb->prepare($sql, ...$params));
-        echo bricks_sire_insights_render_table_html($rows);
+        $rows = $wpdb->get_results($wpdb->prepare($sql, ...array_merge($params, [$per_page, $offset])));
+        if (empty($rows) && $use_date_scope) {
+            // Last-resort fallback: ignore date and return matching filtered rows.
+            $fallback_where_parts = [];
+            $fallback_params = [];
+            $fallback_add_filter = function($value, $column) use (&$fallback_where_parts, &$fallback_params, $wpdb) {
+                if ($value === '' || $column === '') {
+                    return;
+                }
+                $fallback_where_parts[] = '`' . esc_sql($column) . '` = %s';
+                $fallback_params[] = $value;
+            };
+            $fallback_add_filter($course, $cfg['course_col']);
+            $fallback_add_filter($race_type, $cfg['race_type_col']);
+            $fallback_add_filter($going, $cfg['going_col']);
+            $fallback_add_filter($distance_band, $cfg['distance_col']);
+            $fallback_add_filter($sire, $cfg['sire_col']);
+            $fallback_where_sql = !empty($fallback_where_parts) ? ('WHERE ' . implode(' AND ', $fallback_where_parts)) : '';
+            $fallback_count_sql = "SELECT COUNT(*) FROM `" . esc_sql($table) . "` $fallback_where_sql";
+            $fallback_total_rows = intval($wpdb->get_var($wpdb->prepare($fallback_count_sql, ...$fallback_params)));
+            $total_rows = $fallback_total_rows;
+            $total_pages = max(1, (int) ceil($total_rows / $per_page));
+            $page = min($page, $total_pages);
+            $offset = ($page - 1) * $per_page;
+
+            $fallback_sql = "SELECT " . implode(', ', $select_parts) . "
+                    FROM `" . esc_sql($table) . "`
+                    $fallback_where_sql
+                    ORDER BY `" . esc_sql($selected_sort_col) . "` $sort_direction
+                    LIMIT %d OFFSET %d";
+            $rows = $wpdb->get_results($wpdb->prepare($fallback_sql, ...array_merge($fallback_params, [$per_page, $offset])));
+        }
+        echo bricks_sire_insights_render_table_html($rows, [
+            'page' => $page,
+            'total_pages' => $total_pages,
+            'total_rows' => $total_rows,
+        ]);
         wp_die();
     }
 }
@@ -371,7 +569,10 @@ if (!function_exists('bricks_daily_sires_insights_shortcode')) {
             return '<div style="padding:16px;color:#991b1b;background:#fee2e2;border-radius:8px;">Sire insights data table is not available on the current WP DB connection yet. If the table exists in another schema, copy/sync it into this site DB.</div>';
         }
 
-        $default_date = date('Y-m-d');
+        $default_date = bricks_sire_insights_get_latest_date();
+        if ($default_date === '') {
+            $default_date = wp_date('Y-m-d', current_time('timestamp'));
+        }
         ob_start();
         ?>
         <div class="daily-sires-insights-wrapper">

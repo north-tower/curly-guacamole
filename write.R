@@ -41,6 +41,22 @@ routine_exists <- dbGetQuery(
    FROM information_schema.ROUTINES
    WHERE ROUTINE_SCHEMA = 'coolwed1_wp364'
      AND ROUTINE_TYPE = 'PROCEDURE'
+     AND ROUTINE_NAME = 'points_published_picks_daily_UPDATE'"
+)
+
+if (nrow(routine_exists) > 0 && as.integer(routine_exists$cnt[1]) > 0) {
+  print("Calling points_published_picks_daily_UPDATE procedure")
+  dbExecute(smartformDB, "CALL `coolwed1_wp364`.`points_published_picks_daily_UPDATE`()")
+} else {
+  print("points_published_picks_daily_UPDATE not found in coolwed1_wp364, skipped")
+}
+
+routine_exists <- dbGetQuery(
+  smartformDB,
+  "SELECT COUNT(*) AS cnt
+   FROM information_schema.ROUTINES
+   WHERE ROUTINE_SCHEMA = 'coolwed1_wp364'
+     AND ROUTINE_TYPE = 'PROCEDURE'
      AND ROUTINE_NAME = 'daily_sires_insights_UPDATE'"
 )
 

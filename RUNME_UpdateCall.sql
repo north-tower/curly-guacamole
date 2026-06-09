@@ -67,6 +67,19 @@ IF EXISTS (
   FROM information_schema.ROUTINES
   WHERE ROUTINE_SCHEMA = DATABASE()
     AND ROUTINE_TYPE = 'PROCEDURE'
+    AND ROUTINE_NAME = 'points_published_picks_daily_UPDATE'
+) THEN
+  CALL `points_published_picks_daily_UPDATE`();
+  SELECT CONCAT('points_published_picks_daily_UPDATE completed at ', NOW()) AS status;
+ELSE
+  SELECT CONCAT('points_published_picks_daily_UPDATE not found in ', DATABASE(), ', skipped at ', NOW()) AS status;
+END IF;
+
+IF EXISTS (
+  SELECT 1
+  FROM information_schema.ROUTINES
+  WHERE ROUTINE_SCHEMA = DATABASE()
+    AND ROUTINE_TYPE = 'PROCEDURE'
     AND ROUTINE_NAME = 'daily_sires_insights_UPDATE'
 ) THEN
   CALL `daily_sires_insights_UPDATE`();

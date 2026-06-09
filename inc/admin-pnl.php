@@ -103,107 +103,79 @@ if (!function_exists('bricks_admin_pnl_calculate')) {
             $field_size = count($race_rows);
             if ($field_size < 2) continue;
 
-            $scored = [];
-            foreach ($race_rows as $idx => $rr) {
-                $speed_data = (object) [
-                    'fhorsite_rating' => (isset($rr->speed_rating) && is_numeric($rr->speed_rating)) ? $rr->speed_rating : null,
-                    'fhorsite_rating_reliability' => 60,
-                    'SR_LTO' => (isset($rr->wt_speed_rating) && is_numeric($rr->wt_speed_rating)) ? $rr->wt_speed_rating : null,
-                    'days_since_ran' => (isset($rr->days_since_ran) && is_numeric($rr->days_since_ran)) ? $rr->days_since_ran : null,
-                    'draw_bias_pct' => (isset($rr->draw_bias_pct) && is_numeric($rr->draw_bias_pct)) ? $rr->draw_bias_pct : null,
-                    'class_diff' => (isset($rr->class_diff) && is_numeric($rr->class_diff)) ? $rr->class_diff : null,
-                    'official_rating_diff' => (isset($rr->official_rating_diff) && is_numeric($rr->official_rating_diff)) ? $rr->official_rating_diff : null,
-                    'course_winner' => (isset($rr->course_winner) && is_numeric($rr->course_winner)) ? $rr->course_winner : null,
-                    'distance_winner' => (isset($rr->distance_winner) && is_numeric($rr->distance_winner)) ? $rr->distance_winner : null,
-                    'candd_winner' => (isset($rr->candd_winner) && is_numeric($rr->candd_winner)) ? $rr->candd_winner : null,
-                    'going_prev_wins' => (isset($rr->going_prev_wins) && is_numeric($rr->going_prev_wins)) ? $rr->going_prev_wins : null,
-                    'beaten_favourite' => (isset($rr->beaten_favourite) && is_numeric($rr->beaten_favourite)) ? $rr->beaten_favourite : null,
-                    'TnrWinPct14d' => (isset($rr->TnrWinPct14d) && is_numeric($rr->TnrWinPct14d)) ? $rr->TnrWinPct14d : null,
-                    'TnrJkyPlacePct' => (isset($rr->TnrJkyPlacePct) && is_numeric($rr->TnrJkyPlacePct)) ? $rr->TnrJkyPlacePct : null,
-                    'forecast_price_decimal' => (isset($rr->forecast_price_decimal) && is_numeric($rr->forecast_price_decimal)) ? $rr->forecast_price_decimal : null,
-                    'forecast_price' => isset($rr->starting_price) ? $rr->starting_price : ''
-                ];
-
-                $pts = bricks_points_score_runner($rr, $speed_data, ['is_flat' => true]);
-                $odds_decimal = bricks_points_parse_decimal_odds($speed_data->forecast_price_decimal, $speed_data->forecast_price);
-                $scored[] = [
-                    'runner_key' => $idx,
-                    'horse_name' => (string) ($rr->horse_name ?? ''),
-                    'model_score' => floatval($pts['score'] ?? 0),
-                    'market_prob' => bricks_points_market_implied_rank($odds_decimal),
-                    'market_rank' => 0,
-                    'model_rank' => 0,
-                    'edge_score' => 0,
-                    'odds_decimal' => $odds_decimal,
-                    'finish_position' => intval($rr->finish_position ?? 999),
-                ];
+            if (!function_exists('bricks_points_backtest_score_race')) {
+                continue;
             }
+            $scored = bricks_points_backtest_score_race($race_rows);
 
-            usort($scored, function($a, $b){ return $b['model_score'] <=> $a['model_score']; });
-            $rank = 1;
-            foreach ($scored as &$sr) { $sr['model_rank'] = $rank++; }
-            unset($sr);
-
-            $market_sorted = $scored;
-            usort($market_sorted, function($a, $b){ return ($b['market_prob'] ?? 0) <=> ($a['market_prob'] ?? 0); });
-            $mk = 1; $mk_map = [];
-            foreach ($market_sorted as $mr) {
-                if (($mr['market_prob'] ?? 0) > 0) $mk_map[$mr['runner_key']] = $mk++;
-            }
-            foreach ($scored as &$sr) {
-                $sr['market_rank'] = $mk_map[$sr['runner_key']] ?? 0;
-                $rank_edge = ($sr['market_rank'] > 0) ? ($sr['market_rank'] - $sr['model_rank']) : 0;
-                $score_edge = max(0.0, (floatval($sr['model_score']) - 55.0) * 0.20);
-                $sr['edge_score'] = round(($rank_edge * 4.0) + $score_edge, 2);
-            }
-            unset($sr);
+            $pnl_odds = function($pick) {
+                if (!$pick) {
+                    return null;
+                }
+                $settle = $pick['settlement_odds_decimal'] ?? null;
+                if ($settle !== null && floatval($settle) > 1) {
+                    return floatval($settle);
+                }
+                $pre = $pick['odds_decimal'] ?? null;
+                return ($pre !== null && floatval($pre) > 1) ? floatval($pre) : null;
+            };
 
             $picks = bricks_points_pick_winner_place($scored);
             $ew_simple = bricks_points_pick_each_way_simple($scored);
             $ew_edge = bricks_points_pick_each_way_edge($scored);
             $place_terms = bricks_admin_pnl_place_terms($field_size, $manual_places);
 
-            $settle_win = function($pick) use (&$stats, $win_stake) {
-                if (!$pick || !isset($pick['odds_decimal']) || floatval($pick['odds_decimal']) <= 1 || $win_stake <= 0) return;
-                $is_win = intval($pick['finish_position'] ?? 999) === 1;
+            $settle_win = function($pick) use (&$stats, $win_stake, $pnl_odds) {
+                $odds = $pnl_odds($pick);
+                if (!$pick || $odds === null || $win_stake <= 0) return;
+                $is_win = function_exists('bricks_points_finish_is_win')
+                    ? bricks_points_finish_is_win($pick['finish_position'] ?? '')
+                    : (intval($pick['finish_position'] ?? 999) === 1);
                 $stats['win']['selections'] += 1;
                 $stats['win']['staked_pts'] += $win_stake;
-                $stats['win']['returns_pts'] += $is_win ? ($win_stake * floatval($pick['odds_decimal'])) : 0.0;
+                $stats['win']['returns_pts'] += $is_win ? ($win_stake * $odds) : 0.0;
                 if ($is_win) {
                     $stats['win']['hits'] += 1;
                     $stats['win']['win_hits'] += 1;
                 }
             };
 
-            $settle_place = function($pick) use (&$stats, $place_stake, $place_terms, $ew_fraction) {
-                if (!$pick || !isset($pick['odds_decimal']) || floatval($pick['odds_decimal']) <= 1 || $place_stake <= 0) return;
-                $placed = intval($pick['finish_position'] ?? 999) <= $place_terms;
+            $settle_place = function($pick) use (&$stats, $place_stake, $place_terms, $ew_fraction, $pnl_odds) {
+                $odds = $pnl_odds($pick);
+                if (!$pick || $odds === null || $place_stake <= 0) return;
+                $placed = function_exists('bricks_points_finish_is_placed')
+                    ? bricks_points_finish_is_placed($pick['finish_position'] ?? '', $place_terms)
+                    : (intval($pick['finish_position'] ?? 999) <= $place_terms);
                 $stats['place']['selections'] += 1;
                 $stats['place']['staked_pts'] += $place_stake;
                 if ($placed) {
-                    $place_odds = 1.0 + ((floatval($pick['odds_decimal']) - 1.0) * $ew_fraction);
+                    $place_odds = 1.0 + (($odds - 1.0) * $ew_fraction);
                     $stats['place']['returns_pts'] += $place_stake * $place_odds;
                     $stats['place']['hits'] += 1;
                     $stats['place']['place_hits'] += 1;
                 }
             };
 
-            $settle_ew = function($pick, $key) use (&$stats, $ew_win_stake, $ew_place_stake, $place_terms, $ew_fraction) {
-                if (!$pick || !isset($pick['odds_decimal']) || floatval($pick['odds_decimal']) <= 1) return;
+            $settle_ew = function($pick, $key) use (&$stats, $ew_win_stake, $ew_place_stake, $place_terms, $ew_fraction, $pnl_odds) {
+                $odds = $pnl_odds($pick);
+                if (!$pick || $odds === null) return;
                 if (($ew_win_stake + $ew_place_stake) <= 0) return;
-                $finish = intval($pick['finish_position'] ?? 999);
-                $is_win = ($finish === 1);
-                $placed = ($finish <= $place_terms);
+                $is_win = function_exists('bricks_points_finish_is_win')
+                    ? bricks_points_finish_is_win($pick['finish_position'] ?? '')
+                    : (intval($pick['finish_position'] ?? 999) === 1);
+                $placed = function_exists('bricks_points_finish_is_placed')
+                    ? bricks_points_finish_is_placed($pick['finish_position'] ?? '', $place_terms)
+                    : (intval($pick['finish_position'] ?? 999) <= $place_terms);
 
                 $stats[$key]['selections'] += 1;
                 $stats[$key]['staked_pts'] += ($ew_win_stake + $ew_place_stake);
 
                 if ($is_win && $ew_win_stake > 0) {
-                    $stats[$key]['returns_pts'] += $ew_win_stake * floatval($pick['odds_decimal']);
+                    $stats[$key]['returns_pts'] += $ew_win_stake * $odds;
                     $stats[$key]['win_hits'] += 1;
                 }
                 if ($placed && $ew_place_stake > 0) {
-                    $place_odds = 1.0 + ((floatval($pick['odds_decimal']) - 1.0) * $ew_fraction);
+                    $place_odds = 1.0 + (($odds - 1.0) * $ew_fraction);
                     $stats[$key]['returns_pts'] += $ew_place_stake * $place_odds;
                     $stats[$key]['place_hits'] += 1;
                 }

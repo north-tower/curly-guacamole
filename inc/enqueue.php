@@ -118,9 +118,13 @@ function bricks_sire_insights_enqueue_scripts() {
     }
 
     $localize_handle = wp_script_is('sire-insights-ajax', 'enqueued') ? 'sire-insights-ajax' : 'jquery';
+    $default_date = function_exists('bricks_sire_insights_get_latest_date') ? bricks_sire_insights_get_latest_date() : '';
+    if ($default_date === '') {
+        $default_date = wp_date('Y-m-d', current_time('timestamp'));
+    }
     wp_localize_script($localize_handle, 'sire_insights_ajax_obj', [
         'ajax_url' => admin_url('admin-ajax.php'),
-        'default_date' => date('Y-m-d'),
+        'default_date' => $default_date,
     ]);
 }
 add_action('wp_enqueue_scripts', 'bricks_sire_insights_enqueue_scripts');

@@ -31,23 +31,42 @@ function bricks_my_tracker_template_redirect() {
         return;
     }
 
-    // Render points backtest in an isolated template to avoid third-party theme JS crashes.
+    // Points backtest + Admin P&L: same theme shell as My Tracker (header/footer). Admins only.
     if ($is_backtest_qv || $is_backtest_uri || $is_admin_pnl_qv || $is_admin_pnl_uri) {
-        if (($is_admin_pnl_qv || $is_admin_pnl_uri) && (!is_user_logged_in() || !current_user_can('manage_options'))) {
+        if (!bricks_user_can_access_points_backtest()) {
+            $page_title = ($is_admin_pnl_qv || $is_admin_pnl_uri) ? 'Admin P&amp;L' : 'Points Backtest';
             status_header(403);
             nocache_headers();
-            echo '<!doctype html><html ' . get_language_attributes() . '><head><meta charset="' . esc_attr(get_bloginfo('charset')) . '"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . esc_html(get_bloginfo('name') . ' - Admin P&L') . '</title></head><body style="margin:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;"><main style="max-width:980px;margin:0 auto;padding:28px 12px;"><div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;"><h1 style="margin:0 0 8px;font-size:24px;color:#111827;">Admin P&amp;L</h1><p style="margin:0;color:#6b7280;">This page is available to admins only.</p></div></main></body></html>';
+            ob_start();
+            get_header();
+            $header = ob_get_clean();
+            ob_start();
+            get_footer();
+            $footer = ob_get_clean();
+            echo $header;
+            echo '<main class="main-content"><div class="content-container">';
+            echo '<div style="max-width:760px;margin:24px auto;padding:24px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;">';
+            echo '<h1 style="margin:0 0 8px;font-size:24px;color:#111827;">' . $page_title . '</h1>';
+            echo '<p style="margin:0;color:#6b7280;">This page is available to site administrators only.</p>';
+            echo '</div></div></main>';
+            echo $footer;
             exit;
         }
 
-        $title_suffix = ($is_admin_pnl_qv || $is_admin_pnl_uri) ? 'Admin P&L' : 'Points Backtest';
         $shortcode = ($is_admin_pnl_qv || $is_admin_pnl_uri) ? '[admin_pnl_dashboard]' : '[points_backtest]';
         status_header(200);
         nocache_headers();
-        echo '<!doctype html><html ' . get_language_attributes() . '><head><meta charset="' . esc_attr(get_bloginfo('charset')) . '"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . esc_html(get_bloginfo('name') . ' - ' . $title_suffix) . '</title></head><body style="margin:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;">';
-        echo '<main style="max-width:1280px;margin:0 auto;padding:18px 12px 30px;">';
+        ob_start();
+        get_header();
+        $header = ob_get_clean();
+        ob_start();
+        get_footer();
+        $footer = ob_get_clean();
+        echo $header;
+        echo '<main class="main-content"><div class="content-container">';
         echo do_shortcode($shortcode);
-        echo '</main></body></html>';
+        echo '</div></main>';
+        echo $footer;
         exit;
     }
 
@@ -64,7 +83,7 @@ function bricks_my_tracker_template_redirect() {
 
     echo $header;
     echo '<main class="main-content"><div class="content-container">';
-    echo ($is_backtest_qv || $is_backtest_uri) ? do_shortcode('[points_backtest]') : do_shortcode('[my_tracker_dashboard]');
+    echo do_shortcode('[my_tracker_dashboard]');
     echo '</div></main>';
     echo $footer;
     exit;

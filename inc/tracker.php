@@ -525,11 +525,13 @@ function bricks_tracker_floating_quick_link() {
             title="Open My Tracker"
             style="display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);color:#fff;font-weight:700;font-size:13px;text-decoration:none;box-shadow:0 8px 20px rgba(109,40,217,0.35);"
         >📝 My Tracker</a>
+        <?php if (function_exists('bricks_user_can_access_points_backtest') && bricks_user_can_access_points_backtest()): ?>
         <a
             href="<?php echo esc_url(home_url('/points-backtest/')); ?>"
             title="Open Points Backtest"
             style="display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);color:#fff;font-weight:700;font-size:13px;text-decoration:none;box-shadow:0 8px 20px rgba(30,64,175,0.35);"
         >📊 Points Backtest</a>
+        <?php endif; ?>
         <a
             href="<?php echo esc_url(home_url('/daily_sires_insights/')); ?>"
             title="Open Daily Sires Insights"
@@ -741,9 +743,11 @@ function bricks_add_my_tracker_menu_item($items, $args) {
     $items .= '<li class="menu-item menu-item-type-custom menu-item-my-tracker' . esc_attr($active_class) . '">
         <a href="' . esc_url($tracker_url) . '">My Tracker</a>
     </li>';
-    $items .= '<li class="menu-item menu-item-type-custom menu-item-points-backtest' . esc_attr($active_points_class) . '">
-        <a href="' . esc_url($points_url) . '">Points Backtest</a>
-    </li>';
+    if (function_exists('bricks_user_can_access_points_backtest') && bricks_user_can_access_points_backtest()) {
+        $items .= '<li class="menu-item menu-item-type-custom menu-item-points-backtest' . esc_attr($active_points_class) . '">
+            <a href="' . esc_url($points_url) . '">Points Backtest</a>
+        </li>';
+    }
 
     return $items;
 }

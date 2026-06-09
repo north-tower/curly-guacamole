@@ -1,6 +1,6 @@
 <?php 
 /**
- * Register/enqueue custom scripts and styles
+ * Register/enqueue custom scripts and styles hghg
  */
 add_action( 'wp_enqueue_scripts', function() {
 	// Enqueue your files on the canvas & frontend, not the builder panel. Otherwise custom CSS might affect builder)
@@ -35,6 +35,7 @@ add_filter( 'bricks/builder/i18n', function( $i18n ) {
 require_once __DIR__ . '/inc/helpers-core.php';
 require_once __DIR__ . '/inc/enqueue.php';
 require_once __DIR__ . '/inc/rewrites.php';
+require_once __DIR__ . '/inc/seo.php';
 require_once __DIR__ . '/inc/tracker.php';
 require_once __DIR__ . '/inc/race-table.php';
 require_once __DIR__ . '/inc/speed-performance.php';
@@ -43,6 +44,7 @@ require_once __DIR__ . '/inc/race-comments.php';
 require_once __DIR__ . '/inc/sire-insights.php';
 require_once __DIR__ . '/inc/yesterday-winners.php';
 require_once __DIR__ . '/inc/admin-pnl.php';
+require_once __DIR__ . '/inc/points-published-picks.php';
 
 
 /**
@@ -515,33 +517,246 @@ if (!function_exists('bricks_points_table_has_column')) {
     }
 }
 
-if (!function_exists('bricks_points_backtest_fetch_rows')) {
-    function bricks_points_backtest_fetch_rows($from_date, $to_date, $race_type_filter = '') {
+if (!function_exists('bricks_points_backtest_latest_historic_meeting_date')) {
+    function bricks_points_backtest_latest_historic_meeting_date() {
         global $wpdb;
+        if ($wpdb->get_var("SHOW TABLES LIKE 'historic_races_beta'") !== 'historic_races_beta') {
+            return '';
+        }
+        return (string) $wpdb->get_var('SELECT MAX(meeting_date) FROM `historic_races_beta`');
+    }
+}
+
+if (!function_exists('bricks_points_meeting_dates_in_range')) {
+    /**
+     * @return string[]
+     */
+    function bricks_points_meeting_dates_in_range($from_date, $to_date) {
+        $from_ts = strtotime($from_date);
+        $to_ts = strtotime($to_date);
+        if ($from_ts === false || $to_ts === false || $from_ts > $to_ts) {
+            return [];
+        }
+        $dates = [];
+        for ($ts = $from_ts; $ts <= $to_ts; $ts += DAY_IN_SECONDS) {
+            $dates[] = wp_date('Y-m-d', $ts);
+        }
+        return $dates;
+    }
+}
+
+if (!function_exists('bricks_points_backtest_fetch_dch_rows_for_dates')) {
+    /**
+     * Recent meeting cards often land in daily_comment_history before historic ETL.
+     *
+     * @param string[] $meeting_dates Y-m-d list
+     * @return object[]
+     */
+    function bricks_points_backtest_fetch_dch_rows_for_dates(array $meeting_dates, $race_type_filter = '') {
+        global $wpdb;
+
+        $meeting_dates = array_values(array_filter(array_unique(array_map('strval', $meeting_dates)), function($d) {
+            return preg_match('/^\d{4}-\d{2}-\d{2}$/', $d);
+        }));
+        if (empty($meeting_dates)) {
+            return [];
+        }
+
+        $dch_table = 'daily_comment_history';
+        if ($wpdb->get_var("SHOW TABLES LIKE '$dch_table'") !== $dch_table) {
+            return [];
+        }
+
+        $select_parts = [
+            'dch.race_id AS race_id',
+            'dch.runner_id AS runner_id',
+            'dch.meeting_date AS meeting_date',
+            'dch.course AS course',
+            'dch.race_type AS race_type',
+            'dch.name AS horse_name',
+            "'' AS trainer_name",
+            'dch.finish_position AS finish_position',
+            'dch.starting_price AS starting_price',
+            'NULL AS starting_price_decimal',
+        ];
+
+        if (bricks_points_table_has_column($dch_table, 'scheduled_time')) {
+            $select_parts[] = 'dch.scheduled_time AS scheduled_time';
+        } else {
+            $select_parts[] = 'NULL AS scheduled_time';
+        }
+        if (bricks_points_table_has_column($dch_table, 'race_title')) {
+            $select_parts[] = 'dch.race_title AS race_title';
+        } else {
+            $select_parts[] = "'' AS race_title";
+        }
+
+        $non_runners_exists = $wpdb->get_var("SHOW TABLES LIKE 'non_runners'") === 'non_runners';
+        $non_runner_join = '';
+        if ($non_runners_exists) {
+            $non_runner_join = ' LEFT JOIN non_runners nr ON nr.race_id = dch.race_id AND nr.runner_id = dch.runner_id ';
+            $select_parts[] = 'CASE WHEN nr.runner_id IS NOT NULL THEN 1 ELSE 0 END AS is_non_runner';
+        } else {
+            $select_parts[] = '0 AS is_non_runner';
+        }
+
+        $select_parts[] = 'dch.speed_rating AS dch_speed_rating';
+        $select_parts[] = 'dch.wt_speed_rating AS dch_wt_speed_rating';
+        $select_parts[] = 'NULL AS fhorsite_rating';
+        $select_parts[] = 'NULL AS fhorsite_rating_reliability';
+        $select_parts[] = 'NULL AS SR_LTO';
+        $select_parts[] = 'NULL AS SR_2';
+        $select_parts[] = 'NULL AS SR_3';
+        $select_parts[] = 'NULL AS sp_forecast_price_decimal';
+
+        $optional_cols = [
+            'speed_rating' => 'speed_rating',
+            'wt_speed_rating' => 'wt_speed_rating',
+            'days_since_ran' => 'days_since_ran',
+            'draw_bias_pct' => 'draw_bias_pct',
+            'class_diff' => 'class_diff',
+            'official_rating_diff' => 'official_rating_diff',
+            'course_winner' => 'course_winner',
+            'distance_winner' => 'distance_winner',
+            'candd_winner' => 'candd_winner',
+            'going_prev_wins' => 'going_prev_wins',
+            'beaten_favourite' => 'beaten_favourite',
+            'TnrWinPct14d' => 'TnrWinPct14d',
+            'TnrJkyPlacePct' => 'TnrJkyPlacePct',
+            'forecast_price_decimal' => 'forecast_price_decimal',
+        ];
+        foreach ($optional_cols as $alias => $column_name) {
+            if (bricks_points_table_has_column($dch_table, $column_name)) {
+                $select_parts[] = "dch.`$column_name` AS `$alias`";
+            } else {
+                $select_parts[] = "NULL AS `$alias`";
+            }
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($meeting_dates), '%s'));
+        $sql = 'SELECT ' . implode(",\n", $select_parts) . "
+            FROM `$dch_table` dch
+            $non_runner_join
+            WHERE dch.meeting_date IN ($placeholders)
+              AND dch.name IS NOT NULL
+              AND dch.name != ''";
+
+        $params = $meeting_dates;
+        if ($race_type_filter !== '') {
+            $sql .= ' AND dch.race_type = %s';
+            $params[] = $race_type_filter;
+        }
+        $sql .= ' ORDER BY dch.meeting_date ASC, dch.race_id ASC';
+
+        $rows = $wpdb->get_results($wpdb->prepare($sql, ...$params));
+        return is_array($rows) ? $rows : [];
+    }
+}
+
+if (!function_exists('bricks_points_backtest_fetch_rows')) {
+    function bricks_points_backtest_fetch_rows($from_date, $to_date, $race_type_filter = '', &$fetch_meta = null) {
+        global $wpdb;
+
+        $fetch_meta = [
+            'historic_row_count' => 0,
+            'dch_dates' => [],
+            'dch_row_count' => 0,
+        ];
 
         $historic_runners = 'historic_runners_beta';
         $historic_races = 'historic_races_beta';
-        $daily_races = 'daily_races_beta';
+        $historic_ok = (
+            $wpdb->get_var("SHOW TABLES LIKE '$historic_runners'") === $historic_runners
+            && $wpdb->get_var("SHOW TABLES LIKE '$historic_races'") === $historic_races
+        );
+        $rows = [];
+        if (!$historic_ok) {
+            $dch_only = bricks_points_backtest_fetch_dch_rows_for_dates(
+                bricks_points_meeting_dates_in_range($from_date, $to_date),
+                $race_type_filter
+            );
+            $fetch_meta['dch_dates'] = bricks_points_meeting_dates_in_range($from_date, $to_date);
+            $fetch_meta['dch_row_count'] = count($dch_only);
+            return $dch_only;
+        }
 
-        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$historic_runners'");
-        if (!$table_exists) return [];
-        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$historic_races'");
-        if (!$table_exists) return [];
+        // IMPORTANT: Backtest must be deterministic for a historical date.
+        // Use only immutable historic tables for core race identity fields.
+        $race_type_expr = "hracb.race_type";
 
-        $race_type_expr = bricks_points_table_has_column($daily_races, 'race_type')
-            ? "COALESCE(dracb.race_type, hracb.race_type)"
-            : "hracb.race_type";
+        $dch_exists = $wpdb->get_var("SHOW TABLES LIKE 'daily_comment_history'") === 'daily_comment_history';
+        $finish_expr = $dch_exists
+            ? "COALESCE(NULLIF(TRIM(hrunb.finish_position), ''), CAST(dch.finish_position AS CHAR)) AS finish_position"
+            : 'hrunb.finish_position AS finish_position';
 
         $select_parts = [
             "hrunb.race_id AS race_id",
+            "hrunb.runner_id AS runner_id",
             "hracb.meeting_date AS meeting_date",
             "hracb.course AS course",
             "$race_type_expr AS race_type",
             "hrunb.name AS horse_name",
             "hrunb.trainer_name AS trainer_name",
-            "hrunb.finish_position AS finish_position",
+            $finish_expr,
             "hrunb.starting_price AS starting_price"
         ];
+
+        if (bricks_points_table_has_column($historic_runners, 'starting_price_decimal')) {
+            $select_parts[] = 'hrunb.starting_price_decimal AS starting_price_decimal';
+        } else {
+            $select_parts[] = 'NULL AS starting_price_decimal';
+        }
+        if (bricks_points_table_has_column($historic_races, 'scheduled_time')) {
+            $select_parts[] = 'hracb.scheduled_time AS scheduled_time';
+        } else {
+            $select_parts[] = 'NULL AS scheduled_time';
+        }
+        if (bricks_points_table_has_column($historic_races, 'race_title')) {
+            $select_parts[] = 'hracb.race_title AS race_title';
+        } else {
+            $select_parts[] = "'' AS race_title";
+        }
+
+        // Match race-card eligibility: exclude non-runners (pulled/NR) using the dedicated lookup table.
+        $non_runners_exists = $wpdb->get_var("SHOW TABLES LIKE 'non_runners'") === 'non_runners';
+        $non_runner_join = '';
+        if ($non_runners_exists) {
+            $non_runner_join = " LEFT JOIN non_runners nr ON nr.race_id = hrunb.race_id AND nr.runner_id = hrunb.runner_id ";
+            $select_parts[] = "CASE WHEN nr.runner_id IS NOT NULL THEN 1 ELSE 0 END AS is_non_runner";
+        } else {
+            $select_parts[] = "0 AS is_non_runner";
+        }
+
+        // Deterministic historical inputs for scoring:
+        // - Use `daily_comment_history` for speed ratings per meeting_date (historical table).
+        // - Avoid `speed&performance_table` (mutable / derived).
+        $dch_join = '';
+        if ($dch_exists) {
+            $dch_join = " LEFT JOIN daily_comment_history dch
+                          ON dch.race_id = hrunb.race_id
+                         AND dch.runner_id = hrunb.runner_id
+                         AND dch.meeting_date = hracb.meeting_date ";
+            $select_parts[] = 'dch.speed_rating AS dch_speed_rating';
+            $select_parts[] = 'dch.wt_speed_rating AS dch_wt_speed_rating';
+        } else {
+            $select_parts[] = 'NULL AS dch_speed_rating';
+            $select_parts[] = 'NULL AS dch_wt_speed_rating';
+        }
+
+        // Point-in-time Fhorsite (comment rating) from backtest_cr_data when the DB pipeline has been run.
+        $bcr_join = '';
+        if ($wpdb->get_var("SHOW TABLES LIKE 'backtest_cr_data'") === 'backtest_cr_data') {
+            $bcr_join = ' LEFT JOIN backtest_cr_data bcr ON bcr.race_id = hrunb.race_id AND bcr.runner_id = hrunb.runner_id ';
+            $select_parts[] = 'bcr.CR AS fhorsite_rating';
+            $select_parts[] = 'NULL AS fhorsite_rating_reliability';
+        } else {
+            $select_parts[] = 'NULL AS fhorsite_rating';
+            $select_parts[] = 'NULL AS fhorsite_rating_reliability';
+        }
+        $select_parts[] = 'NULL AS SR_LTO';
+        $select_parts[] = 'NULL AS SR_2';
+        $select_parts[] = 'NULL AS SR_3';
+        $select_parts[] = 'NULL AS sp_forecast_price_decimal';
 
         $optional_cols = [
             'speed_rating' => 'speed_rating',
@@ -571,7 +786,9 @@ if (!function_exists('bricks_points_backtest_fetch_rows')) {
         $sql = "SELECT " . implode(",\n", $select_parts) . "
             FROM `$historic_runners` hrunb
             INNER JOIN `$historic_races` hracb ON hracb.race_id = hrunb.race_id
-            LEFT JOIN `$daily_races` dracb ON dracb.race_id = hrunb.race_id
+            $non_runner_join
+            $dch_join
+            $bcr_join
             WHERE hracb.meeting_date BETWEEN %s AND %s
               AND hrunb.name IS NOT NULL
               AND hrunb.name != ''";
@@ -583,21 +800,66 @@ if (!function_exists('bricks_points_backtest_fetch_rows')) {
         }
         $sql .= " ORDER BY hracb.meeting_date ASC, hrunb.race_id ASC";
 
-        return $wpdb->get_results($wpdb->prepare($sql, ...$params));
+        $rows = $wpdb->get_results($wpdb->prepare($sql, ...$params));
+        if (!is_array($rows)) {
+            $rows = [];
+        }
+        $fetch_meta['historic_row_count'] = count($rows);
+
+        $dates_in_range = bricks_points_meeting_dates_in_range($from_date, $to_date);
+        $dates_with_historic = [];
+        foreach ($rows as $row) {
+            if (!empty($row->meeting_date)) {
+                $dates_with_historic[(string) $row->meeting_date] = true;
+            }
+        }
+        $missing_dates = array_values(array_filter($dates_in_range, function($d) use ($dates_with_historic) {
+            return empty($dates_with_historic[$d]);
+        }));
+        if (!empty($missing_dates)) {
+            $dch_rows = bricks_points_backtest_fetch_dch_rows_for_dates($missing_dates, $race_type_filter);
+            if (!empty($dch_rows)) {
+                $fetch_meta['dch_dates'] = $missing_dates;
+                $fetch_meta['dch_row_count'] = count($dch_rows);
+                $rows = array_merge($rows, $dch_rows);
+                usort($rows, function($a, $b) {
+                    $dc = strcmp((string) ($a->meeting_date ?? ''), (string) ($b->meeting_date ?? ''));
+                    if ($dc !== 0) {
+                        return $dc;
+                    }
+                    return intval($a->race_id ?? 0) <=> intval($b->race_id ?? 0);
+                });
+            }
+        }
+
+        return $rows;
     }
 }
 
 if (!function_exists('bricks_points_backtest_calculate')) {
-    function bricks_points_backtest_calculate($from_date, $to_date, $race_type_filter = '') {
-        $rows = bricks_points_backtest_fetch_rows($from_date, $to_date, $race_type_filter);
+  /**
+   * @param string $backtest_mode 'model' (recompute picks) or 'published' (saved race-card picks)
+   */
+    function bricks_points_backtest_calculate($from_date, $to_date, $race_type_filter = '', $backtest_mode = 'model') {
+        $backtest_mode = ($backtest_mode === 'published') ? 'published' : 'model';
+        $fetch_meta = [];
+        $rows = bricks_points_backtest_fetch_rows($from_date, $to_date, $race_type_filter, $fetch_meta);
         if (empty($rows)) {
             return [
                 'summary' => [],
                 'sample_rows' => [],
                 'race_count' => 0,
-                'runner_count' => 0
+                'runner_count' => 0,
+                'unsettled_win_bets' => 0,
+                'missing_published_snapshot' => 0,
+                'backtest_mode' => $backtest_mode,
+                'fetch_meta' => $fetch_meta,
+                'latest_historic_date' => bricks_points_backtest_latest_historic_meeting_date(),
             ];
         }
+
+        $day_span = max(1, (int) floor((strtotime($to_date) - strtotime($from_date)) / 86400) + 1);
+        $sample_limit = ($day_span <= 1) ? 9999 : (($day_span <= 7) ? 500 : 120);
 
         $by_race = [];
         foreach ($rows as $row) {
@@ -614,95 +876,90 @@ if (!function_exists('bricks_points_backtest_calculate')) {
             'ew_edge' => ['bets' => 0, 'profit' => 0.0, 'hits' => 0]
         ];
         $sample_rows = [];
+        $unsettled_win_bets = 0;
+        $missing_published_snapshot = 0;
 
         foreach ($by_race as $race_id => $race_rows) {
             $field_size = count($race_rows);
-            if ($field_size < 2) continue;
-
-            $scored = [];
-            foreach ($race_rows as $idx => $rr) {
-                $speed_data = (object) [
-                    'fhorsite_rating' => (isset($rr->speed_rating) && is_numeric($rr->speed_rating)) ? $rr->speed_rating : null,
-                    'fhorsite_rating_reliability' => 60,
-                    'SR_LTO' => (isset($rr->wt_speed_rating) && is_numeric($rr->wt_speed_rating)) ? $rr->wt_speed_rating : null,
-                    'days_since_ran' => (isset($rr->days_since_ran) && is_numeric($rr->days_since_ran)) ? $rr->days_since_ran : null,
-                    'draw_bias_pct' => (isset($rr->draw_bias_pct) && is_numeric($rr->draw_bias_pct)) ? $rr->draw_bias_pct : null,
-                    'class_diff' => (isset($rr->class_diff) && is_numeric($rr->class_diff)) ? $rr->class_diff : null,
-                    'official_rating_diff' => (isset($rr->official_rating_diff) && is_numeric($rr->official_rating_diff)) ? $rr->official_rating_diff : null,
-                    'course_winner' => (isset($rr->course_winner) && is_numeric($rr->course_winner)) ? $rr->course_winner : null,
-                    'distance_winner' => (isset($rr->distance_winner) && is_numeric($rr->distance_winner)) ? $rr->distance_winner : null,
-                    'candd_winner' => (isset($rr->candd_winner) && is_numeric($rr->candd_winner)) ? $rr->candd_winner : null,
-                    'going_prev_wins' => (isset($rr->going_prev_wins) && is_numeric($rr->going_prev_wins)) ? $rr->going_prev_wins : null,
-                    'beaten_favourite' => (isset($rr->beaten_favourite) && is_numeric($rr->beaten_favourite)) ? $rr->beaten_favourite : null,
-                    'TnrWinPct14d' => (isset($rr->TnrWinPct14d) && is_numeric($rr->TnrWinPct14d)) ? $rr->TnrWinPct14d : null,
-                    'TnrJkyPlacePct' => (isset($rr->TnrJkyPlacePct) && is_numeric($rr->TnrJkyPlacePct)) ? $rr->TnrJkyPlacePct : null,
-                    'forecast_price_decimal' => (isset($rr->forecast_price_decimal) && is_numeric($rr->forecast_price_decimal)) ? $rr->forecast_price_decimal : null,
-                    'forecast_price' => isset($rr->starting_price) ? $rr->starting_price : ''
-                ];
-
-                $pts = bricks_points_score_runner($rr, $speed_data, ['is_flat' => true]);
-                $odds_decimal = bricks_points_parse_decimal_odds($speed_data->forecast_price_decimal, $speed_data->forecast_price);
-                $scored[] = [
-                    'runner_key' => $race_id . '_' . $idx,
-                    'horse_name' => (string) ($rr->horse_name ?? ''),
-                    'model_score' => floatval($pts['score'] ?? 0),
-                    'model_reasons' => $pts['reasons'] ?? [],
-                    'market_prob' => bricks_points_market_implied_rank($odds_decimal),
-                    'market_rank' => 0,
-                    'model_rank' => 0,
-                    'edge_score' => 0,
-                    'odds_decimal' => $odds_decimal,
-                    'odds_fractional' => (string) ($rr->starting_price ?? ''),
-                    'is_non_runner' => false,
-                    'finish_position' => intval($rr->finish_position ?? 999),
-                    'meeting_date' => (string) ($rr->meeting_date ?? '')
-                ];
+            if ($field_size < 2) {
+                continue;
             }
 
-            usort($scored, function($a, $b){ return $b['model_score'] <=> $a['model_score']; });
-            $rank = 1;
-            foreach ($scored as &$sr) { $sr['model_rank'] = $rank++; }
-            unset($sr);
-            $market_sorted = $scored;
-            usort($market_sorted, function($a, $b){ return ($b['market_prob'] ?? 0) <=> ($a['market_prob'] ?? 0); });
-            $mk = 1; $mk_map = [];
-            foreach ($market_sorted as $mr) { if (($mr['market_prob'] ?? 0) > 0) $mk_map[$mr['runner_key']] = $mk++; }
-            foreach ($scored as &$sr) {
-                $sr['market_rank'] = $mk_map[$sr['runner_key']] ?? 0;
-                $rank_edge = ($sr['market_rank'] > 0) ? ($sr['market_rank'] - $sr['model_rank']) : 0;
-                $score_edge = max(0.0, (floatval($sr['model_score']) - 55.0) * 0.20);
-                $sr['edge_score'] = round(($rank_edge * 4.0) + $score_edge, 2);
-            }
-            unset($sr);
+            $scored = bricks_points_backtest_score_race($race_rows);
+            $meeting_date = (string) ($race_rows[0]->meeting_date ?? '');
 
-            $picks = bricks_points_pick_winner_place($scored);
-            $ew_simple = bricks_points_pick_each_way_simple($scored);
-            $ew_edge = bricks_points_pick_each_way_edge($scored);
+            if ($backtest_mode === 'published') {
+                $snapshot = function_exists('bricks_points_published_picks_get')
+                    ? bricks_points_published_picks_get($race_id, $meeting_date)
+                    : null;
+                if (!$snapshot || empty($snapshot['win_horse'])) {
+                    $missing_published_snapshot += 1;
+                    continue;
+                }
+                $published = bricks_points_picks_from_published_snapshot($snapshot, $scored);
+                $picks = ['winner' => $published['winner'], 'place' => $published['place']];
+                $ew_simple = $published['ew_simple'];
+                $ew_edge = $published['ew_edge'];
+            } else {
+                $picks = bricks_points_pick_winner_place($scored);
+                $ew_simple = bricks_points_pick_each_way_simple($scored);
+                $ew_edge = bricks_points_pick_each_way_edge($scored);
+            }
             $place_terms = bricks_points_place_terms_count($field_size);
 
-            $apply_win = function($pick) use (&$stats) {
-                if (!$pick || !isset($pick['odds_decimal']) || $pick['odds_decimal'] === null || floatval($pick['odds_decimal']) <= 1) return;
+            $pick_odds = function($pick) {
+                if (!$pick) {
+                    return null;
+                }
+                $settle = $pick['settlement_odds_decimal'] ?? null;
+                if ($settle !== null && floatval($settle) > 1) {
+                    return floatval($settle);
+                }
+                $pre = $pick['odds_decimal'] ?? null;
+                return ($pre !== null && floatval($pre) > 1) ? floatval($pre) : null;
+            };
+
+            $apply_win = function($pick) use (&$stats, $pick_odds, &$unsettled_win_bets) {
+                $odds = $pick_odds($pick);
+                if (!$pick || $odds === null) {
+                    return;
+                }
+                if (!bricks_points_finish_has_result($pick['finish_position'] ?? '')) {
+                    $unsettled_win_bets += 1;
+                    return;
+                }
                 $stats['win']['bets'] += 1;
-                $is_win = intval($pick['finish_position'] ?? 999) === 1;
-                if ($is_win) $stats['win']['hits'] += 1;
-                $stats['win']['profit'] += $is_win ? (floatval($pick['odds_decimal']) - 1.0) : -1.0;
+                $is_win = bricks_points_finish_is_win($pick['finish_position'] ?? '');
+                if ($is_win) {
+                    $stats['win']['hits'] += 1;
+                }
+                $stats['win']['profit'] += $is_win ? ($odds - 1.0) : -1.0;
             };
-            $apply_place = function($pick) use (&$stats, $place_terms) {
-                if (!$pick || !isset($pick['odds_decimal']) || $pick['odds_decimal'] === null || floatval($pick['odds_decimal']) <= 1) return;
+            $apply_place = function($pick) use (&$stats, $place_terms, $pick_odds) {
+                $odds = $pick_odds($pick);
+                if (!$pick || $odds === null) {
+                    return;
+                }
                 $stats['place']['bets'] += 1;
-                $placed = intval($pick['finish_position'] ?? 999) <= $place_terms;
-                if ($placed) $stats['place']['hits'] += 1;
-                $stats['place']['profit'] += $placed ? ((floatval($pick['odds_decimal']) - 1.0) * 0.25) : -1.0;
+                $placed = bricks_points_finish_is_placed($pick['finish_position'] ?? '', $place_terms);
+                if ($placed) {
+                    $stats['place']['hits'] += 1;
+                }
+                $stats['place']['profit'] += $placed ? (($odds - 1.0) * 0.25) : -1.0;
             };
-            $apply_ew = function($pick, $key) use (&$stats, $place_terms) {
-                if (!$pick || !isset($pick['odds_decimal']) || $pick['odds_decimal'] === null || floatval($pick['odds_decimal']) <= 1) return;
+            $apply_ew = function($pick, $key) use (&$stats, $place_terms, $pick_odds) {
+                $odds = $pick_odds($pick);
+                if (!$pick || $odds === null) {
+                    return;
+                }
                 $stats[$key]['bets'] += 2;
-                $finish = intval($pick['finish_position'] ?? 999);
-                $is_win = ($finish === 1);
-                $placed = ($finish <= $place_terms);
-                if ($placed) $stats[$key]['hits'] += 1;
-                $stats[$key]['profit'] += $is_win ? (floatval($pick['odds_decimal']) - 1.0) : -1.0;
-                $stats[$key]['profit'] += $placed ? ((floatval($pick['odds_decimal']) - 1.0) * 0.25) : -1.0;
+                $is_win = bricks_points_finish_is_win($pick['finish_position'] ?? '');
+                $placed = bricks_points_finish_is_placed($pick['finish_position'] ?? '', $place_terms);
+                if ($placed) {
+                    $stats[$key]['hits'] += 1;
+                }
+                $stats[$key]['profit'] += $is_win ? ($odds - 1.0) : -1.0;
+                $stats[$key]['profit'] += $placed ? (($odds - 1.0) * 0.25) : -1.0;
             };
 
             $apply_win($picks['winner'] ?? null);
@@ -714,19 +971,46 @@ if (!function_exists('bricks_points_backtest_calculate')) {
             $apply_ew($ew_simple, 'ew_simple');
             $apply_ew($ew_edge, 'ew_edge');
 
-            if (count($sample_rows) < 60) {
+            if (count($sample_rows) < $sample_limit) {
+                $win_pick = $picks['winner'] ?? null;
+                $has_result = $win_pick && bricks_points_finish_has_result($win_pick['finish_position'] ?? '');
+                $is_win = $has_result && bricks_points_finish_is_win($win_pick['finish_position'] ?? '');
+                $race_time = '';
+                if (!empty($race_rows[0]->scheduled_time)) {
+                    $race_time = wp_date('H:i', strtotime((string) $race_rows[0]->scheduled_time));
+                }
                 $sample_rows[] = [
                     'meeting_date' => $race_rows[0]->meeting_date ?? '',
                     'race_id' => $race_id,
                     'course' => $race_rows[0]->course ?? '',
-                    'winner_pick' => $picks['winner']['horse_name'] ?? '',
-                    'winner_pick_pos' => $picks['winner']['finish_position'] ?? '',
+                    'race_time' => $race_time,
+                    'race_title' => $race_rows[0]->race_title ?? '',
+                    'race_type' => $race_rows[0]->race_type ?? '',
+                    'winner_pick' => $win_pick['horse_name'] ?? '',
+                    'winner_pick_pos' => $win_pick ? bricks_points_format_finish_position($win_pick['finish_position'] ?? '') : '—',
+                    'winner_hit' => !$has_result ? '—' : ($is_win ? 'Y' : 'N'),
+                    'settlement_odds' => $win_pick ? ($pick_odds($win_pick) ?? '') : '',
                     'ew_simple' => $ew_simple['horse_name'] ?? '',
-                    'ew_simple_pos' => $ew_simple['finish_position'] ?? '',
+                    'ew_simple_pos' => bricks_points_format_finish_position($ew_simple['finish_position'] ?? ''),
                     'ew_edge' => $ew_edge['horse_name'] ?? '',
-                    'ew_edge_pos' => $ew_edge['finish_position'] ?? ''
+                    'ew_edge_pos' => bricks_points_format_finish_position($ew_edge['finish_position'] ?? ''),
                 ];
             }
+        }
+
+        if ($day_span <= 7 && count($sample_rows) > 1) {
+            usort($sample_rows, function ($a, $b) {
+                $a_win = (($a['winner_hit'] ?? '') === 'Y') ? 0 : 1;
+                $b_win = (($b['winner_hit'] ?? '') === 'Y') ? 0 : 1;
+                if ($a_win !== $b_win) {
+                    return $a_win <=> $b_win;
+                }
+                $dc = strcmp((string) ($a['meeting_date'] ?? ''), (string) ($b['meeting_date'] ?? ''));
+                if ($dc !== 0) {
+                    return $dc;
+                }
+                return strcmp((string) ($a['course'] ?? ''), (string) ($b['course'] ?? ''));
+            });
         }
 
         $summary = [];
@@ -747,52 +1031,520 @@ if (!function_exists('bricks_points_backtest_calculate')) {
             'summary' => $summary,
             'sample_rows' => $sample_rows,
             'race_count' => count($by_race),
-            'runner_count' => count($rows)
+            'runner_count' => count($rows),
+            'unsettled_win_bets' => $unsettled_win_bets,
+            'day_span' => $day_span,
+            'sample_truncated' => ($day_span > 7 && count($by_race) > $sample_limit),
+            'missing_published_snapshot' => $missing_published_snapshot,
+            'backtest_mode' => $backtest_mode,
+            'fetch_meta' => $fetch_meta,
+            'latest_historic_date' => bricks_points_backtest_latest_historic_meeting_date(),
         ];
+    }
+}
+
+if (!function_exists('bricks_points_race_type_is_national_hunt')) {
+    function bricks_points_race_type_is_national_hunt($race_type) {
+        $race_type_lower = strtolower((string) $race_type);
+        return (
+            strpos($race_type_lower, 'hurdle') !== false ||
+            strpos($race_type_lower, 'chase') !== false ||
+            strpos($race_type_lower, 'n_h_flat') !== false ||
+            strpos($race_type_lower, 'nh_flat') !== false ||
+            strpos($race_type_lower, 'national hunt') !== false
+        );
+    }
+}
+
+if (!function_exists('bricks_points_engine_normalize_horse_name')) {
+    function bricks_points_engine_normalize_horse_name($name) {
+        $n = strtolower(trim(wp_strip_all_tags((string) $name)));
+        return preg_replace('/\s+/', ' ', $n);
+    }
+}
+
+if (!function_exists('bricks_points_finish_is_win')) {
+    function bricks_points_finish_is_win($finish_position) {
+        $fp = strtolower(trim((string) $finish_position));
+        if ($fp === '' || $fp === 'null') {
+            return false;
+        }
+        if ($fp === '1st' || $fp === 'first') {
+            return true;
+        }
+        if (preg_match('/^\d+$/', $fp)) {
+            return intval($fp) === 1;
+        }
+        $as_float = floatval($fp);
+        return abs($as_float - 1.0) < 0.001;
+    }
+}
+
+if (!function_exists('bricks_points_finish_has_result')) {
+    function bricks_points_finish_has_result($finish_position) {
+        $fp = strtolower(trim((string) $finish_position));
+        if ($fp === '' || $fp === '-' || $fp === 'null') {
+            return false;
+        }
+        if (in_array($fp, ['pu', 'ur', 'bd', 'f', 'ro', 'nr', 'non-runner', 'non runner'], true)) {
+            return false;
+        }
+        return preg_match('/\d/', $fp) === 1;
+    }
+}
+
+if (!function_exists('bricks_points_format_finish_position')) {
+    function bricks_points_format_finish_position($finish_position) {
+        $fp = trim((string) $finish_position);
+        if ($fp === '' || $fp === '-') {
+            return '—';
+        }
+        return $fp;
+    }
+}
+
+if (!function_exists('bricks_points_finish_is_placed')) {
+    function bricks_points_finish_is_placed($finish_position, $place_terms) {
+        $fp = strtolower(trim((string) $finish_position));
+        if ($fp === '' || $fp === 'null') {
+            return false;
+        }
+        if (preg_match('/^\d+$/', $fp)) {
+            return intval($fp) >= 1 && intval($fp) <= intval($place_terms);
+        }
+        $as_float = floatval($fp);
+        if ($as_float >= 1 && $as_float <= floatval($place_terms) + 0.001) {
+            return true;
+        }
+        return false;
+    }
+}
+
+if (!function_exists('bricks_points_settlement_odds_decimal')) {
+    /**
+     * Backtest P&L: prefer result SP (starting_price) over pre-race forecast.
+     */
+    function bricks_points_settlement_odds_decimal($forecast_decimal, $starting_price = '', $starting_price_decimal = null) {
+        if ($starting_price_decimal !== null && $starting_price_decimal !== '' && is_numeric($starting_price_decimal)) {
+            $sp = floatval($starting_price_decimal);
+            if ($sp > 1) {
+                return $sp;
+            }
+        }
+        $from_sp = bricks_points_parse_decimal_odds(null, $starting_price);
+        if ($from_sp !== null && $from_sp > 1) {
+            return $from_sp;
+        }
+        return bricks_points_parse_decimal_odds($forecast_decimal, '');
+    }
+}
+
+if (!function_exists('bricks_points_backtest_speed_data_from_row')) {
+    /**
+     * Build speed_data for scoring — align with race-card inputs where columns exist on the fetch row.
+     */
+    function bricks_points_backtest_speed_data_from_row($rr) {
+        $fsr = null;
+        // Do not map dch.speed_rating (same-race SR from sr_results) onto FSr — that leaks result-era data.
+        if (isset($rr->fhorsite_rating) && is_numeric($rr->fhorsite_rating)) {
+            $fsr = floatval($rr->fhorsite_rating);
+        } elseif (isset($rr->speed_rating) && is_numeric($rr->speed_rating)) {
+            $fsr = floatval($rr->speed_rating);
+        }
+
+        $fsrr = null;
+        if (isset($rr->fhorsite_rating_reliability) && is_numeric($rr->fhorsite_rating_reliability)) {
+            $fsrr = floatval($rr->fhorsite_rating_reliability);
+        }
+
+        $sr_lto = null;
+        if (isset($rr->SR_LTO) && is_numeric($rr->SR_LTO)) {
+            $sr_lto = floatval($rr->SR_LTO);
+        } elseif (isset($rr->dch_wt_speed_rating) && is_numeric($rr->dch_wt_speed_rating)) {
+            $sr_lto = floatval($rr->dch_wt_speed_rating);
+        } elseif (isset($rr->wt_speed_rating) && is_numeric($rr->wt_speed_rating)) {
+            $sr_lto = floatval($rr->wt_speed_rating);
+        }
+
+        $forecast_decimal = null;
+        if (isset($rr->forecast_price_decimal) && is_numeric($rr->forecast_price_decimal)) {
+            $forecast_decimal = floatval($rr->forecast_price_decimal);
+        } elseif (isset($rr->sp_forecast_price_decimal) && is_numeric($rr->sp_forecast_price_decimal)) {
+            $forecast_decimal = floatval($rr->sp_forecast_price_decimal);
+        }
+
+        return (object) [
+            'fhorsite_rating' => $fsr,
+            'fhorsite_rating_reliability' => $fsrr !== null ? $fsrr : 60,
+            'SR_LTO' => $sr_lto,
+            'SR_2' => (isset($rr->SR_2) && is_numeric($rr->SR_2)) ? floatval($rr->SR_2) : null,
+            'SR_3' => (isset($rr->SR_3) && is_numeric($rr->SR_3)) ? floatval($rr->SR_3) : null,
+            'days_since_ran' => (isset($rr->days_since_ran) && is_numeric($rr->days_since_ran)) ? floatval($rr->days_since_ran) : null,
+            'draw_bias_pct' => (isset($rr->draw_bias_pct) && is_numeric($rr->draw_bias_pct)) ? floatval($rr->draw_bias_pct) : null,
+            'class_diff' => (isset($rr->class_diff) && is_numeric($rr->class_diff)) ? floatval($rr->class_diff) : null,
+            'official_rating_diff' => (isset($rr->official_rating_diff) && is_numeric($rr->official_rating_diff)) ? floatval($rr->official_rating_diff) : null,
+            'course_winner' => (isset($rr->course_winner) && is_numeric($rr->course_winner)) ? $rr->course_winner : null,
+            'distance_winner' => (isset($rr->distance_winner) && is_numeric($rr->distance_winner)) ? $rr->distance_winner : null,
+            'candd_winner' => (isset($rr->candd_winner) && is_numeric($rr->candd_winner)) ? $rr->candd_winner : null,
+            'going_prev_wins' => (isset($rr->going_prev_wins) && is_numeric($rr->going_prev_wins)) ? $rr->going_prev_wins : null,
+            'beaten_favourite' => (isset($rr->beaten_favourite) && is_numeric($rr->beaten_favourite)) ? $rr->beaten_favourite : null,
+            'TnrWinPct14d' => (isset($rr->TnrWinPct14d) && is_numeric($rr->TnrWinPct14d)) ? floatval($rr->TnrWinPct14d) : null,
+            'TnrJkyPlacePct' => (isset($rr->TnrJkyPlacePct) && is_numeric($rr->TnrJkyPlacePct)) ? floatval($rr->TnrJkyPlacePct) : null,
+            'forecast_price_decimal' => $forecast_decimal,
+            'forecast_price' => isset($rr->starting_price) ? $rr->starting_price : '',
+        ];
+    }
+}
+
+if (!function_exists('bricks_points_backtest_score_race')) {
+    /**
+     * Score all runners in one race the same way as the live race card (NH vs Flat, shared speed mapping).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    function bricks_points_backtest_score_race($race_rows) {
+        if (empty($race_rows)) {
+            return [];
+        }
+
+        $race_type = (string) ($race_rows[0]->race_type ?? '');
+        $is_flat = !bricks_points_race_type_is_national_hunt($race_type);
+        $race_id = isset($race_rows[0]->race_id) ? intval($race_rows[0]->race_id) : 0;
+
+        $scored = [];
+        foreach ($race_rows as $idx => $rr) {
+            $speed_data = bricks_points_backtest_speed_data_from_row($rr);
+            $pts = bricks_points_score_runner($rr, $speed_data, ['is_flat' => $is_flat]);
+
+            $forecast_decimal = $speed_data->forecast_price_decimal ?? null;
+            $forecast_fractional = (string) ($speed_data->forecast_price ?? '');
+            $odds_decimal = bricks_points_parse_decimal_odds($forecast_decimal, $forecast_fractional);
+            $settlement_odds = bricks_points_settlement_odds_decimal(
+                $forecast_decimal,
+                isset($rr->starting_price) ? (string) $rr->starting_price : '',
+                $rr->starting_price_decimal ?? null
+            );
+
+            $scored[] = [
+                'runner_key' => $race_id . '_' . $idx,
+                'horse_name' => (string) ($rr->horse_name ?? ''),
+                'model_score' => floatval($pts['score'] ?? 0),
+                'model_reasons' => $pts['reasons'] ?? [],
+                'market_prob' => bricks_points_market_implied_rank($odds_decimal),
+                'market_rank' => 0,
+                'model_rank' => 0,
+                'edge_score' => 0,
+                'odds_decimal' => $odds_decimal,
+                'settlement_odds_decimal' => $settlement_odds,
+                'odds_fractional' => (string) ($rr->starting_price ?? ''),
+                'is_non_runner' => !empty($rr->is_non_runner),
+                'finish_position' => $rr->finish_position ?? '',
+                'meeting_date' => (string) ($rr->meeting_date ?? ''),
+            ];
+        }
+
+        usort($scored, function ($a, $b) {
+            return ($b['model_score'] ?? 0) <=> ($a['model_score'] ?? 0);
+        });
+        $rank = 1;
+        foreach ($scored as &$sr) {
+            $sr['model_rank'] = $rank++;
+        }
+        unset($sr);
+
+        $market_sorted = $scored;
+        usort($market_sorted, function ($a, $b) {
+            return ($b['market_prob'] ?? 0) <=> ($a['market_prob'] ?? 0);
+        });
+        $mk = 1;
+        $mk_map = [];
+        foreach ($market_sorted as $mr) {
+            if (($mr['market_prob'] ?? 0) > 0) {
+                $mk_map[$mr['runner_key']] = $mk++;
+            }
+        }
+        foreach ($scored as &$sr) {
+            $sr['market_rank'] = $mk_map[$sr['runner_key']] ?? 0;
+            $rank_edge = ($sr['market_rank'] > 0) ? ($sr['market_rank'] - $sr['model_rank']) : 0;
+            $score_edge = max(0.0, (floatval($sr['model_score']) - 55.0) * 0.20);
+            $sr['edge_score'] = round(($rank_edge * 4.0) + $score_edge, 2);
+        }
+        unset($sr);
+
+        return $scored;
+    }
+}
+
+if (!function_exists('bricks_points_engine_meeting_day_win_pick_hit_race_ids')) {
+    /**
+     * Races on a calendar day where the Points Engine Win pick (highest model score) won.
+     *
+     * @param string $meeting_date_ymd Y-m-d
+     * @return int[]
+     */
+    function bricks_points_engine_meeting_day_win_pick_hit_race_ids($meeting_date_ymd) {
+        if (!function_exists('bricks_points_backtest_fetch_rows')) {
+            return [];
+        }
+        $rows = bricks_points_backtest_fetch_rows($meeting_date_ymd, $meeting_date_ymd, '');
+        if (empty($rows)) {
+            return [];
+        }
+
+        $by_race = [];
+        foreach ($rows as $row) {
+            $rid = isset($row->race_id) ? intval($row->race_id) : 0;
+            if ($rid <= 0) {
+                continue;
+            }
+            if (!isset($by_race[$rid])) {
+                $by_race[$rid] = [];
+            }
+            $by_race[$rid][] = $row;
+        }
+
+        $hit_race_ids = [];
+
+        foreach ($by_race as $race_id => $race_rows) {
+            $field_size = count($race_rows);
+            if ($field_size < 2) {
+                continue;
+            }
+
+            $scored = bricks_points_backtest_score_race($race_rows);
+            $picks = bricks_points_pick_winner_place($scored);
+            $pick = $picks['winner'] ?? null;
+            if (!$pick || empty($pick['horse_name'])) {
+                continue;
+            }
+
+            $actual_winner_name = '';
+            foreach ($race_rows as $rr) {
+                if (bricks_points_finish_is_win($rr->finish_position ?? '')) {
+                    $actual_winner_name = (string) ($rr->horse_name ?? '');
+                    break;
+                }
+            }
+            if ($actual_winner_name === '') {
+                continue;
+            }
+
+            if (bricks_points_engine_normalize_horse_name($pick['horse_name']) === bricks_points_engine_normalize_horse_name($actual_winner_name)) {
+                $hit_race_ids[] = intval($race_id);
+            }
+        }
+
+        return $hit_race_ids;
     }
 }
 
 if (!function_exists('bricks_points_backtest_shortcode')) {
     function bricks_points_backtest_shortcode($atts = []) {
-        if (!is_user_logged_in()) {
+        if (!function_exists('bricks_user_can_access_points_backtest') || !bricks_user_can_access_points_backtest()) {
             return '<div style="max-width:760px;margin:40px auto;padding:24px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;">
                 <h2 style="margin:0 0 10px 0;color:#111827;">Points Backtest</h2>
-                <p style="margin:0;color:#6b7280;">Please log in to view backtest results.</p>
+                <p style="margin:0;color:#6b7280;">This page is available to site administrators only.</p>
             </div>';
         }
 
-        $default_to = date('Y-m-d', strtotime('-1 day'));
-        $default_from = date('Y-m-d', strtotime('-365 days', strtotime($default_to)));
+        $yesterday = wp_date('Y-m-d', strtotime('-1 day', current_time('timestamp')));
+        $default_to = $yesterday;
+        $default_from = $yesterday;
 
         $from_date = isset($_GET['pb_from']) ? sanitize_text_field($_GET['pb_from']) : $default_from;
         $to_date = isset($_GET['pb_to']) ? sanitize_text_field($_GET['pb_to']) : $default_to;
         $race_type_filter = isset($_GET['pb_race_type']) ? sanitize_text_field($_GET['pb_race_type']) : '';
+        $backtest_mode = isset($_GET['pb_mode']) ? sanitize_text_field($_GET['pb_mode']) : 'published';
+        if ($backtest_mode !== 'published' && $backtest_mode !== 'model') {
+            $backtest_mode = 'published';
+        }
+        $requested_from = $from_date;
+        $requested_to = $to_date;
 
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from_date)) $from_date = $default_from;
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to_date)) $to_date = $default_to;
-        if ($from_date > $to_date) { $tmp = $from_date; $from_date = $to_date; $to_date = $tmp; }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from_date)) {
+            $from_date = $default_from;
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to_date)) {
+            $to_date = $default_to;
+        }
+        if ($from_date > $to_date) {
+            $tmp = $from_date;
+            $from_date = $to_date;
+            $to_date = $tmp;
+        }
+        $dates_clamped = false;
+        if ($to_date > $yesterday) {
+            $dates_clamped = true;
+            $to_date = $yesterday;
+        }
+        if ($from_date > $yesterday) {
+            $dates_clamped = true;
+            $from_date = $yesterday;
+        }
 
-        $result = bricks_points_backtest_calculate($from_date, $to_date, $race_type_filter);
+        $snapshot_result = null;
+        if (
+            isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST'
+            && isset($_POST['bricks_snapshot_published_picks'])
+            && function_exists('bricks_points_published_picks_bulk_snapshot')
+        ) {
+            check_admin_referer('bricks_snapshot_published_picks');
+            $snap_from = isset($_POST['snap_from']) ? sanitize_text_field(wp_unslash($_POST['snap_from'])) : $from_date;
+            $snap_to = isset($_POST['snap_to']) ? sanitize_text_field(wp_unslash($_POST['snap_to'])) : $to_date;
+            $snap_overwrite = !empty($_POST['snap_overwrite']);
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $snap_from)) {
+                $snap_from = $from_date;
+            }
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $snap_to)) {
+                $snap_to = $to_date;
+            }
+            if ($snap_from > $snap_to) {
+                $tmp = $snap_from;
+                $snap_from = $snap_to;
+                $snap_to = $tmp;
+            }
+            $snapshot_result = bricks_points_published_picks_bulk_snapshot($snap_from, $snap_to, $snap_overwrite);
+        }
+
+        $published_snapshot_count = function_exists('bricks_points_published_picks_count_for_range')
+            ? bricks_points_published_picks_count_for_range($from_date, $to_date)
+            : 0;
+
+        $result = bricks_points_backtest_calculate($from_date, $to_date, $race_type_filter, $backtest_mode);
         $summary = $result['summary'] ?? [];
         $sample_rows = $result['sample_rows'] ?? [];
+        $day_span = isset($result['day_span']) ? intval($result['day_span']) : 1;
+        $sample_truncated = !empty($result['sample_truncated']);
+        $unsettled_win = isset($result['unsettled_win_bets']) ? intval($result['unsettled_win_bets']) : 0;
+        $missing_published = isset($result['missing_published_snapshot']) ? intval($result['missing_published_snapshot']) : 0;
+        $has_backtest_cr = $GLOBALS['wpdb']->get_var("SHOW TABLES LIKE 'backtest_cr_data'") === 'backtest_cr_data';
+        $fetch_meta = is_array($result['fetch_meta'] ?? null) ? $result['fetch_meta'] : [];
+        $dch_dates = is_array($fetch_meta['dch_dates'] ?? null) ? $fetch_meta['dch_dates'] : [];
+        $latest_historic_date = (string) ($result['latest_historic_date'] ?? '');
 
         ob_start();
         ?>
         <div style="max-width:1200px;margin:24px auto;padding:0 16px 30px;">
             <h1 style="margin:0 0 6px;color:#111827;font-size:30px;font-weight:800;">Points Engine Backtest</h1>
-            <p style="margin:0 0 14px;color:#6b7280;">Historical ROI test for Win, Place, EW Simple and EW Edge strategies.</p>
+            <p style="margin:0 0 14px;color:#6b7280;">Historical ROI test for Win, Place, EW Simple and EW Edge. Use <strong>Published picks</strong> to audit what the race card actually showed; <strong>Model replay</strong> recomputes from historic data (may differ from live).</p>
 
-            <form method="get" style="display:flex;flex-wrap:wrap;gap:10px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin-bottom:14px;">
+            <form method="get" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin-bottom:14px;">
                 <input type="hidden" name="my_points_backtest" value="1" />
-                <label style="font-size:12px;color:#374151;">From<br><input type="date" name="pb_from" value="<?php echo esc_attr($from_date); ?>" style="padding:8px;border:1px solid #d1d5db;border-radius:8px;"></label>
-                <label style="font-size:12px;color:#374151;">To<br><input type="date" name="pb_to" value="<?php echo esc_attr($to_date); ?>" style="padding:8px;border:1px solid #d1d5db;border-radius:8px;"></label>
+                <label style="font-size:12px;color:#374151;">From<br><input type="date" name="pb_from" max="<?php echo esc_attr($yesterday); ?>" value="<?php echo esc_attr($from_date); ?>" style="padding:8px;border:1px solid #d1d5db;border-radius:8px;"></label>
+                <label style="font-size:12px;color:#374151;">To<br><input type="date" name="pb_to" max="<?php echo esc_attr($yesterday); ?>" value="<?php echo esc_attr($to_date); ?>" style="padding:8px;border:1px solid #d1d5db;border-radius:8px;"></label>
+                <label style="font-size:12px;color:#374151;">Mode<br>
+                    <select name="pb_mode" style="padding:8px;border:1px solid #d1d5db;border-radius:8px;">
+                        <option value="published" <?php selected($backtest_mode, 'published'); ?>>Published picks (race card)</option>
+                        <option value="model" <?php selected($backtest_mode, 'model'); ?>>Model replay</option>
+                    </select>
+                </label>
                 <label style="font-size:12px;color:#374151;">Race Type<br><input type="text" name="pb_race_type" value="<?php echo esc_attr($race_type_filter); ?>" placeholder="Optional exact match" style="padding:8px;border:1px solid #d1d5db;border-radius:8px;"></label>
-                <div style="align-self:flex-end;"><button type="submit" style="padding:9px 14px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;">Run Backtest</button></div>
+                <button type="submit" style="padding:9px 14px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;">Run Backtest</button>
+                <a href="<?php echo esc_url(add_query_arg(['my_points_backtest' => '1', 'pb_from' => $yesterday, 'pb_to' => $yesterday], home_url('/points-backtest/'))); ?>" style="padding:9px 14px;border-radius:8px;background:#ecfdf5;color:#065f46;font-weight:700;text-decoration:none;border:1px solid #6ee7b7;">Yesterday only</a>
             </form>
 
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:12px;padding:14px;margin-bottom:14px;">
+                <h2 style="margin:0 0 6px;font-size:16px;color:#0f172a;">Snapshot published picks for date range</h2>
+                <p style="margin:0 0 10px;font-size:13px;color:#475569;">
+                    Bulk-save win/place/EW picks into <code>points_engine_published_picks</code> for published backtest mode.
+                    Uses live <code>speed&amp;performance_table</code> when rows exist; otherwise historic model replay (labelled <code>admin_bulk_replay</code>).
+                    <strong><?php echo esc_html($published_snapshot_count); ?></strong> snapshot(s) already stored for the current backtest period.
+                </p>
+                <form method="post" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+                    <?php wp_nonce_field('bricks_snapshot_published_picks'); ?>
+                    <input type="hidden" name="bricks_snapshot_published_picks" value="1" />
+                    <label style="font-size:12px;color:#374151;">From<br><input type="date" name="snap_from" max="<?php echo esc_attr($yesterday); ?>" value="<?php echo esc_attr($from_date); ?>" style="padding:8px;border:1px solid #d1d5db;border-radius:8px;"></label>
+                    <label style="font-size:12px;color:#374151;">To<br><input type="date" name="snap_to" max="<?php echo esc_attr($yesterday); ?>" value="<?php echo esc_attr($to_date); ?>" style="padding:8px;border:1px solid #d1d5db;border-radius:8px;"></label>
+                    <label style="font-size:12px;color:#374151;display:flex;align-items:center;gap:6px;padding-bottom:8px;">
+                        <input type="checkbox" name="snap_overwrite" value="1" />
+                        Overwrite existing
+                    </label>
+                    <button type="submit" style="padding:9px 14px;border:none;border-radius:8px;background:#0f766e;color:#fff;font-weight:700;cursor:pointer;">Snapshot published picks</button>
+                </form>
+                <p style="margin:10px 0 0;font-size:12px;color:#64748b;">Processes up to 400 races per run. Re-run for longer ranges. Past dates without speed rows get replay picks, not exact race-card copies.</p>
+            </div>
+
+            <?php if (is_array($snapshot_result)): ?>
+            <div style="margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#ecfdf5;border:1px solid #6ee7b7;color:#065f46;font-size:13px;">
+                Snapshot complete:
+                <strong><?php echo esc_html($snapshot_result['saved'] ?? 0); ?></strong> saved,
+                <strong><?php echo esc_html($snapshot_result['skipped'] ?? 0); ?></strong> skipped (already stored),
+                <strong><?php echo esc_html($snapshot_result['failed'] ?? 0); ?></strong> failed.
+                <?php
+                $src = is_array($snapshot_result['sources'] ?? null) ? $snapshot_result['sources'] : [];
+                $live_n = intval($src['admin_bulk_live'] ?? 0);
+                $replay_n = intval($src['admin_bulk_replay'] ?? 0);
+                if ($live_n > 0 || $replay_n > 0):
+                ?>
+                Sources: <?php echo esc_html($live_n); ?> live speed, <?php echo esc_html($replay_n); ?> historic replay.
+                <?php endif; ?>
+                <?php if (!empty($snapshot_result['errors']) && is_array($snapshot_result['errors'])): ?>
+                <ul style="margin:8px 0 0;padding-left:18px;">
+                    <?php foreach ($snapshot_result['errors'] as $err): ?>
+                    <li><?php echo esc_html($err); ?></li>
+                    <?php endforeach; ?>
+                </ul>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
+            <?php if ($dates_clamped): ?>
+            <div style="margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:13px;">
+                Dates are capped at <strong>yesterday (<?php echo esc_html($yesterday); ?>)</strong>.
+                <?php if ($requested_to > $yesterday || $requested_from > $yesterday): ?>
+                You asked for <?php echo esc_html($requested_from); ?> → <?php echo esc_html($requested_to); ?>; showing <?php echo esc_html($from_date); ?> → <?php echo esc_html($to_date); ?> instead.
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
+            <?php if ($backtest_mode === 'model'): ?>
+            <div style="margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:13px;">
+                <strong>Model replay</strong> does not use the live <code>speed&amp;performance_table</code>. It recomputes picks from historic rows
+                <?php echo $has_backtest_cr ? '(Fhorsite from <code>backtest_cr_data</code> when available)' : '(Fhorsite point-in-time table <code>backtest_cr_data</code> not found — run CR backtest SQL on DB)'; ?>.
+                Picks can differ from what members saw on the race card. For audits, use <strong>Published picks</strong>.
+            </div>
+            <?php elseif ($missing_published > 0): ?>
+            <div style="margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:13px;">
+                <strong><?php echo esc_html($missing_published); ?></strong> race(s) had no saved published pick. Use <strong>Snapshot published picks</strong> above to backfill, open those race pages while logged in, or switch to Model replay for those days.
+            </div>
+            <?php endif; ?>
+
+            <?php if (!empty($dch_dates)): ?>
+            <div style="margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;font-size:13px;">
+                <?php echo esc_html(count($dch_dates) === 1 ? 'This day' : count($dch_dates) . ' days'); ?> not yet in historic tables — loaded from <strong>daily_comment_history</strong>
+                (<?php echo esc_html(implode(', ', $dch_dates)); ?>).
+            </div>
+            <?php endif; ?>
+
+            <?php if (intval($result['race_count'] ?? 0) === 0): ?>
+            <div style="margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:13px;">
+                No settled race data for <strong><?php echo esc_html($from_date); ?></strong><?php echo $from_date !== $to_date ? ' → <strong>' . esc_html($to_date) . '</strong>' : ''; ?>.
+                <?php if ($latest_historic_date !== ''): ?>
+                Latest date in historic tables: <strong><?php echo esc_html($latest_historic_date); ?></strong>.
+                <?php endif; ?>
+                Recent cards appear here once results are in daily_comment_history or after the historic ETL run.
+            </div>
+            <?php endif; ?>
+
+            <?php if ($day_span > 31): ?>
+            <div style="margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:13px;">
+                You are backtesting <strong><?php echo esc_html($day_span); ?> days</strong> (<?php echo esc_html($from_date); ?> → <?php echo esc_html($to_date); ?>).
+                Summary totals are for the whole period. The race list below shows only the <strong>first ~120 races</strong> in that range — not your most recent card.
+                To check last Sunday’s Kelso/Curragh winners, set <strong>From and To to the same day</strong> (e.g. <?php echo esc_html($yesterday); ?>) or use “Yesterday only”.
+            </div>
+            <?php elseif ($sample_truncated): ?>
+            <div style="margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:13px;">
+                Race list is truncated to the first <?php echo esc_html(count($sample_rows)); ?> races in this range. Narrow the dates to see every race on one card.
+            </div>
+            <?php endif; ?>
+
             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+                <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;font-size:12px;color:#374151;">Period: <strong><?php echo esc_html($from_date); ?></strong> → <strong><?php echo esc_html($to_date); ?></strong> (<?php echo esc_html($day_span); ?> day<?php echo $day_span === 1 ? '' : 's'; ?>)</div>
                 <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;font-size:12px;color:#374151;">Races: <strong><?php echo esc_html($result['race_count'] ?? 0); ?></strong></div>
                 <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;font-size:12px;color:#374151;">Runners: <strong><?php echo esc_html($result['runner_count'] ?? 0); ?></strong></div>
+                <?php if ($unsettled_win > 0): ?>
+                <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 12px;font-size:12px;color:#991b1b;">Win picks with no finish in historic/DCH: <strong><?php echo esc_html($unsettled_win); ?></strong> (excluded from win P&amp;L — not counted as losses)</div>
+                <?php endif; ?>
             </div>
 
             <div style="overflow:auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:16px;">
@@ -833,8 +1585,12 @@ if (!function_exists('bricks_points_backtest_shortcode')) {
                     <thead>
                         <tr>
                             <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Date</th>
+                            <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Time</th>
                             <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Course</th>
+                            <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Race</th>
                             <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Win Pick</th>
+                            <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Hit</th>
+                            <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">SP</th>
                             <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">EW Simple</th>
                             <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">EW Edge</th>
                         </tr>
@@ -843,8 +1599,15 @@ if (!function_exists('bricks_points_backtest_shortcode')) {
                         <?php foreach ($sample_rows as $sr): ?>
                         <tr>
                             <td style="padding:10px;border-bottom:1px solid #f3f4f6;"><?php echo esc_html($sr['meeting_date']); ?></td>
+                            <td style="padding:10px;border-bottom:1px solid #f3f4f6;"><?php echo esc_html($sr['race_time'] ?? '-'); ?></td>
                             <td style="padding:10px;border-bottom:1px solid #f3f4f6;"><?php echo esc_html($sr['course']); ?></td>
-                            <td style="padding:10px;border-bottom:1px solid #f3f4f6;"><?php echo esc_html(($sr['winner_pick'] ?: '-') . ' (Pos ' . ($sr['winner_pick_pos'] ?: '-') . ')'); ?></td>
+                            <td style="padding:10px;border-bottom:1px solid #f3f4f6;font-size:12px;color:#475569;max-width:220px;"><?php echo esc_html(wp_trim_words($sr['race_title'] ?? '-', 8, '…')); ?></td>
+                            <td style="padding:10px;border-bottom:1px solid #f3f4f6;"><?php echo esc_html(($sr['winner_pick'] ?: '-') . ' (Pos ' . ($sr['winner_pick_pos'] ?? '—') . ')'); ?></td>
+                            <td style="padding:10px;border-bottom:1px solid #f3f4f6;font-weight:700;color:<?php
+                                $hit = $sr['winner_hit'] ?? '-';
+                                echo esc_attr($hit === 'Y' ? '#065f46' : ($hit === '—' ? '#92400e' : '#6b7280'));
+                            ?>;"><?php echo esc_html($hit); ?></td>
+                            <td style="padding:10px;border-bottom:1px solid #f3f4f6;"><?php echo esc_html($sr['settlement_odds'] !== '' ? $sr['settlement_odds'] : '-'); ?></td>
                             <td style="padding:10px;border-bottom:1px solid #f3f4f6;"><?php echo esc_html(($sr['ew_simple'] ?: '-') . ' (Pos ' . ($sr['ew_simple_pos'] ?: '-') . ')'); ?></td>
                             <td style="padding:10px;border-bottom:1px solid #f3f4f6;"><?php echo esc_html(($sr['ew_edge'] ?: '-') . ' (Pos ' . ($sr['ew_edge_pos'] ?: '-') . ')'); ?></td>
                         </tr>
@@ -1561,6 +2324,16 @@ if (!empty($runners)) {
 $race_points_picks = bricks_points_pick_winner_place($race_points_scored);
 $race_points_ew_simple = bricks_points_pick_each_way_simple($race_points_scored);
 $race_points_ew_edge = bricks_points_pick_each_way_edge($race_points_scored);
+
+if (function_exists('bricks_points_published_picks_save') && !empty($race->meeting_date)) {
+    bricks_points_published_picks_save(
+        $race_id,
+        $race->meeting_date,
+        $race_points_picks,
+        $race_points_ew_simple,
+        $race_points_ew_edge
+    );
+}
 
 if (function_exists('bricks_debug_enabled') && bricks_debug_enabled()) {
     bricks_debug_log('Race Points Engine Debug - Payload: ' . wp_json_encode([
@@ -3033,6 +3806,29 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled()) {
         </div>
         
         <?php if ($runners && count($runners) > 0): ?>
+
+        <div class="premium-ratings-container">
+        <?php if (!function_exists('bricks_race_detail_can_view_premium') || !bricks_race_detail_can_view_premium()): ?>
+            <div class="premium-ratings-paywall-gate" style="padding:28px 24px;background:linear-gradient(135deg,#f8fafc 0%,#eef2ff 100%);border:1px solid #c7d2fe;border-radius:12px;text-align:center;">
+                <h2 style="margin:0 0 10px;font-size:22px;color:#1e3a8a;">Fhorsite &amp; speed ratings</h2>
+                <p style="margin:0 0 16px;color:#475569;max-width:560px;margin-left:auto;margin-right:auto;">
+                    Full runner ratings, Points Engine picks, and performance charts are available to registered members.
+                </p>
+                <p style="margin:0 0 18px;font-size:13px;color:#64748b;">
+                    <?php
+                    $runner_names = array_map(function ($r) {
+                        return trim((string) ($r->name ?? ''));
+                    }, $runners);
+                    $runner_names = array_values(array_filter($runner_names));
+                    echo esc_html(count($runner_names) . ' runners: ' . implode(', ', array_slice($runner_names, 0, 12)));
+                    if (count($runner_names) > 12) {
+                        echo esc_html(' …');
+                    }
+                    ?>
+                </p>
+                <a href="<?php echo esc_url(wp_login_url(bricks_race_url($race_id))); ?>" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;text-decoration:none;">Log in to view ratings</a>
+            </div>
+        <?php else: ?>
         
         <!-- Runners Table -->
         <div class="runners-card">
@@ -5510,6 +6306,9 @@ jQuery(document).on('click', '.toggle-details-btn', function() {
         }
     });
     </script>
+
+        <?php endif; ?>
+        </div><!-- .premium-ratings-container -->
         
         <?php else: ?>
         <div class="runners-card">
@@ -5759,14 +6558,19 @@ add_shortcode('race_detail', 'bricks_race_detail_shortcode');
 function bricks_is_standalone_page() {
     // Check if we're on a page that should have full page layout
     $current_url = $_SERVER['REQUEST_URI'];
+
+    // Race pages use race-detail.php (header/footer + shortcode). Do not wrap again.
+    if (get_query_var('race_id')) {
+        return false;
+    }
+
     return (
-        strpos($current_url, '/daily') !== false || 
+        strpos($current_url, '/daily') !== false ||
         strpos($current_url, '/speed') !== false ||
         strpos($current_url, '/my-tracker') !== false ||
         strpos($current_url, '/points-backtest') !== false ||
         get_query_var('my_tracker_page') ||
-        get_query_var('my_points_backtest') ||
-        get_query_var('race_id')
+        get_query_var('my_points_backtest')
     );
 }
 
@@ -5815,12 +6619,14 @@ function bricks_get_navigation_header() {
                             <span class="nav-text">My Tracker</span>
                         </a>
                     </li>
+                    <?php if (function_exists('bricks_user_can_access_points_backtest') && bricks_user_can_access_points_backtest()): ?>
                     <li>
                         <a href="<?php echo home_url('/points-backtest/'); ?>" class="nav-link <?php echo (strpos($current_url, '/points-backtest') !== false) ? 'active' : ''; ?>">
                             <span class="nav-icon">📊</span>
                             <span class="nav-text">Points Backtest</span>
                         </a>
                     </li>
+                    <?php endif; ?>
                     
                     <?php if ($wp_pages): ?>
                         <?php foreach ($wp_pages as $page): ?>
@@ -6075,6 +6881,41 @@ function update_details_handle_form_submission() {
     exit;
 }
 
+/**
+ * Target URL for the “Manage subscription” CTA on [update_details].
+ * Not in git history: a Bricks-only button on the page would vanish if the page was re-saved without it.
+ *
+ * Resolution order: FHOR_SUBSCRIPTION_MANAGE_URL constant → option fhor_subscription_manage_url
+ * → filter fhor_update_details_subscription_manage_url → WooCommerce My Account → published page by slug.
+ *
+ * @return string Escaped URL or empty string.
+ */
+function fhor_get_update_details_subscription_manage_url() {
+    if (defined('FHOR_SUBSCRIPTION_MANAGE_URL') && FHOR_SUBSCRIPTION_MANAGE_URL !== '') {
+        return esc_url(FHOR_SUBSCRIPTION_MANAGE_URL);
+    }
+    $opt = get_option('fhor_subscription_manage_url', '');
+    if (is_string($opt) && $opt !== '') {
+        return esc_url($opt);
+    }
+    $filtered = apply_filters('fhor_update_details_subscription_manage_url', '');
+    if (is_string($filtered) && $filtered !== '') {
+        return esc_url($filtered);
+    }
+    if (function_exists('wc_get_page_permalink')) {
+        $my = wc_get_page_permalink('myaccount');
+        if (!empty($my)) {
+            return esc_url($my);
+        }
+    }
+    foreach (['my-account', 'account', 'subscriptions', 'member-account'] as $slug) {
+        $p = get_page_by_path($slug);
+        if ($p instanceof WP_Post && $p->post_status === 'publish') {
+            return esc_url(get_permalink($p));
+        }
+    }
+    return '';
+}
 
 /**
  * The Update Details shortcode - renders the profile update form.
@@ -6690,6 +7531,27 @@ function update_details_shortcode($atts) {
                 </div>
             </div>
         </form>
+
+        <?php
+        $manage_sub_url = "https://billing.stripe.com/p/login/7sY4gy9tY6dm1FU8u09Zm00?prefilled_email=";
+        if ($manage_sub_url !== '') :
+            ?>
+        <!-- Subscription / billing (code-driven so it is not lost when the Bricks page is edited) -->
+        <div class="ud-card">
+            <div class="ud-card-header">
+                <span class="ud-card-header-icon">💳</span>
+                <div>
+                    <h2>Subscription &amp; billing</h2>
+                    <p>Upgrade, downgrade, update payment details, or cancel from your account area</p>
+                </div>
+            </div>
+            <div class="ud-card-footer">
+                <a href="<?php echo esc_url($manage_sub_url); echo esc_html($current_user->user_email); ?>" class="ud-btn ud-btn-primary">Manage subscription</a>
+            </div>
+        </div>
+            <?php
+        endif;
+        ?>
     </div>
 
     <script>

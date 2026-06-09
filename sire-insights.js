@@ -9,6 +9,8 @@ jQuery(document).ready(function($) {
     }
 
     let currentSort = { column: 'mean_prb', direction: 'desc' };
+    let currentPage = 1;
+    const perPage = 50;
 
     function collectFilters() {
         return {
@@ -20,7 +22,9 @@ jQuery(document).ready(function($) {
             distance_band: $('#sire-distance-filter').val(),
             sire: $('#sire-name-filter').val(),
             sort_column: currentSort.column,
-            sort_direction: currentSort.direction
+            sort_direction: currentSort.direction,
+            page: currentPage,
+            per_page: perPage
         };
     }
 
@@ -47,6 +51,9 @@ jQuery(document).ready(function($) {
             success: function(response) {
                 if (response && !response.success) {
                     return;
+                }
+                if (response && response.effective_date) {
+                    $('#sire-date-filter').val(response.effective_date);
                 }
                 updateSelect('#sire-course-filter', response.courses, 'All Courses');
                 updateSelect('#sire-type-filter', response.race_types, 'All Types');
@@ -81,6 +88,7 @@ jQuery(document).ready(function($) {
     }
 
     $('#sire-apply-btn').on('click', function() {
+        currentPage = 1;
         loadTable();
     });
 
@@ -88,6 +96,7 @@ jQuery(document).ready(function($) {
         $('#sire-date-filter').val(sire_insights_ajax_obj.default_date);
         $('#sire-course-filter, #sire-type-filter, #sire-going-filter, #sire-distance-filter, #sire-name-filter').val('');
         currentSort = { column: 'mean_prb', direction: 'desc' };
+        currentPage = 1;
         loadFilterOptions();
         loadTable();
     });
@@ -107,6 +116,17 @@ jQuery(document).ready(function($) {
             currentSort.column = nextColumn;
             currentSort.direction = 'asc';
         }
+        currentPage = 1;
+        loadTable();
+    });
+
+    $(document).on('click', '.sire-pagination-btn', function(e) {
+        e.preventDefault();
+        const nextPage = parseInt($(this).data('page'), 10);
+        if (!nextPage || nextPage < 1) {
+            return;
+        }
+        currentPage = nextPage;
         loadTable();
     });
 

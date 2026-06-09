@@ -107,6 +107,12 @@ if (!function_exists('bricks_race_url')) {
     }
 }
 
+if (!function_exists('bricks_user_can_access_points_backtest')) {
+    function bricks_user_can_access_points_backtest() {
+        return is_user_logged_in() && current_user_can('manage_options');
+    }
+}
+
 if (!function_exists('bricks_horse_history_url')) {
     function bricks_horse_history_url($runner_id) {
         $token = bricks_encode_entity_id($runner_id, 'runner');
