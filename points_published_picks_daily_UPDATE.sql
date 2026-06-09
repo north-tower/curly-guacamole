@@ -89,7 +89,6 @@ BEGIN
             END AS maturity_edge_score,
             CASE
                 WHEN nr.runner_id IS NOT NULL THEN 1
-                WHEN IFNULL(drunb.non_runner, 0) = 1 THEN 1
                 ELSE 0
             END AS is_non_runner,
             CASE
@@ -183,8 +182,6 @@ BEGIN
             , 1))) AS model_score
         FROM `speed&performance_table` sp
         INNER JOIN daily_races_beta dracb ON dracb.race_id = sp.race_id
-        LEFT JOIN daily_runners_beta drunb
-            ON drunb.race_id = sp.race_id AND drunb.runner_id = sp.runner_id
         LEFT JOIN non_runners nr
             ON nr.race_id = sp.race_id AND nr.runner_id = sp.runner_id
         LEFT JOIN tmp_points_trainer_course tc
