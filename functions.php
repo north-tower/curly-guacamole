@@ -36,6 +36,7 @@ require_once __DIR__ . '/inc/helpers-core.php';
 require_once __DIR__ . '/inc/enqueue.php';
 require_once __DIR__ . '/inc/rewrites.php';
 require_once __DIR__ . '/inc/seo.php';
+require_once __DIR__ . '/inc/seo-regional.php';
 require_once __DIR__ . '/inc/tracker.php';
 require_once __DIR__ . '/inc/race-table.php';
 require_once __DIR__ . '/inc/speed-performance.php';
@@ -43,8 +44,12 @@ require_once __DIR__ . '/inc/horse-history.php';
 require_once __DIR__ . '/inc/race-comments.php';
 require_once __DIR__ . '/inc/sire-insights.php';
 require_once __DIR__ . '/inc/yesterday-winners.php';
+require_once __DIR__ . '/inc/racecourse-guides.php';
+require_once __DIR__ . '/inc/racing-festivals.php';
+require_once __DIR__ . '/inc/proven-winners.php';
 require_once __DIR__ . '/inc/admin-pnl.php';
 require_once __DIR__ . '/inc/points-published-picks.php';
+require_once __DIR__ . '/inc/points-today-picks.php';
 
 
 /**
@@ -1426,7 +1431,7 @@ if (!function_exists('bricks_points_backtest_shortcode')) {
         ?>
         <div style="max-width:1200px;margin:24px auto;padding:0 16px 30px;">
             <h1 style="margin:0 0 6px;color:#111827;font-size:30px;font-weight:800;">Points Engine Backtest</h1>
-            <p style="margin:0 0 14px;color:#6b7280;">Historical ROI test for Win, Place, EW Simple and EW Edge. Use <strong>Published picks</strong> to audit what the race card actually showed; <strong>Model replay</strong> recomputes from historic data (may differ from live).</p>
+            <p style="margin:0 0 14px;color:#6b7280;">Historical ROI test for Win, Place, EW Simple and EW Edge. Use <strong>Published picks</strong> to audit what the race card actually showed; <strong>Model replay</strong> recomputes from historic data (may differ from live). <a href="<?php echo esc_url(home_url('/today-picks/')); ?>" style="color:#0f766e;font-weight:700;">Today's Picks sheet</a> for a one-page audit screenshot.</p>
 
             <form method="get" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin-bottom:14px;">
                 <input type="hidden" name="my_points_backtest" value="1" />
@@ -4631,9 +4636,13 @@ if ($speed_data) {
         </div>
 
           <!-- Speed Rating Chart Section -->
+        <?php
+        $runner_count_chart = is_countable($runners) ? count($runners) : 0;
+        $speed_chart_height_px = min(2400, max(500, ($runner_count_chart * 52) + 160));
+        ?>
         <div style="background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.1);margin-top:30px;padding:30px;">
             <h2 style="color:#111827;margin-bottom:25px;text-align:center;font-size:24px;font-weight:700;">📊 Fhorsite and Speed Rating Analysis</h2>
-            <div class="speed-rating-chart-container" style="position:relative;height:700px;margin:30px 0;background:linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);border-radius:8px;padding:20px;">
+            <div class="speed-rating-chart-container" style="position:relative;height:<?php echo (int) $speed_chart_height_px; ?>px;min-height:500px;margin:30px 0;background:linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);border-radius:8px;padding:20px;">
                 <div style="text-align:center;margin-bottom:10px;font-size:12px;color:#6b7280;font-style:italic;">💡 Click on legend items to filter the chart</div>
                 <canvas id="speedRatingChart_<?php echo $race_id; ?>"></canvas>
                 <div id="speedRatingNoData_<?php echo $race_id; ?>" style="display:none;text-align:center;padding:40px;color:#666;">
@@ -5008,6 +5017,8 @@ const chartData = {
         }
         
         // Chart configuration
+        const runnerLabelCount = chartData.labels.length;
+        const yTickFontSize = runnerLabelCount > 24 ? 10 : (runnerLabelCount > 16 ? 11 : 13);
         const config = {
             type: 'bar',
             data: chartData,
@@ -5032,7 +5043,9 @@ const chartData = {
                     y: {
                         grid: { display: false },
                         ticks: {
-                            font: { size: 13, weight: '600' },
+                            autoSkip: false,
+                            includeBounds: true,
+                            font: { size: yTickFontSize, weight: '600' },
                             color: '#333'
                         }
                     }
@@ -5042,8 +5055,8 @@ const chartData = {
                         borderWidth: 0,
                         borderRadius: 8,
                         borderSkipped: false,
-                        categoryPercentage: 0.95,
-                        barPercentage: 0.95
+                        categoryPercentage: runnerLabelCount > 20 ? 0.88 : 0.95,
+                        barPercentage: runnerLabelCount > 20 ? 0.82 : 0.95
                     }
                 },
                 layout: { padding: { top: 20, bottom: 20 } },
@@ -5097,6 +5110,7 @@ const chartData = {
         if (ctx) {
             dbg('Creating Speed Rating chart...');
             const chart = new Chart(ctx, config);
+            chart.resize();
             // Store chart instance and original data globally
             if (!window.raceDetailCharts_<?php echo $race_id; ?>) {
                 window.raceDetailCharts_<?php echo $race_id; ?> = {};
@@ -6569,8 +6583,22 @@ function bricks_is_standalone_page() {
         strpos($current_url, '/speed') !== false ||
         strpos($current_url, '/my-tracker') !== false ||
         strpos($current_url, '/points-backtest') !== false ||
+        strpos($current_url, '/today-picks') !== false ||
+        strpos($current_url, '/tracks') !== false ||
+        strpos($current_url, '/racecourses') !== false ||
+        strpos($current_url, '/festivals') !== false ||
         get_query_var('my_tracker_page') ||
-        get_query_var('my_points_backtest')
+        get_query_var('my_points_backtest') ||
+        get_query_var('my_today_picks_page') ||
+        get_query_var('track_slug') ||
+        get_query_var('tracks_index') ||
+        get_query_var('racecourses_index') ||
+        get_query_var('racecourses_region') ||
+        get_query_var('proven_winners_page') ||
+        get_query_var('festivals_index') ||
+        get_query_var('festival_slug') ||
+        (function_exists('bricks_proven_winners_is_request') && bricks_proven_winners_is_request()) ||
+        (function_exists('bricks_festival_is_request') && bricks_festival_is_request())
     );
 }
 
@@ -6620,6 +6648,12 @@ function bricks_get_navigation_header() {
                         </a>
                     </li>
                     <?php if (function_exists('bricks_user_can_access_points_backtest') && bricks_user_can_access_points_backtest()): ?>
+                    <li>
+                        <a href="<?php echo home_url('/today-picks/'); ?>" class="nav-link <?php echo (strpos($current_url, '/today-picks') !== false) ? 'active' : ''; ?>">
+                            <span class="nav-icon">📋</span>
+                            <span class="nav-text">Today's Picks</span>
+                        </a>
+                    </li>
                     <li>
                         <a href="<?php echo home_url('/points-backtest/'); ?>" class="nav-link <?php echo (strpos($current_url, '/points-backtest') !== false) ? 'active' : ''; ?>">
                             <span class="nav-icon">📊</span>

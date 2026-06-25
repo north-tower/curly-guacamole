@@ -3,6 +3,13 @@ jQuery(document).ready(function($) {
     let currentFilters = { date: race_ajax_obj.default_date };
     let currentSort = { column: '', direction: '' };
 
+    const $wrapper = $('.race-table-wrapper').first();
+    const lockedCourse = $wrapper.data('locked-course') || race_ajax_obj.locked_course || '';
+    if (lockedCourse) {
+        $('#race-course-filter').val(lockedCourse);
+        currentFilters.course = lockedCourse;
+    }
+
     loadRaceTable();
 
     $('.race-date-tab').on('click', function() {
@@ -23,11 +30,17 @@ jQuery(document).ready(function($) {
 
     $('#race-reset-btn').on('click', function() {
         $('.race-filter').val('');
+        if (lockedCourse) {
+            $('#race-course-filter').val(lockedCourse);
+        }
         $('#race-runners-from-filter').val('');
         $('#race-runners-to-filter').val('');
         $('.race-date-tab').removeClass('active');
         $('.race-date-tab[data-date="' + race_ajax_obj.default_date + '"]').addClass('active');
         currentFilters = { date: race_ajax_obj.default_date };
+        if (lockedCourse) {
+            currentFilters.course = lockedCourse;
+        }
         currentPage = 1;
         currentSort = { column: '', direction: '' };
         loadFilterOptions(race_ajax_obj.default_date);
@@ -112,7 +125,7 @@ jQuery(document).ready(function($) {
             action: 'load_race_table',
             race_page: currentPage,
             country: $('#race-country-filter').val(),
-            course: $('#race-course-filter').val(),
+            course: lockedCourse || $('#race-course-filter').val(),
             race_type: $('#race-type-filter').val(),
             class: $('#race-class-filter').val(),
             handicap: $('#race-handicap-filter').val(),
@@ -152,7 +165,7 @@ jQuery(document).ready(function($) {
             action: 'load_race_table',
             race_page: currentPage,
             country: $('#race-country-filter').val(),
-            course: $('#race-course-filter').val(),
+            course: lockedCourse || $('#race-course-filter').val(),
             race_type: $('#race-type-filter').val(),
             class: $('#race-class-filter').val(),
             handicap: $('#race-handicap-filter').val(),

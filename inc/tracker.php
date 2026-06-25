@@ -182,6 +182,7 @@ if (!function_exists('bricks_tracker_should_load_frontend_assets')) {
             $has_route_match = bricks_request_uri_contains([
                 '/my-tracker',
                 '/points-backtest',
+                '/today-picks',
                 '/daily_sires_insights',
                 '/admin-pnl',
                 '/race/',
@@ -189,6 +190,9 @@ if (!function_exists('bricks_tracker_should_load_frontend_assets')) {
                 '/race-comments/',
                 '/daily',
                 '/speed',
+                '/tracks',
+                '/racecourses',
+                '/festivals',
             ]);
         }
 
@@ -198,11 +202,18 @@ if (!function_exists('bricks_tracker_should_load_frontend_assets')) {
                 'my_tracker_dashboard',
                 'race_table',
                 'race_table_full',
+                'racecourse_guide',
+                'racecourse_guide_static',
+                'racecourse_guide_card',
+                'racecourse_index',
+                'racing_festivals_index',
+                'racing_festival_hub',
                 'speed_performance_table',
                 'horse_history',
                 'race_comment_history',
                 'race_detail',
                 'points_backtest',
+                'points_today_picks',
                 'daily_sires_insights',
                 'admin_pnl_dashboard',
             ]);
@@ -215,6 +226,13 @@ if (!function_exists('bricks_tracker_should_load_frontend_assets')) {
             get_query_var('race_comment_id') ||
             get_query_var('my_tracker_page') ||
             get_query_var('my_points_backtest') ||
+            get_query_var('my_today_picks_page') ||
+            get_query_var('track_slug') ||
+            get_query_var('tracks_index') ||
+            get_query_var('racecourses_index') ||
+            get_query_var('racecourses_region') ||
+            get_query_var('festivals_index') ||
+            get_query_var('festival_slug') ||
             $has_route_match ||
             $has_shortcode_match
         );
@@ -527,6 +545,11 @@ function bricks_tracker_floating_quick_link() {
         >📝 My Tracker</a>
         <?php if (function_exists('bricks_user_can_access_points_backtest') && bricks_user_can_access_points_backtest()): ?>
         <a
+            href="<?php echo esc_url(home_url('/today-picks/')); ?>"
+            title="Open Today's Picks (audit sheet)"
+            style="display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:linear-gradient(135deg, #0f766e 0%, #115e59 100%);color:#fff;font-weight:700;font-size:13px;text-decoration:none;box-shadow:0 8px 20px rgba(17,94,89,0.35);"
+        >📋 Today's Picks</a>
+        <a
             href="<?php echo esc_url(home_url('/points-backtest/')); ?>"
             title="Open Points Backtest"
             style="display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);color:#fff;font-weight:700;font-size:13px;text-decoration:none;box-shadow:0 8px 20px rgba(30,64,175,0.35);"
@@ -729,21 +752,26 @@ function bricks_add_my_tracker_menu_item($items, $args) {
     }
 
     $tracker_url = home_url('/my-tracker/');
+    $today_picks_url = home_url('/today-picks/');
     $points_url = home_url('/points-backtest/');
     if (strpos($items, $tracker_url) !== false) {
-        if (strpos($items, $points_url) !== false) {
+        if (strpos($items, $points_url) !== false && strpos($items, $today_picks_url) !== false) {
             return $items;
         }
     }
 
     $current_url = $_SERVER['REQUEST_URI'] ?? '';
     $active_class = (strpos($current_url, '/my-tracker') !== false) ? ' current-menu-item current_page_item' : '';
+    $active_today_class = (strpos($current_url, '/today-picks') !== false) ? ' current-menu-item current_page_item' : '';
     $active_points_class = (strpos($current_url, '/points-backtest') !== false) ? ' current-menu-item current_page_item' : '';
 
     $items .= '<li class="menu-item menu-item-type-custom menu-item-my-tracker' . esc_attr($active_class) . '">
         <a href="' . esc_url($tracker_url) . '">My Tracker</a>
     </li>';
     if (function_exists('bricks_user_can_access_points_backtest') && bricks_user_can_access_points_backtest()) {
+        $items .= '<li class="menu-item menu-item-type-custom menu-item-today-picks' . esc_attr($active_today_class) . '">
+            <a href="' . esc_url($today_picks_url) . '">Today\'s Picks</a>
+        </li>';
         $items .= '<li class="menu-item menu-item-type-custom menu-item-points-backtest' . esc_attr($active_points_class) . '">
             <a href="' . esc_url($points_url) . '">Points Backtest</a>
         </li>';

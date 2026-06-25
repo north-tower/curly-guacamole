@@ -7,6 +7,7 @@ function bricks_my_tracker_rewrite_rules() {
     add_rewrite_rule('my-tracker/?$', 'index.php?my_tracker_page=1', 'top');
     add_rewrite_rule('points-backtest/?$', 'index.php?my_points_backtest=1', 'top');
     add_rewrite_rule('admin-pnl/?$', 'index.php?my_admin_pnl_page=1', 'top');
+    add_rewrite_rule('today-picks/?$', 'index.php?my_today_picks_page=1', 'top');
 }
 add_action('init', 'bricks_my_tracker_rewrite_rules', 10);
 
@@ -14,6 +15,7 @@ function bricks_my_tracker_query_vars($vars) {
     $vars[] = 'my_tracker_page';
     $vars[] = 'my_points_backtest';
     $vars[] = 'my_admin_pnl_page';
+    $vars[] = 'my_today_picks_page';
     return $vars;
 }
 add_filter('query_vars', 'bricks_my_tracker_query_vars');
@@ -23,18 +25,30 @@ function bricks_my_tracker_template_redirect() {
     $is_tracker_uri = strpos($request_uri, '/my-tracker') !== false;
     $is_backtest_uri = strpos($request_uri, '/points-backtest') !== false;
     $is_admin_pnl_uri = strpos($request_uri, '/admin-pnl') !== false;
+    $is_today_picks_uri = strpos($request_uri, '/today-picks') !== false;
     $is_tracker_qv = (bool) get_query_var('my_tracker_page');
     $is_backtest_qv = (bool) get_query_var('my_points_backtest');
     $is_admin_pnl_qv = (bool) get_query_var('my_admin_pnl_page');
+    $is_today_picks_qv = (bool) get_query_var('my_today_picks_page');
 
-    if ((!$is_tracker_qv && !$is_backtest_qv && !$is_admin_pnl_qv && !$is_tracker_uri && !$is_backtest_uri && !$is_admin_pnl_uri) || is_admin()) {
+    if (
+        (!$is_tracker_qv && !$is_backtest_qv && !$is_admin_pnl_qv && !$is_today_picks_qv
+            && !$is_tracker_uri && !$is_backtest_uri && !$is_admin_pnl_uri && !$is_today_picks_uri)
+        || is_admin()
+    ) {
         return;
     }
 
-    // Points backtest + Admin P&L: same theme shell as My Tracker (header/footer). Admins only.
-    if ($is_backtest_qv || $is_backtest_uri || $is_admin_pnl_qv || $is_admin_pnl_uri) {
+    // Points backtest + Admin P&L + Today's picks: same theme shell as My Tracker (header/footer). Admins only.
+    if ($is_backtest_qv || $is_backtest_uri || $is_admin_pnl_qv || $is_admin_pnl_uri || $is_today_picks_qv || $is_today_picks_uri) {
         if (!bricks_user_can_access_points_backtest()) {
-            $page_title = ($is_admin_pnl_qv || $is_admin_pnl_uri) ? 'Admin P&amp;L' : 'Points Backtest';
+            if ($is_admin_pnl_qv || $is_admin_pnl_uri) {
+                $page_title = 'Admin P&amp;L';
+            } elseif ($is_today_picks_qv || $is_today_picks_uri) {
+                $page_title = 'Today\'s Picks';
+            } else {
+                $page_title = 'Points Backtest';
+            }
             status_header(403);
             nocache_headers();
             ob_start();
@@ -53,7 +67,13 @@ function bricks_my_tracker_template_redirect() {
             exit;
         }
 
-        $shortcode = ($is_admin_pnl_qv || $is_admin_pnl_uri) ? '[admin_pnl_dashboard]' : '[points_backtest]';
+        if ($is_admin_pnl_qv || $is_admin_pnl_uri) {
+            $shortcode = '[admin_pnl_dashboard]';
+        } elseif ($is_today_picks_qv || $is_today_picks_uri) {
+            $shortcode = '[points_today_picks]';
+        } else {
+            $shortcode = '[points_backtest]';
+        }
         status_header(200);
         nocache_headers();
         ob_start();
@@ -91,9 +111,9 @@ function bricks_my_tracker_template_redirect() {
 add_action('template_redirect', 'bricks_my_tracker_template_redirect', 1);
 
 function bricks_flush_my_tracker_rewrite_rules_if_needed() {
-    if (get_option('my_tracker_rewrite_rules_flushed') !== '4') {
+    if (get_option('my_tracker_rewrite_rules_flushed') !== '6') {
         flush_rewrite_rules();
-        update_option('my_tracker_rewrite_rules_flushed', '5');
+        update_option('my_tracker_rewrite_rules_flushed', '6');
     }
 }
 add_action('init', 'bricks_flush_my_tracker_rewrite_rules_if_needed', 999);
@@ -154,9 +174,21 @@ function bricks_setup_virtual_page_post() {
         || get_query_var('my_tracker_page')
         || get_query_var('my_points_backtest')
         || get_query_var('my_admin_pnl_page')
+        || get_query_var('my_today_picks_page')
+        || get_query_var('track_slug')
+        || get_query_var('tracks_index')
+        || get_query_var('racecourses_index')
+        || get_query_var('racecourses_region')
+        || get_query_var('proven_winners_page')
+        || get_query_var('festivals_index')
+        || get_query_var('festival_slug')
+        || (function_exists('bricks_proven_winners_is_request') && bricks_proven_winners_is_request())
+        || (function_exists('bricks_festival_is_request') && bricks_festival_is_request())
         || (strpos($request_uri, '/my-tracker') !== false)
         || (strpos($request_uri, '/points-backtest') !== false)
-        || (strpos($request_uri, '/admin-pnl') !== false);
+        || (strpos($request_uri, '/admin-pnl') !== false)
+        || (strpos($request_uri, '/today-picks') !== false)
+        || (strpos($request_uri, '/tracks') !== false);
     if (!$is_virtual) {
         return;
     }

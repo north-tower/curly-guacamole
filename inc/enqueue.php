@@ -37,9 +37,11 @@ if (!function_exists('bricks_current_post_has_shortcode')) {
 }
 
 function bricks_race_table_enqueue_scripts() {
-    $is_daily_route = bricks_request_uri_contains(['/daily']);
-    $has_race_shortcode = bricks_current_post_has_shortcode(['race_table', 'race_table_full']);
-    if (!$is_daily_route && !$has_race_shortcode) {
+    $is_daily_route = bricks_request_uri_contains(['/daily', '/racecourses', '/tracks']);
+    $has_race_shortcode = bricks_current_post_has_shortcode(['race_table', 'race_table_full', 'racecourse_guide', 'racecourse_guide_card']);
+    $is_track_route = get_query_var('track_slug') || get_query_var('tracks_index')
+        || get_query_var('racecourses_index') || get_query_var('racecourses_region');
+    if (!$is_daily_route && !$has_race_shortcode && !$is_track_route) {
         return;
     }
 
@@ -145,11 +147,24 @@ function bricks_tracker_enqueue_scripts() {
         get_query_var('race_comment_id') ||
         get_query_var('my_tracker_page') ||
         get_query_var('my_points_backtest') ||
-        bricks_request_uri_contains(['/my-tracker', '/points-backtest', '/race/', '/horse-history/', '/race-comments/']) ||
+        get_query_var('my_today_picks_page') ||
+        get_query_var('track_slug') ||
+        get_query_var('tracks_index') ||
+        get_query_var('racecourses_index') ||
+        get_query_var('racecourses_region') ||
+        get_query_var('festivals_index') ||
+        get_query_var('festival_slug') ||
+        bricks_request_uri_contains(['/my-tracker', '/points-backtest', '/today-picks', '/race/', '/horse-history/', '/race-comments/', '/tracks', '/racecourses', '/festivals']) ||
         bricks_current_post_has_shortcode([
             'my_tracker_dashboard',
             'race_table',
             'race_table_full',
+            'racecourse_guide',
+            'racecourse_guide_static',
+            'racecourse_guide_card',
+            'racecourse_index',
+            'racing_festivals_index',
+            'racing_festival_hub',
             'speed_performance_table',
             'horse_history',
             'race_comment_history',

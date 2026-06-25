@@ -275,7 +275,7 @@ function bricks_get_race_filter_options() {
         $table = 'advance_daily_races_beta';
     }
 
-    $cache_key = bricks_cache_key('race_filters', [$table, $date]);
+    $cache_key = 'race_filter_opts_' . md5($table . '|' . $date);
     $cached = get_transient($cache_key);
     if ($cached !== false && is_array($cached)) {
         wp_send_json($cached);
@@ -640,8 +640,18 @@ add_action('wp_ajax_nopriv_load_race_table', 'bricks_ajax_load_race_table');
 // SHORTCODE FOR DISPLAY
 // ==============================================
 
-function bricks_race_table_shortcode() {
+function bricks_race_table_shortcode($atts = []) {
     global $wpdb;
+
+    $atts = shortcode_atts([
+        'course' => '',
+        'lock_course' => '0',
+        'hide_course_filter' => '0',
+    ], $atts, 'race_table');
+
+    $locked_course = trim((string) $atts['course']);
+    $lock_course = ($atts['lock_course'] === '1' || $atts['lock_course'] === 'true') && $locked_course !== '';
+    $hide_course_filter = $atts['hide_course_filter'] === '1' || $atts['hide_course_filter'] === 'true' || $lock_course;
 
     $today = new DateTimeImmutable();
     $today_date = $today->format('Y-m-d');
@@ -1062,7 +1072,11 @@ $dates[] = [
         }
     </style>
 
-    <div class="race-table-wrapper">
+    <div class="race-table-wrapper"<?php
+        if ($lock_course && $locked_course !== '') {
+            echo ' data-locked-course="' . esc_attr($locked_course) . '"';
+        }
+    ?>>
 
     <div class="race-filters">
         <div class="filter-group">
@@ -1075,13 +1089,16 @@ $dates[] = [
             </select>
         </div>
 
-        <div class="filter-group">
+        <div class="filter-group"<?php echo $hide_course_filter ? ' style="display:none;"' : ''; ?>>
             <label for="race-course-filter">Course:</label>
-            <select id="race-course-filter" class="race-filter">
+            <select id="race-course-filter" class="race-filter"<?php echo $lock_course ? ' data-locked="1"' : ''; ?>>
                 <option value="">All Courses</option>
                 <?php foreach ($courses as $course): ?>
-                    <option value="<?= esc_attr($course) ?>"><?= esc_html($course) ?></option>
+                    <option value="<?= esc_attr($course) ?>"<?php selected($lock_course && $locked_course === $course); ?>><?= esc_html($course) ?></option>
                 <?php endforeach; ?>
+                <?php if ($lock_course && $locked_course !== '' && !in_array($locked_course, $courses, true)): ?>
+                    <option value="<?= esc_attr($locked_course) ?>" selected><?= esc_html($locked_course) ?></option>
+                <?php endif; ?>
             </select>
         </div>
 
@@ -1183,9 +1200,9 @@ function bricks_race_table_shortcode_with_header() {
             <div class="page-header-container">
                 <h1 class="page-title">
                     <span>🏁</span>
-                    Today\'s Races
+                    UK &amp; Irish Race Cards Today
                 </h1>
-                <p class="page-description">Live racing data, results and comprehensive race information</p>
+                <p class="page-description">Today\'s UK and Irish meetings — turf speed ratings, All-Weather AW speed figures, and full racecard data</p>
             </div>
         </div>
         <main class="main-content">
