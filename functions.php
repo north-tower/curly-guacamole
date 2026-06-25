@@ -1631,6 +1631,10 @@ add_shortcode('points_backtest', 'bricks_points_backtest_shortcode');
 function bricks_race_detail_shortcode($atts) {
     global $wpdb;
 
+    if (!fhor_user_has_paid_race_access()) {
+        return fhor_race_access_required_message();
+    }
+
     $atts = shortcode_atts(['race_id' => 0], $atts);
     $race_id = bricks_decode_entity_id($atts['race_id'], 'race');
     if (!$race_id) {
@@ -6949,6 +6953,186 @@ function fhor_get_update_details_subscription_manage_url() {
         }
     }
     return '';
+}
+
+/**
+ * Race access policy:
+ * - Wednesday: any logged-in user can view races.
+ * - Other days: user must be a paid Bricks Members member.
+ */
+function fhor_user_has_paid_race_access($user_id = 0) {
+    if (!is_user_logged_in()) {
+        return false;
+    }
+
+    $user_id = $user_id ? intval($user_id) : get_current_user_id();
+    if ($user_id <= 0) {
+        return false;
+    }
+
+    if (user_can($user_id, 'manage_options')) {
+        return true;
+    }
+
+    $now = new DateTimeImmutable('now', wp_timezone());
+    if ($now->format('N') === '3') {
+        return true;
+    }
+
+    // Allow explicit site-level override via custom integration.
+    $override = apply_filters('fhor_bricks_members_paid_access', null, $user_id);
+    if (is_bool($override)) {
+        return $override;
+    }
+
+    $allowed_level_ids = [5];
+    if (defined('FHOR_PAID_MEMBER_LEVEL_IDS')) {
+        $allowed_level_ids = array_map('intval', (array) FHOR_PAID_MEMBER_LEVEL_IDS);
+    } else {
+        $option_ids = get_option('fhor_paid_member_level_ids', $allowed_level_ids);
+        $allowed_level_ids = array_map('intval', (array) $option_ids);
+    }
+    $allowed_level_ids = array_values(array_filter($allowed_level_ids, function($v) {
+        return $v > 0;
+    }));
+
+    $allowed_level_names = ['fhorsite member'];
+    if (defined('FHOR_PAID_MEMBER_LEVEL_NAMES')) {
+        $allowed_level_names = (array) FHOR_PAID_MEMBER_LEVEL_NAMES;
+    } else {
+        $option_names = get_option('fhor_paid_member_level_names', $allowed_level_names);
+        $allowed_level_names = (array) $option_names;
+    }
+    $allowed_level_names = array_map(function($name) {
+        return strtolower(trim((string) $name));
+    }, $allowed_level_names);
+    $allowed_level_names = array_values(array_filter($allowed_level_names, function($name) {
+        return $name !== '';
+    }));
+
+    $user_level_ids = [];
+    $user_level_names = [];
+
+    $raw_levels = null;
+    if (function_exists('bricks_members_get_user_levels')) {
+        $raw_levels = bricks_members_get_user_levels($user_id);
+    } elseif (function_exists('bm_get_user_levels')) {
+        $raw_levels = bm_get_user_levels($user_id);
+    }
+
+    if (is_array($raw_levels)) {
+        foreach ($raw_levels as $lvl) {
+            if (is_numeric($lvl)) {
+                $user_level_ids[] = intval($lvl);
+                continue;
+            }
+            if (is_object($lvl)) {
+                if (isset($lvl->id) && is_numeric($lvl->id)) {
+                    $user_level_ids[] = intval($lvl->id);
+                }
+                if (isset($lvl->name)) {
+                    $user_level_names[] = strtolower(trim((string) $lvl->name));
+                }
+                continue;
+            }
+            if (is_array($lvl)) {
+                if (isset($lvl['id']) && is_numeric($lvl['id'])) {
+                    $user_level_ids[] = intval($lvl['id']);
+                }
+                if (isset($lvl['name'])) {
+                    $user_level_names[] = strtolower(trim((string) $lvl['name']));
+                }
+            }
+        }
+    }
+
+    foreach ([
+        'bricks_members_levels',
+        'bricks_members_level_ids',
+        'bm_levels',
+        'bm_level_ids',
+        'bricks_members_user_levels',
+    ] as $meta_key) {
+        $meta = get_user_meta($user_id, $meta_key, true);
+        if (empty($meta)) {
+            continue;
+        }
+
+        if (is_string($meta)) {
+            $decoded = json_decode($meta, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $meta = $decoded;
+            } else {
+                $meta = array_map('trim', explode(',', $meta));
+            }
+        }
+
+        if (!is_array($meta)) {
+            $meta = [$meta];
+        }
+
+        foreach ($meta as $value) {
+            if (is_numeric($value)) {
+                $user_level_ids[] = intval($value);
+            } elseif (is_string($value)) {
+                $val = strtolower(trim($value));
+                if ($val !== '') {
+                    if (ctype_digit($val)) {
+                        $user_level_ids[] = intval($val);
+                    } else {
+                        $user_level_names[] = $val;
+                    }
+                }
+            } elseif (is_array($value)) {
+                if (isset($value['id']) && is_numeric($value['id'])) {
+                    $user_level_ids[] = intval($value['id']);
+                }
+                if (isset($value['name']) && is_string($value['name'])) {
+                    $name = strtolower(trim($value['name']));
+                    if ($name !== '') {
+                        $user_level_names[] = $name;
+                    }
+                }
+            }
+        }
+    }
+
+    $user_level_ids = array_values(array_unique(array_filter($user_level_ids, function($v) {
+        return $v > 0;
+    })));
+    $user_level_names = array_values(array_unique(array_filter($user_level_names, function($name) {
+        return $name !== '';
+    })));
+
+    if (!empty($allowed_level_ids) && !empty(array_intersect($allowed_level_ids, $user_level_ids))) {
+        return true;
+    }
+
+    if (!empty($allowed_level_names) && !empty(array_intersect($allowed_level_names, $user_level_names))) {
+        return true;
+    }
+
+    return false;
+}
+
+function fhor_race_access_required_message() {
+    ob_start();
+    $manage_url = fhor_get_update_details_subscription_manage_url();
+    ?>
+    <div style="text-align:center;padding:28px 20px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;">
+        <div style="font-size:28px;margin-bottom:10px;">🔒</div>
+        <div style="font-size:18px;font-weight:700;color:#111827;margin-bottom:8px;">Race access is for paid members</div>
+        <div style="color:#6b7280;max-width:520px;margin:0 auto 14px;">
+            On Wednesdays, all logged-in users can view races. On other days, an active paid membership is required.
+        </div>
+        <?php if (!is_user_logged_in()): ?>
+            <a href="<?php echo esc_url(wp_login_url(get_permalink())); ?>" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Log in</a>
+        <?php elseif (!empty($manage_url)): ?>
+            <a href="<?php echo esc_url($manage_url); ?>" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Manage subscription</a>
+        <?php endif; ?>
+    </div>
+    <?php
+    return ob_get_clean();
 }
 
 /**

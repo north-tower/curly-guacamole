@@ -261,8 +261,48 @@ const filters = {
 // AJAX HANDLERS
 // ==============================================
 
+function bricks_race_membership_required_message() {
+    if (function_exists('fhor_race_access_required_message')) {
+        return fhor_race_access_required_message();
+    }
+
+    ob_start();
+    $manage_url = function_exists('fhor_get_update_details_subscription_manage_url')
+        ? fhor_get_update_details_subscription_manage_url()
+        : '';
+    ?>
+    <div style="text-align:center;padding:28px 20px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;">
+        <div style="font-size:28px;margin-bottom:10px;">🔒</div>
+        <div style="font-size:18px;font-weight:700;color:#111827;margin-bottom:8px;">Race access is for paid members</div>
+        <div style="color:#6b7280;max-width:520px;margin:0 auto 14px;">
+            On Wednesdays, all logged-in users can view races. On other days, an active paid membership is required.
+        </div>
+        <?php if (!is_user_logged_in()): ?>
+            <a href="<?php echo esc_url(wp_login_url(get_permalink())); ?>" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Log in</a>
+        <?php elseif (!empty($manage_url)): ?>
+            <a href="<?php echo esc_url($manage_url); ?>" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Manage subscription</a>
+        <?php endif; ?>
+    </div>
+    <?php
+    return ob_get_clean();
+}
+
 function bricks_get_race_filter_options() {
     global $wpdb;
+
+    if (!function_exists('fhor_user_has_paid_race_access') || !fhor_user_has_paid_race_access()) {
+        wp_send_json([
+            'countries' => [],
+            'courses' => [],
+            'types' => [],
+            'classes' => [],
+            'ages' => [],
+            'handicaps' => [],
+            'restricted' => true,
+        ]);
+        return;
+    }
+
     $date = !empty($_POST['date']) ? sanitize_text_field($_POST['date']) : date('Y-m-d');
 
     // FIXED: Determine which table to use based on date
@@ -320,6 +360,10 @@ add_action('wp_ajax_nopriv_get_race_filter_options', 'bricks_get_race_filter_opt
 
 function bricks_ajax_load_race_table() {
     global $wpdb;
+
+    if (!function_exists('fhor_user_has_paid_race_access') || !fhor_user_has_paid_race_access()) {
+        wp_die(bricks_race_membership_required_message());
+    }
 
     $per_page = 50;
     $paged = isset($_POST['race_page']) ? intval($_POST['race_page']) : 1;
@@ -642,6 +686,10 @@ add_action('wp_ajax_nopriv_load_race_table', 'bricks_ajax_load_race_table');
 
 function bricks_race_table_shortcode($atts = []) {
     global $wpdb;
+
+    if (!function_exists('fhor_user_has_paid_race_access') || !fhor_user_has_paid_race_access()) {
+        return bricks_race_membership_required_message();
+    }
 
     $atts = shortcode_atts([
         'course' => '',
