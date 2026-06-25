@@ -6974,7 +6974,12 @@ function fhor_user_has_paid_race_access($user_id = 0) {
         return true;
     }
 
-    $now = new DateTimeImmutable('now', wp_timezone());
+    try {
+        $race_tz = new DateTimeZone('Europe/London');
+    } catch (Exception $e) {
+        $race_tz = wp_timezone();
+    }
+    $now = new DateTimeImmutable('now', $race_tz);
     if ($now->format('N') === '3') {
         return true;
     }
@@ -6986,29 +6991,7 @@ function fhor_user_has_paid_race_access($user_id = 0) {
     }
 
     $allowed_level_ids = [5];
-    if (defined('FHOR_PAID_MEMBER_LEVEL_IDS')) {
-        $allowed_level_ids = array_map('intval', (array) FHOR_PAID_MEMBER_LEVEL_IDS);
-    } else {
-        $option_ids = get_option('fhor_paid_member_level_ids', $allowed_level_ids);
-        $allowed_level_ids = array_map('intval', (array) $option_ids);
-    }
-    $allowed_level_ids = array_values(array_filter($allowed_level_ids, function($v) {
-        return $v > 0;
-    }));
-
     $allowed_level_names = ['fhorsite member'];
-    if (defined('FHOR_PAID_MEMBER_LEVEL_NAMES')) {
-        $allowed_level_names = (array) FHOR_PAID_MEMBER_LEVEL_NAMES;
-    } else {
-        $option_names = get_option('fhor_paid_member_level_names', $allowed_level_names);
-        $allowed_level_names = (array) $option_names;
-    }
-    $allowed_level_names = array_map(function($name) {
-        return strtolower(trim((string) $name));
-    }, $allowed_level_names);
-    $allowed_level_names = array_values(array_filter($allowed_level_names, function($name) {
-        return $name !== '';
-    }));
 
     $user_level_ids = [];
     $user_level_names = [];
@@ -7041,57 +7024,6 @@ function fhor_user_has_paid_race_access($user_id = 0) {
                 }
                 if (isset($lvl['name'])) {
                     $user_level_names[] = strtolower(trim((string) $lvl['name']));
-                }
-            }
-        }
-    }
-
-    foreach ([
-        'bricks_members_levels',
-        'bricks_members_level_ids',
-        'bm_levels',
-        'bm_level_ids',
-        'bricks_members_user_levels',
-    ] as $meta_key) {
-        $meta = get_user_meta($user_id, $meta_key, true);
-        if (empty($meta)) {
-            continue;
-        }
-
-        if (is_string($meta)) {
-            $decoded = json_decode($meta, true);
-            if (json_last_error() === JSON_ERROR_NONE) {
-                $meta = $decoded;
-            } else {
-                $meta = array_map('trim', explode(',', $meta));
-            }
-        }
-
-        if (!is_array($meta)) {
-            $meta = [$meta];
-        }
-
-        foreach ($meta as $value) {
-            if (is_numeric($value)) {
-                $user_level_ids[] = intval($value);
-            } elseif (is_string($value)) {
-                $val = strtolower(trim($value));
-                if ($val !== '') {
-                    if (ctype_digit($val)) {
-                        $user_level_ids[] = intval($val);
-                    } else {
-                        $user_level_names[] = $val;
-                    }
-                }
-            } elseif (is_array($value)) {
-                if (isset($value['id']) && is_numeric($value['id'])) {
-                    $user_level_ids[] = intval($value['id']);
-                }
-                if (isset($value['name']) && is_string($value['name'])) {
-                    $name = strtolower(trim($value['name']));
-                    if ($name !== '') {
-                        $user_level_names[] = $name;
-                    }
                 }
             }
         }
