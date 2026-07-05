@@ -224,6 +224,151 @@ function bricks_speed_performance_inline_js() {
 }
 
 // ==============================================
+// POINTS PICKS HELPERS (Quick Reference)
+// ==============================================
+
+if (!function_exists('bricks_speed_performance_picks_lookup')) {
+    /**
+     * Published Points Engine picks for a meeting day, keyed by race_id.
+     *
+     * @return array<int, array{win:string, win_display:string, place:array, ew_simple:string, ew_simple_display:string, ew_edge:string, ew_edge_display:string}>
+     */
+    function bricks_speed_performance_picks_lookup($meeting_date_ymd) {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $meeting_date_ymd)) {
+            return [];
+        }
+
+        $cache_key = 'bricks_sp_picks_' . $meeting_date_ymd;
+        $cached = get_transient($cache_key);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        global $wpdb;
+        $lookup = [];
+
+        if (!function_exists('bricks_points_published_picks_table_name')) {
+            set_transient($cache_key, $lookup, 10 * MINUTE_IN_SECONDS);
+            return $lookup;
+        }
+
+        $picks_table = bricks_points_published_picks_table_name();
+        if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $picks_table)) !== $picks_table) {
+            set_transient($cache_key, $lookup, 10 * MINUTE_IN_SECONDS);
+            return $lookup;
+        }
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT race_id, win_horse, place_horses, ew_simple_horse, ew_edge_horse
+             FROM `$picks_table`
+             WHERE meeting_date = %s AND win_horse != ''",
+            $meeting_date_ymd
+        ));
+
+        $normalize = function_exists('bricks_points_engine_normalize_horse_name')
+            ? 'bricks_points_engine_normalize_horse_name'
+            : function ($name) {
+                return strtolower(trim(preg_replace('/\s+/', ' ', (string) $name)));
+            };
+
+        foreach ($rows as $row) {
+            $race_id = intval($row->race_id);
+            if ($race_id <= 0) {
+                continue;
+            }
+
+            $place_norm = [];
+            $place_raw = [];
+            if (!empty($row->place_horses)) {
+                $decoded = json_decode((string) $row->place_horses, true);
+                if (is_array($decoded)) {
+                    foreach ($decoded as $place_name) {
+                        $place_name = trim((string) $place_name);
+                        if ($place_name === '') {
+                            continue;
+                        }
+                        $place_norm[] = $normalize($place_name);
+                        $place_raw[] = $place_name;
+                    }
+                }
+            }
+
+            $lookup[$race_id] = [
+                'win' => $normalize($row->win_horse ?? ''),
+                'win_display' => (string) ($row->win_horse ?? ''),
+                'place' => $place_norm,
+                'place_display' => $place_raw,
+                'ew_simple' => $normalize($row->ew_simple_horse ?? ''),
+                'ew_simple_display' => (string) ($row->ew_simple_horse ?? ''),
+                'ew_edge' => $normalize($row->ew_edge_horse ?? ''),
+                'ew_edge_display' => (string) ($row->ew_edge_horse ?? ''),
+            ];
+        }
+
+        set_transient($cache_key, $lookup, 10 * MINUTE_IN_SECONDS);
+        return $lookup;
+    }
+}
+
+if (!function_exists('bricks_speed_performance_runner_pick_flags')) {
+    /**
+     * @return array{wp:int, p:int, ews:int, ewe:int, any:int}
+     */
+    function bricks_speed_performance_runner_pick_flags($race_id, $horse_name, array $picks_lookup) {
+        $flags = ['wp' => 0, 'p' => 0, 'ews' => 0, 'ewe' => 0, 'any' => 0];
+        $race_id = intval($race_id);
+        if ($race_id <= 0 || empty($picks_lookup[$race_id])) {
+            return $flags;
+        }
+
+        $normalize = function_exists('bricks_points_engine_normalize_horse_name')
+            ? 'bricks_points_engine_normalize_horse_name'
+            : function ($name) {
+                return strtolower(trim(preg_replace('/\s+/', ' ', (string) $name)));
+            };
+        $norm = $normalize($horse_name);
+        if ($norm === '') {
+            return $flags;
+        }
+
+        $pick = $picks_lookup[$race_id];
+        if (!empty($pick['win']) && $norm === $pick['win']) {
+            $flags['wp'] = 1;
+        }
+        if (!empty($pick['place']) && in_array($norm, $pick['place'], true)) {
+            $flags['p'] = 1;
+        }
+        if (!empty($pick['ew_simple']) && $norm === $pick['ew_simple']) {
+            $flags['ews'] = 1;
+        }
+        if (!empty($pick['ew_edge']) && $norm === $pick['ew_edge']) {
+            $flags['ewe'] = 1;
+        }
+        $flags['any'] = $flags['wp'] + $flags['p'] + $flags['ews'] + $flags['ewe'];
+        return $flags;
+    }
+}
+
+if (!function_exists('bricks_speed_performance_pick_badge_html')) {
+    function bricks_speed_performance_pick_badge_html($type, $is_active) {
+        if (!$is_active) {
+            return '<span class="pick-badge pick-badge-empty">—</span>';
+        }
+
+        $labels = [
+            'wp' => ['WP', 'Win pick'],
+            'p' => ['P', 'Place pick'],
+            'ews' => ['EWS', 'Each-way simple'],
+            'ewe' => ['EWE', 'Each-way edge'],
+        ];
+        $label = $labels[$type][0] ?? strtoupper($type);
+        $title = $labels[$type][1] ?? '';
+
+        return '<span class="pick-badge pick-badge-' . esc_attr($type) . '" title="' . esc_attr($title) . '">' . esc_html($label) . '</span>';
+    }
+}
+
+// ==============================================
 // AJAX HANDLERS
 // ==============================================
 
@@ -346,6 +491,11 @@ function bricks_ajax_load_speed_performance_table() {
     
     $total_records = $wpdb->get_var($full_query);
     
+    $pick_sort_columns = ['pick_wp', 'pick_p', 'pick_ews', 'pick_ewe', 'pick_any'];
+    $sort_column = !empty($_POST['sort_column']) ? sanitize_key($_POST['sort_column']) : '';
+    $is_pick_sort = in_array($sort_column, $pick_sort_columns, true);
+    $picks_lookup = bricks_speed_performance_picks_lookup($date_ymd);
+
     $order_by = '`Time`, `course`';
     $allowed_sorts = [
         'Time', 'course', 'Distance', 'name', 'age', 'trainer_name', 'jockey_name',
@@ -353,9 +503,9 @@ function bricks_ajax_load_speed_performance_table() {
         'cloth_number', 'stall_number', 'weight_pounds', 'days_since_ran'
     ];
     
-    if (!empty($_POST['sort_column']) && in_array($_POST['sort_column'], $allowed_sorts)) {
+    if (!$is_pick_sort && $sort_column && in_array($sort_column, $allowed_sorts, true)) {
         $direction = (!empty($_POST['sort_direction']) && $_POST['sort_direction'] === 'desc') ? 'DESC' : 'ASC';
-        $order_by = '`' . $_POST['sort_column'] . '` ' . $direction;
+        $order_by = '`' . $sort_column . '` ' . $direction;
         $order_by_sql = $order_by;
     } else {
         // Default: Sort races by minimum cloth_number within each race group, then by Time and course
@@ -364,7 +514,7 @@ function bricks_ajax_load_speed_performance_table() {
         $order_by_sql = "(SELECT MIN(`cloth_number`) FROM $table t2 WHERE t2.`race_id` = $table.`race_id` AND t2.`Date` = $table.`Date`) ASC, `Time`, `course`, `cloth_number`";
     }
 
-    $results = $wpdb->get_results("SELECT 
+    $select_sql = "SELECT 
         `race_id`, `runner_id`, `Date`, `Time`, `course`, `Distance`, `distance_yards`,
         `name`, `age`, `gender`, `colour`, `trainer_name`, `jockey_name`, `jockey_claim`,
         `official_rating`, `forecast_price`, `forecast_price_decimal`,
@@ -381,8 +531,52 @@ function bricks_ajax_load_speed_performance_table() {
         `draw_bias_pct`, `fhorsite_rating`
         FROM $table
         WHERE $where
-        ORDER BY $order_by_sql
-        LIMIT $per_page OFFSET $offset");
+        ORDER BY $order_by_sql";
+
+    if ($is_pick_sort) {
+        $all_results = $wpdb->get_results($select_sql);
+        if (!empty($all_results)) {
+            foreach ($all_results as $row) {
+                $flags = bricks_speed_performance_runner_pick_flags($row->race_id, $row->name ?? '', $picks_lookup);
+                $row->_pick_wp = $flags['wp'];
+                $row->_pick_p = $flags['p'];
+                $row->_pick_ews = $flags['ews'];
+                $row->_pick_ewe = $flags['ewe'];
+                $row->_pick_any = $flags['any'];
+            }
+
+            $pick_field_map = [
+                'pick_wp' => '_pick_wp',
+                'pick_p' => '_pick_p',
+                'pick_ews' => '_pick_ews',
+                'pick_ewe' => '_pick_ewe',
+                'pick_any' => '_pick_any',
+            ];
+            $pick_field = $pick_field_map[$sort_column] ?? '_pick_any';
+            $direction = (!empty($_POST['sort_direction']) && $_POST['sort_direction'] === 'desc') ? 'desc' : 'asc';
+
+            usort($all_results, function ($a, $b) use ($pick_field, $direction) {
+                $va = intval($a->{$pick_field} ?? 0);
+                $vb = intval($b->{$pick_field} ?? 0);
+                if ($va === $vb) {
+                    $time_cmp = strcmp((string) ($a->Time ?? ''), (string) ($b->Time ?? ''));
+                    if ($time_cmp !== 0) {
+                        return $time_cmp;
+                    }
+                    $course_cmp = strcasecmp((string) ($a->course ?? ''), (string) ($b->course ?? ''));
+                    if ($course_cmp !== 0) {
+                        return $course_cmp;
+                    }
+                    return intval($a->cloth_number ?? 0) <=> intval($b->cloth_number ?? 0);
+                }
+                return ($direction === 'desc') ? ($vb <=> $va) : ($va <=> $vb);
+            });
+        }
+
+        $results = !empty($all_results) ? array_slice($all_results, $offset, $per_page) : [];
+    } else {
+        $results = $wpdb->get_results($select_sql . $wpdb->prepare(' LIMIT %d OFFSET %d', $per_page, $offset));
+    }
     
     $total_pages = ceil($total_records / $per_page);
 
@@ -392,6 +586,7 @@ function bricks_ajax_load_speed_performance_table() {
 
     if ($results) {
         $current_course = '';
+        $show_race_headers = !$is_pick_sort;
         echo '<div class="speed-performance-table-scroll">
         <table class="speed-performance-table">
             <thead>
@@ -406,6 +601,10 @@ function bricks_ajax_load_speed_performance_table() {
                     <th data-sort="weight_pounds" class="sortable">Weight</th>
                     <th data-sort="forecast_price" class="sortable">Price</th>
                     <th data-sort="fhorsite_rating" class="sortable">FSr</th>
+                    <th data-sort="pick_wp" class="sortable" title="Win pick">WP</th>
+                    <th data-sort="pick_p" class="sortable" title="Place pick">P</th>
+                    <th data-sort="pick_ews" class="sortable" title="Each-way simple">EWS</th>
+                    <th data-sort="pick_ewe" class="sortable" title="Each-way edge">EWE</th>
                     <th data-sort="SR_LTO" class="sortable">Speed LTO</th>
                     <th data-sort="days_since_ran" class="sortable">Days</th>
                     <th>Form</th>
@@ -424,9 +623,9 @@ function bricks_ajax_load_speed_performance_table() {
             
             // Check if we need a new header row (when course, time, race, or distance changes)
             $header_key = $row->course . '|' . $time_formatted . '|' . $row->race_id . '|' . $distance_formatted;
-            if ($header_key !== $current_course) {
+            if ($show_race_headers && $header_key !== $current_course) {
                 $current_course = $header_key;
-                echo '<tr data-course-header="true"><td colspan="16">
+                echo '<tr data-course-header="true"><td colspan="20">
                     <div class="course-header-content">
                         <div class="course-header-item">
                             <span class="course-header-label">📍 Course:</span>
@@ -443,8 +642,27 @@ function bricks_ajax_load_speed_performance_table() {
                         <div class="course-header-item">
                             <span class="course-header-label">📏 Distance:</span>
                             <span class="course-header-value">' . esc_html($distance_formatted) . '</span>
-                        </div>
-                    </div>
+                        </div>';
+                $race_picks = $picks_lookup[intval($row->race_id)] ?? null;
+                if ($race_picks) {
+                    echo '<div class="course-header-item course-header-picks">
+                            <span class="course-header-label">🎯 Picks:</span>
+                            <span class="course-header-value course-header-pick-badges">';
+                    if (!empty($race_picks['win_display'])) {
+                        echo bricks_speed_performance_pick_badge_html('wp', true) . ' <span>' . esc_html($race_picks['win_display']) . '</span>';
+                    }
+                    if (!empty($race_picks['place_display'])) {
+                        echo ' <span style="margin-left:8px;">' . bricks_speed_performance_pick_badge_html('p', true) . ' <span>' . esc_html(implode(', ', $race_picks['place_display'])) . '</span></span>';
+                    }
+                    if (!empty($race_picks['ew_simple_display'])) {
+                        echo ' <span style="margin-left:8px;">' . bricks_speed_performance_pick_badge_html('ews', true) . ' <span>' . esc_html($race_picks['ew_simple_display']) . '</span></span>';
+                    }
+                    if (!empty($race_picks['ew_edge_display'])) {
+                        echo ' <span style="margin-left:8px;">' . bricks_speed_performance_pick_badge_html('ewe', true) . ' <span>' . esc_html($race_picks['ew_edge_display']) . '</span></span>';
+                    }
+                    echo '</span></div>';
+                }
+                echo '</div>
                 </td></tr>';
             }
             $age_gender = $row->age . ($row->gender ?: '');
@@ -563,6 +781,23 @@ function bricks_ajax_load_speed_performance_table() {
                 $tracker_flag = '<div class="tracker-flag">📝 Tracker: ' . esc_html(wp_trim_words($latest_tracker_note['note'], 12, '...')) . '</div>';
             }
 
+            if (isset($row->_pick_wp)) {
+                $pick_flags = [
+                    'wp' => intval($row->_pick_wp),
+                    'p' => intval($row->_pick_p),
+                    'ews' => intval($row->_pick_ews),
+                    'ewe' => intval($row->_pick_ewe),
+                ];
+            } else {
+                $computed = bricks_speed_performance_runner_pick_flags($row->race_id, $row->name ?? '', $picks_lookup);
+                $pick_flags = [
+                    'wp' => $computed['wp'],
+                    'p' => $computed['p'],
+                    'ews' => $computed['ews'],
+                    'ewe' => $computed['ewe'],
+                ];
+            }
+
             echo '<tr' . ($tracker_count > 0 ? ' class="tracker-row-highlight"' : '') . '>
                 <td style="font-weight:600;">' . esc_html($row->name ?: 'N/A') . $tracker_flag . '</td>
                 <td style="color:#6b7280;">' . esc_html($age_gender) . '</td>
@@ -574,6 +809,10 @@ function bricks_ajax_load_speed_performance_table() {
                 <td style="font-family:monospace;">' . esc_html($weight_formatted) . '</td>
                 <td style="color:#059669;font-weight:600;">' . esc_html($price_formatted) . '</td>
                 <td><span class="' . $fsr_class . '">' . esc_html($fsr_formatted) . '</span></td>
+                <td class="pick-cell">' . bricks_speed_performance_pick_badge_html('wp', !empty($pick_flags['wp'])) . '</td>
+                <td class="pick-cell">' . bricks_speed_performance_pick_badge_html('p', !empty($pick_flags['p'])) . '</td>
+                <td class="pick-cell">' . bricks_speed_performance_pick_badge_html('ews', !empty($pick_flags['ews'])) . '</td>
+                <td class="pick-cell">' . bricks_speed_performance_pick_badge_html('ewe', !empty($pick_flags['ewe'])) . '</td>
                 <td><span class="' . $speed_class . '">' . esc_html($speed_formatted) . '</span></td>
                 <td style="text-align:center;color:#6b7280;">' . esc_html($days_formatted) . '</td>
                 <td style="font-family:monospace;font-size:11px;">' . esc_html($form_formatted) . '</td>
@@ -1066,6 +1305,90 @@ function bricks_speed_performance_shortcode() {
             background: #f59e0b;
         }
 
+        /* Points Engine pick badges */
+        .pick-cell {
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .pick-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 34px;
+            padding: 3px 7px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+            line-height: 1.2;
+        }
+
+        .pick-badge-empty {
+            color: #d1d5db;
+            background: transparent;
+            font-weight: 600;
+            min-width: auto;
+            padding: 0;
+        }
+
+        .pick-badge-wp {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            color: #fff;
+            box-shadow: 0 1px 3px rgba(37, 99, 235, 0.35);
+        }
+
+        .pick-badge-p {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+            color: #fff;
+            box-shadow: 0 1px 3px rgba(14, 165, 233, 0.35);
+        }
+
+        .pick-badge-ews {
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            color: #fff;
+            box-shadow: 0 1px 3px rgba(249, 115, 22, 0.35);
+        }
+
+        .pick-badge-ewe {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            color: #fff;
+            box-shadow: 0 1px 3px rgba(139, 92, 246, 0.35);
+        }
+
+        .course-header-picks .pick-badge {
+            margin-right: 4px;
+            vertical-align: middle;
+        }
+
+        .course-header-pick-badges {
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .speed-picks-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin: 0 0 16px;
+            padding: 10px 12px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #475569;
+        }
+
+        .speed-picks-legend strong {
+            color: #111827;
+            margin-right: 4px;
+        }
+
         /* Pagination */
         .speed-performance-pagination-wrapper {
             margin-top: 24px;
@@ -1310,6 +1633,15 @@ function bricks_speed_performance_shortcode() {
             <div class="speed-filter-group" style="display:flex;align-items:flex-end;">
                 <button type="button" id="speed-performance-reset-btn" style="width:100%;">Reset Filters</button>
             </div>
+        </div>
+
+        <div class="speed-picks-legend">
+            <strong>Points picks:</strong>
+            <?php echo bricks_speed_performance_pick_badge_html('wp', true); ?> Win
+            <?php echo bricks_speed_performance_pick_badge_html('p', true); ?> Place
+            <?php echo bricks_speed_performance_pick_badge_html('ews', true); ?> EW Simple
+            <?php echo bricks_speed_performance_pick_badge_html('ewe', true); ?> EW Edge
+            <span style="color:#94a3b8;">— click column headers to sort by pick type</span>
         </div>
 
         <div id="speed-performance-table-container">
