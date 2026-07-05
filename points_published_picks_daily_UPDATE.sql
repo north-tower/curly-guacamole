@@ -97,7 +97,23 @@ BEGIN
                 THEN sp.forecast_price_decimal
                 ELSE NULL
             END AS odds_decimal,
-            LEAST(100, GREATEST(0, ROUND(
+            LEAST(
+                CASE
+                    WHEN NOT (
+                        (sp.form_figures IS NOT NULL AND TRIM(sp.form_figures) != '' AND TRIM(sp.form_figures) NOT IN ('-', '—', '0'))
+                        OR sp.SR_LTO IS NOT NULL
+                        OR sp.SR_2 IS NOT NULL
+                        OR sp.SR_3 IS NOT NULL
+                        OR (sp.days_since_ran IS NOT NULL AND sp.days_since_ran > 0 AND sp.days_since_ran < 800)
+                    )
+                    AND NOT (
+                        IFNULL(sp.fhorsite_rating, 0) >= 76
+                        AND IFNULL(sp.fhorsite_rating_reliability, 0) >= 55
+                    )
+                    THEN 52.0
+                    ELSE 100.0
+                END,
+                GREATEST(0, ROUND(
                 50.0
                 + IF(sp.fhorsite_rating IS NOT NULL, (sp.fhorsite_rating - 70.0) * 0.35, 0)
                 + IF(sp.fhorsite_rating_reliability IS NOT NULL, (sp.fhorsite_rating_reliability - 50.0) * 0.08, 0)
@@ -179,7 +195,18 @@ BEGIN
                         ELSE 0
                     END
                   )
-            , 1))) AS model_score
+                - CASE
+                    WHEN NOT (
+                        (sp.form_figures IS NOT NULL AND TRIM(sp.form_figures) != '' AND TRIM(sp.form_figures) NOT IN ('-', '—', '0'))
+                        OR sp.SR_LTO IS NOT NULL
+                        OR sp.SR_2 IS NOT NULL
+                        OR sp.SR_3 IS NOT NULL
+                        OR (sp.days_since_ran IS NOT NULL AND sp.days_since_ran > 0 AND sp.days_since_ran < 800)
+                    ) THEN 12.0
+                    ELSE 0.0
+                  END
+            , 1)))
+            AS model_score
         FROM `speed&performance_table` sp
         INNER JOIN daily_races_beta dracb ON dracb.race_id = sp.race_id
         LEFT JOIN non_runners nr

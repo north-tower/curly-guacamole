@@ -302,8 +302,74 @@ if (!function_exists('bricks_points_default_weights')) {
             'or_diff_bonus' => 0.15,
             'cdg_bonus' => 1.2,
             'lbf_bonus' => 0.8,
-            'maturity_edge_scale' => 0.70
+            'maturity_edge_scale' => 0.70,
+            'no_form_penalty' => 12.0,
+            'debut_score_cap' => 52.0,
+            'debut_pick_min_fsr' => 76.0,
+            'debut_pick_min_fsrr' => 55.0,
         ];
+    }
+}
+
+if (!function_exists('bricks_points_runner_has_racing_form')) {
+    /**
+     * True when the horse has evidence of a prior run (form figures or recent speed history).
+     */
+    function bricks_points_runner_has_racing_form($speed_data, $runner = null) {
+        $form = '';
+        if ($speed_data && isset($speed_data->form_figures)) {
+            $form = trim((string) $speed_data->form_figures);
+        } elseif ($runner && isset($runner->form_figures)) {
+            $form = trim((string) $runner->form_figures);
+        }
+
+        if ($form !== '' && !in_array($form, ['-', '—', '0', '00'], true)) {
+            if (preg_match('/[0-9PUFBURpu\/\-]/', $form)) {
+                return true;
+            }
+        }
+
+        foreach (['SR_LTO', 'SR_2', 'SR_3'] as $key) {
+            if ($speed_data && isset($speed_data->{$key}) && is_numeric($speed_data->{$key}) && floatval($speed_data->{$key}) > 0) {
+                return true;
+            }
+        }
+
+        if ($speed_data && isset($speed_data->days_since_ran) && is_numeric($speed_data->days_since_ran)) {
+            $days = floatval($speed_data->days_since_ran);
+            if ($days > 0 && $days < 800) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('bricks_points_runner_pick_eligible')) {
+    /**
+     * Win / EW selections require prior form, unless unraced with a strong reliable FSr.
+     */
+    function bricks_points_runner_pick_eligible(array $row) {
+        if (!empty($row['has_form'])) {
+            return true;
+        }
+
+        $w = bricks_points_default_weights();
+        $fsr = (isset($row['fsr']) && is_numeric($row['fsr'])) ? floatval($row['fsr']) : null;
+        $fsrr = (isset($row['fsrr']) && is_numeric($row['fsrr'])) ? floatval($row['fsrr']) : null;
+        if ($fsr === null || $fsrr === null) {
+            return false;
+        }
+
+        return $fsr >= floatval($w['debut_pick_min_fsr']) && $fsrr >= floatval($w['debut_pick_min_fsrr']);
+    }
+}
+
+if (!function_exists('bricks_points_pick_pool')) {
+    function bricks_points_pick_pool(array $eligible) {
+        $preferred = array_values(array_filter($eligible, 'bricks_points_runner_pick_eligible'));
+        return !empty($preferred) ? $preferred : $eligible;
     }
 }
 
@@ -448,11 +514,25 @@ if (!function_exists('bricks_points_score_runner')) {
             $score += floatval($race_context['maturity_edge_score']) * $w['maturity_edge_scale'];
         }
 
+        $has_form = bricks_points_runner_has_racing_form($speed_data, $runner);
+        if (!$has_form) {
+            $score -= floatval($w['no_form_penalty']);
+            $strong_unraced = ($fsr !== null && $fsr >= floatval($w['debut_pick_min_fsr']))
+                && ($fsrr !== null && $fsrr >= floatval($w['debut_pick_min_fsrr']));
+            if (!$strong_unraced) {
+                $score = min($score, floatval($w['debut_score_cap']));
+                $reasons[] = 'No prior form';
+            } else {
+                $reasons[] = 'Unraced (strong FSr)';
+            }
+        }
+
         $score = max(0.0, min(100.0, round($score, 1)));
 
         return [
             'score' => $score,
-            'reasons' => array_values(array_unique(array_slice($reasons, 0, 3)))
+            'reasons' => array_values(array_unique(array_slice($reasons, 0, 3))),
+            'has_form' => $has_form,
         ];
     }
 }
@@ -466,13 +546,14 @@ if (!function_exists('bricks_points_pick_winner_place')) {
         $eligible = array_values(array_filter($scored_runners, function($r) {
             return empty($r['is_non_runner']);
         }));
-        usort($eligible, function($a, $b) {
+        $pick_pool = bricks_points_pick_pool($eligible);
+        usort($pick_pool, function($a, $b) {
             return ($b['model_score'] ?? 0) <=> ($a['model_score'] ?? 0);
         });
 
         return [
-            'winner' => $eligible[0] ?? null,
-            'place' => array_slice($eligible, 0, 3)
+            'winner' => $pick_pool[0] ?? null,
+            'place' => array_slice($pick_pool, 0, 3)
         ];
     }
 }
@@ -483,10 +564,11 @@ if (!function_exists('bricks_points_pick_each_way_simple')) {
             return empty($r['is_non_runner']) && isset($r['odds_fractional']) && isset($r['odds_decimal']) &&
                 $r['odds_decimal'] !== null && floatval($r['odds_decimal']) >= 6.0;
         }));
-        usort($eligible, function($a, $b) {
+        $pick_pool = bricks_points_pick_pool($eligible);
+        usort($pick_pool, function($a, $b) {
             return ($b['model_score'] ?? 0) <=> ($a['model_score'] ?? 0);
         });
-        return $eligible[0] ?? null;
+        return $pick_pool[0] ?? null;
     }
 }
 
@@ -500,10 +582,11 @@ if (!function_exists('bricks_points_pick_each_way_edge')) {
             if (!isset($r['market_rank']) || intval($r['market_rank']) <= 0) return false;
             return (intval($r['market_rank']) - intval($r['model_rank'])) >= 2;
         }));
-        usort($eligible, function($a, $b) {
+        $pick_pool = bricks_points_pick_pool($eligible);
+        usort($pick_pool, function($a, $b) {
             return ($b['edge_score'] ?? 0) <=> ($a['edge_score'] ?? 0);
         });
-        return $eligible[0] ?? null;
+        return $pick_pool[0] ?? null;
     }
 }
 
@@ -638,6 +721,7 @@ if (!function_exists('bricks_points_backtest_fetch_dch_rows_for_dates')) {
             'TnrWinPct14d' => 'TnrWinPct14d',
             'TnrJkyPlacePct' => 'TnrJkyPlacePct',
             'forecast_price_decimal' => 'forecast_price_decimal',
+            'form_figures' => 'form_figures',
         ];
         foreach ($optional_cols as $alias => $column_name) {
             if (bricks_points_table_has_column($dch_table, $column_name)) {
@@ -786,7 +870,8 @@ if (!function_exists('bricks_points_backtest_fetch_rows')) {
             'beaten_favourite' => 'beaten_favourite',
             'TnrWinPct14d' => 'TnrWinPct14d',
             'TnrJkyPlacePct' => 'TnrJkyPlacePct',
-            'forecast_price_decimal' => 'forecast_price_decimal'
+            'forecast_price_decimal' => 'forecast_price_decimal',
+            'form_figures' => 'form_figures',
         ];
 
         foreach ($optional_cols as $alias => $column_name) {
@@ -865,6 +950,7 @@ if (!function_exists('bricks_points_backtest_calculate')) {
                 'race_count' => 0,
                 'runner_count' => 0,
                 'unsettled_win_bets' => 0,
+                'excluded_void_races' => 0,
                 'missing_published_snapshot' => 0,
                 'backtest_mode' => $backtest_mode,
                 'fetch_meta' => $fetch_meta,
@@ -891,7 +977,9 @@ if (!function_exists('bricks_points_backtest_calculate')) {
         ];
         $sample_rows = [];
         $unsettled_win_bets = 0;
+        $excluded_void_races = 0;
         $missing_published_snapshot = 0;
+        $settled_race_count = 0;
 
         foreach ($by_race as $race_id => $race_rows) {
             $field_size = count($race_rows);
@@ -899,6 +987,12 @@ if (!function_exists('bricks_points_backtest_calculate')) {
                 continue;
             }
 
+            if (bricks_points_race_void_for_backtest($race_id, $race_rows)) {
+                $excluded_void_races += 1;
+                continue;
+            }
+
+            $settled_race_count += 1;
             $scored = bricks_points_backtest_score_race($race_rows);
             $meeting_date = (string) ($race_rows[0]->meeting_date ?? '');
 
@@ -954,6 +1048,9 @@ if (!function_exists('bricks_points_backtest_calculate')) {
                 if (!$pick || $odds === null) {
                     return;
                 }
+                if (!bricks_points_finish_has_result($pick['finish_position'] ?? '')) {
+                    return;
+                }
                 $stats['place']['bets'] += 1;
                 $placed = bricks_points_finish_is_placed($pick['finish_position'] ?? '', $place_terms);
                 if ($placed) {
@@ -964,6 +1061,9 @@ if (!function_exists('bricks_points_backtest_calculate')) {
             $apply_ew = function($pick, $key) use (&$stats, $place_terms, $pick_odds) {
                 $odds = $pick_odds($pick);
                 if (!$pick || $odds === null) {
+                    return;
+                }
+                if (!bricks_points_finish_has_result($pick['finish_position'] ?? '')) {
                     return;
                 }
                 $stats[$key]['bets'] += 2;
@@ -1044,9 +1144,10 @@ if (!function_exists('bricks_points_backtest_calculate')) {
         return [
             'summary' => $summary,
             'sample_rows' => $sample_rows,
-            'race_count' => count($by_race),
+            'race_count' => $settled_race_count,
             'runner_count' => count($rows),
             'unsettled_win_bets' => $unsettled_win_bets,
+            'excluded_void_races' => $excluded_void_races,
             'day_span' => $day_span,
             'sample_truncated' => ($day_span > 7 && count($by_race) > $sample_limit),
             'missing_published_snapshot' => $missing_published_snapshot,
@@ -1100,10 +1201,35 @@ if (!function_exists('bricks_points_finish_has_result')) {
         if ($fp === '' || $fp === '-' || $fp === 'null') {
             return false;
         }
-        if (in_array($fp, ['pu', 'ur', 'bd', 'f', 'ro', 'nr', 'non-runner', 'non runner'], true)) {
+        if (in_array($fp, ['pu', 'ur', 'bd', 'f', 'ro', 'nr', 'non-runner', 'non runner', 'void', 'abandoned', 'abnd', 'ab'], true)) {
             return false;
         }
         return preg_match('/\d/', $fp) === 1;
+    }
+}
+
+if (!function_exists('bricks_points_race_has_settled_result')) {
+    /**
+     * True when at least one runner has a numeric finishing position (race actually ran).
+     */
+    function bricks_points_race_has_settled_result(array $race_rows) {
+        foreach ($race_rows as $row) {
+            if (bricks_points_finish_has_result($row->finish_position ?? '')) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+if (!function_exists('bricks_points_race_void_for_backtest')) {
+    /**
+     * Abandoned / void / unrun races should not count in backtest P&L (stakes returned, not losses).
+     * Detected when no runner has a numeric finishing position for that race.
+     */
+    function bricks_points_race_void_for_backtest($race_id, array $race_rows) {
+        unset($race_id);
+        return !bricks_points_race_has_settled_result($race_rows);
     }
 }
 
@@ -1206,6 +1332,7 @@ if (!function_exists('bricks_points_backtest_speed_data_from_row')) {
             'TnrJkyPlacePct' => (isset($rr->TnrJkyPlacePct) && is_numeric($rr->TnrJkyPlacePct)) ? floatval($rr->TnrJkyPlacePct) : null,
             'forecast_price_decimal' => $forecast_decimal,
             'forecast_price' => isset($rr->starting_price) ? $rr->starting_price : '',
+            'form_figures' => isset($rr->form_figures) ? (string) $rr->form_figures : '',
         ];
     }
 }
@@ -1254,6 +1381,9 @@ if (!function_exists('bricks_points_backtest_score_race')) {
                 'is_non_runner' => !empty($rr->is_non_runner),
                 'finish_position' => $rr->finish_position ?? '',
                 'meeting_date' => (string) ($rr->meeting_date ?? ''),
+                'has_form' => !empty($pts['has_form']),
+                'fsr' => $speed_data->fhorsite_rating ?? null,
+                'fsrr' => $speed_data->fhorsite_rating_reliability ?? null,
             ];
         }
 
@@ -1322,6 +1452,10 @@ if (!function_exists('bricks_points_engine_meeting_day_win_pick_hit_race_ids')) 
         foreach ($by_race as $race_id => $race_rows) {
             $field_size = count($race_rows);
             if ($field_size < 2) {
+                continue;
+            }
+
+            if (bricks_points_race_void_for_backtest($race_id, $race_rows)) {
                 continue;
             }
 
@@ -1430,6 +1564,7 @@ if (!function_exists('bricks_points_backtest_shortcode')) {
         $day_span = isset($result['day_span']) ? intval($result['day_span']) : 1;
         $sample_truncated = !empty($result['sample_truncated']);
         $unsettled_win = isset($result['unsettled_win_bets']) ? intval($result['unsettled_win_bets']) : 0;
+        $excluded_void = isset($result['excluded_void_races']) ? intval($result['excluded_void_races']) : 0;
         $missing_published = isset($result['missing_published_snapshot']) ? intval($result['missing_published_snapshot']) : 0;
         $has_backtest_cr = $GLOBALS['wpdb']->get_var("SHOW TABLES LIKE 'backtest_cr_data'") === 'backtest_cr_data';
         $fetch_meta = is_array($result['fetch_meta'] ?? null) ? $result['fetch_meta'] : [];
@@ -1554,8 +1689,11 @@ if (!function_exists('bricks_points_backtest_shortcode')) {
 
             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
                 <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;font-size:12px;color:#374151;">Period: <strong><?php echo esc_html($from_date); ?></strong> → <strong><?php echo esc_html($to_date); ?></strong> (<?php echo esc_html($day_span); ?> day<?php echo $day_span === 1 ? '' : 's'; ?>)</div>
-                <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;font-size:12px;color:#374151;">Races: <strong><?php echo esc_html($result['race_count'] ?? 0); ?></strong></div>
+                <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;font-size:12px;color:#374151;">Races: <strong><?php echo esc_html($result['race_count'] ?? 0); ?></strong> settled</div>
                 <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;font-size:12px;color:#374151;">Runners: <strong><?php echo esc_html($result['runner_count'] ?? 0); ?></strong></div>
+                <?php if ($excluded_void > 0): ?>
+                <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 12px;font-size:12px;color:#1e40af;">Abandoned / void races excluded: <strong><?php echo esc_html($excluded_void); ?></strong> (picks kept for audit — no P&amp;L impact)</div>
+                <?php endif; ?>
                 <?php if ($unsettled_win > 0): ?>
                 <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 12px;font-size:12px;color:#991b1b;">Win picks with no finish in historic/DCH: <strong><?php echo esc_html($unsettled_win); ?></strong> (excluded from win P&amp;L — not counted as losses)</div>
                 <?php endif; ?>
@@ -2112,7 +2250,10 @@ if (!empty($runners)) {
             'edge_score' => 0.0,
             'odds_decimal' => $odds_decimal,
             'odds_fractional' => $forecast_fractional,
-            'is_non_runner' => $is_non_runner
+            'is_non_runner' => $is_non_runner,
+            'has_form' => !empty($points_result['has_form']),
+            'fsr' => ($speed_data && isset($speed_data->fhorsite_rating) && is_numeric($speed_data->fhorsite_rating)) ? floatval($speed_data->fhorsite_rating) : null,
+            'fsrr' => ($speed_data && isset($speed_data->fhorsite_rating_reliability) && is_numeric($speed_data->fhorsite_rating_reliability)) ? floatval($speed_data->fhorsite_rating_reliability) : null,
         ];
 
         $race_points_scored[] = $entry;

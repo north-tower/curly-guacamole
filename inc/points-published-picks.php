@@ -452,6 +452,9 @@ if (!function_exists('bricks_points_engine_score_runners')) {
                 'odds_decimal' => $odds_decimal,
                 'odds_fractional' => $forecast_fractional,
                 'is_non_runner' => $is_non_runner,
+                'has_form' => !empty($points_result['has_form']),
+                'fsr' => ($speed_data && isset($speed_data->fhorsite_rating) && is_numeric($speed_data->fhorsite_rating)) ? floatval($speed_data->fhorsite_rating) : null,
+                'fsrr' => ($speed_data && isset($speed_data->fhorsite_rating_reliability) && is_numeric($speed_data->fhorsite_rating_reliability)) ? floatval($speed_data->fhorsite_rating_reliability) : null,
             ];
         }
 
