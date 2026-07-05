@@ -247,3 +247,166 @@ if (!function_exists('bricks_run_daily_filter_cache_flush')) {
     }
 }
 add_action('bricks_daily_filter_cache_flush', 'bricks_run_daily_filter_cache_flush');
+
+if (!function_exists('fhor_is_race_wednesday_open_day')) {
+    /**
+     * Wednesdays (UK time): all race data is open to everyone for that day.
+     */
+    function fhor_is_race_wednesday_open_day() {
+        try {
+            $race_tz = new DateTimeZone('Europe/London');
+        } catch (Exception $e) {
+            $race_tz = wp_timezone();
+        }
+
+        return (new DateTimeImmutable('now', $race_tz))->format('N') === '3';
+    }
+}
+
+if (!function_exists('fhor_brm_user_has_active_level')) {
+    /**
+     * Check Bricks Members level assignment via plugin APIs and brm_user_level_assignments table.
+     */
+    function fhor_brm_user_has_active_level($user_id, $level_id) {
+        global $wpdb;
+
+        $user_id = intval($user_id);
+        $level_id = intval($level_id);
+        if ($user_id <= 0 || $level_id <= 0) {
+            return false;
+        }
+
+        $api_result = apply_filters('fhor_brm_user_has_active_level', null, $user_id, $level_id);
+        if (is_bool($api_result)) {
+            return $api_result;
+        }
+
+        if (function_exists('brm_user_has_level') && brm_user_has_level($user_id, $level_id)) {
+            return true;
+        }
+        if (function_exists('brm_has_user_level') && brm_has_user_level($user_id, $level_id)) {
+            return true;
+        }
+        if (function_exists('brm_user_has_levels')) {
+            $has = brm_user_has_levels($user_id, [$level_id]);
+            if ($has) {
+                return true;
+            }
+        }
+        if (class_exists('BRM_User_Levels') && method_exists('BRM_User_Levels', 'user_has_level')) {
+            if (BRM_User_Levels::user_has_level($user_id, $level_id)) {
+                return true;
+            }
+        }
+
+        $table = $wpdb->prefix . 'brm_user_level_assignments';
+        if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table)) !== $table) {
+            return false;
+        }
+
+        $assignments = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM `$table` WHERE user_id = %d",
+            $user_id
+        ), ARRAY_A);
+
+        if (empty($assignments)) {
+            return false;
+        }
+
+        foreach ($assignments as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $row_level_id = 0;
+            if (isset($row['level_id']) && is_numeric($row['level_id'])) {
+                $row_level_id = intval($row['level_id']);
+            } elseif (isset($row['user_level_id']) && is_numeric($row['user_level_id'])) {
+                $row_level_id = intval($row['user_level_id']);
+            }
+
+            if ($row_level_id !== $level_id) {
+                continue;
+            }
+
+            if (array_key_exists('removed_at', $row)) {
+                $removed_at = trim((string) $row['removed_at']);
+                if ($removed_at !== '' && $removed_at !== '0000-00-00 00:00:00') {
+                    continue;
+                }
+            }
+            if (array_key_exists('revoked_at', $row)) {
+                $revoked_at = trim((string) $row['revoked_at']);
+                if ($revoked_at !== '' && $revoked_at !== '0000-00-00 00:00:00') {
+                    continue;
+                }
+            }
+            if (array_key_exists('is_active', $row) && (string) $row['is_active'] === '0') {
+                continue;
+            }
+            if (array_key_exists('status', $row)) {
+                $status = strtolower(trim((string) $row['status']));
+                if (in_array($status, ['removed', 'revoked', 'inactive', 'expired', 'cancelled', 'canceled'], true)) {
+                    continue;
+                }
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('fhor_user_is_paid_member')) {
+    /**
+     * True when the user has the Fhorsite Member Bricks Members level (ID 5).
+     */
+    function fhor_user_is_paid_member($user_id = 0) {
+        $user_id = $user_id ? intval($user_id) : get_current_user_id();
+        if ($user_id <= 0) {
+            return false;
+        }
+
+        if (user_can($user_id, 'manage_options')) {
+            return true;
+        }
+
+        $override = apply_filters('fhor_bricks_members_paid_access', null, $user_id);
+        if (is_bool($override)) {
+            return $override;
+        }
+
+        $allowed_level_ids = [5];
+        if (defined('FHOR_PAID_MEMBER_LEVEL_IDS')) {
+            $allowed_level_ids = array_map('intval', (array) FHOR_PAID_MEMBER_LEVEL_IDS);
+        } else {
+            $option_ids = get_option('fhor_paid_member_level_ids', $allowed_level_ids);
+            $allowed_level_ids = array_map('intval', (array) $option_ids);
+        }
+        $allowed_level_ids = array_values(array_filter($allowed_level_ids, function ($v) {
+            return $v > 0;
+        }));
+
+        foreach ($allowed_level_ids as $level_id) {
+            if (fhor_brm_user_has_active_level($user_id, $level_id)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('fhor_can_view_race_premium_content')) {
+    /**
+     * Premium race content (ratings tables, graphs, picks): paid members, or everyone on Wednesdays.
+     */
+    function fhor_can_view_race_premium_content($user_id = 0) {
+        if (fhor_is_race_wednesday_open_day()) {
+            return true;
+        }
+
+        return fhor_user_is_paid_member($user_id);
+    }
+}

@@ -198,7 +198,7 @@ if (!function_exists('bricks_seo_is_search_crawler')) {
 
 if (!function_exists('bricks_race_detail_can_view_premium')) {
     function bricks_race_detail_can_view_premium() {
-        if (is_user_logged_in()) {
+        if (function_exists('fhor_can_view_race_premium_content') && fhor_can_view_race_premium_content()) {
             return true;
         }
         if (bricks_seo_is_search_crawler()) {

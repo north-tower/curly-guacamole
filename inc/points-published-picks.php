@@ -50,6 +50,55 @@ if (!function_exists('bricks_points_published_picks_maybe_install')) {
 }
 add_action('init', 'bricks_points_published_picks_maybe_install', 5);
 
+if (!function_exists('bricks_points_published_picks_save_if_changed')) {
+    /**
+     * Avoid a DB write on every race page view when picks are unchanged.
+     */
+    function bricks_points_published_picks_save_if_changed($race_id, $meeting_date, $picks, $ew_simple, $ew_edge, $source = 'race_card') {
+        $race_id = intval($race_id);
+        $meeting_date = (string) $meeting_date;
+        if ($race_id <= 0 || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $meeting_date)) {
+            return false;
+        }
+
+        $win = isset($picks['winner']['horse_name']) ? (string) $picks['winner']['horse_name'] : '';
+        if ($win === '') {
+            return false;
+        }
+
+        $place_names = [];
+        if (!empty($picks['place']) && is_array($picks['place'])) {
+            foreach ($picks['place'] as $pp) {
+                if (!empty($pp['horse_name'])) {
+                    $place_names[] = (string) $pp['horse_name'];
+                }
+            }
+        }
+
+        $ew_simple_name = is_array($ew_simple) ? (string) ($ew_simple['horse_name'] ?? '') : '';
+        $ew_edge_name = is_array($ew_edge) ? (string) ($ew_edge['horse_name'] ?? '') : '';
+
+        $existing = bricks_points_published_picks_get($race_id, $meeting_date);
+        if (is_array($existing)) {
+            $existing_places = isset($existing['place_horses']) && is_array($existing['place_horses'])
+                ? array_values($existing['place_horses'])
+                : [];
+            sort($place_names);
+            sort($existing_places);
+            if (
+                ($existing['win_horse'] ?? '') === $win
+                && $existing_places === $place_names
+                && ($existing['ew_simple_horse'] ?? '') === $ew_simple_name
+                && ($existing['ew_edge_horse'] ?? '') === $ew_edge_name
+            ) {
+                return false;
+            }
+        }
+
+        return bricks_points_published_picks_save($race_id, $meeting_date, $picks, $ew_simple, $ew_edge, $source);
+    }
+}
+
 if (!function_exists('bricks_points_published_picks_save')) {
     /**
      * @param array $picks bricks_points_pick_winner_place() result
@@ -93,6 +142,10 @@ if (!function_exists('bricks_points_published_picks_save')) {
             ['%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s']
         );
 
+        if (function_exists('bricks_points_published_picks_clear_get_cache')) {
+            bricks_points_published_picks_clear_get_cache($race_id, $meeting_date);
+        }
+
         return true;
     }
 }
@@ -106,6 +159,12 @@ if (!function_exists('bricks_points_published_picks_get')) {
             return null;
         }
 
+        $cache_key = 'bricks_pe_picks_' . $race_id . '_' . $meeting_date;
+        $cached = get_transient($cache_key);
+        if ($cached !== false) {
+            return $cached === 'none' ? null : $cached;
+        }
+
         $table = bricks_points_published_picks_table_name();
         $row = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM `$table` WHERE race_id = %d AND meeting_date = %s",
@@ -114,6 +173,7 @@ if (!function_exists('bricks_points_published_picks_get')) {
         ));
 
         if (!$row) {
+            set_transient($cache_key, 'none', 10 * MINUTE_IN_SECONDS);
             return null;
         }
 
@@ -125,7 +185,7 @@ if (!function_exists('bricks_points_published_picks_get')) {
             }
         }
 
-        return [
+        $result = [
             'race_id' => $race_id,
             'meeting_date' => $meeting_date,
             'win_horse' => (string) ($row->win_horse ?? ''),
@@ -135,6 +195,22 @@ if (!function_exists('bricks_points_published_picks_get')) {
             'saved_at' => (string) ($row->saved_at ?? ''),
             'source' => (string) ($row->source ?? 'race_card'),
         ];
+        set_transient($cache_key, $result, 10 * MINUTE_IN_SECONDS);
+        return $result;
+    }
+}
+
+if (!function_exists('bricks_points_published_picks_clear_get_cache')) {
+    function bricks_points_published_picks_clear_get_cache($race_id, $meeting_date) {
+        delete_transient('bricks_pe_picks_' . intval($race_id) . '_' . (string) $meeting_date);
+    }
+}
+
+if (!function_exists('bricks_points_published_picks_defer_save_if_changed')) {
+    function bricks_points_published_picks_defer_save_if_changed($race_id, $meeting_date, $picks, $ew_simple, $ew_edge, $source = 'race_card') {
+        register_shutdown_function(function () use ($race_id, $meeting_date, $picks, $ew_simple, $ew_edge, $source) {
+            bricks_points_published_picks_save_if_changed($race_id, $meeting_date, $picks, $ew_simple, $ew_edge, $source);
+        });
     }
 }
 

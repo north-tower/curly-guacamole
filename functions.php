@@ -33,6 +33,7 @@ add_filter( 'bricks/builder/i18n', function( $i18n ) {
 } );
 
 require_once __DIR__ . '/inc/helpers-core.php';
+require_once __DIR__ . '/inc/race-detail-perf.php';
 require_once __DIR__ . '/inc/enqueue.php';
 require_once __DIR__ . '/inc/rewrites.php';
 require_once __DIR__ . '/inc/seo.php';
@@ -151,6 +152,12 @@ if (!function_exists('get_course_features')) {
         }
         
         // Get course features from course_features table
+        $cache_key = 'bricks_course_features_' . md5(strtolower(trim($course_name)));
+        $cached = get_transient($cache_key);
+        if ($cached !== false) {
+            return $cached === 'none' ? null : $cached;
+        }
+
         $course_features = $wpdb->get_row($wpdb->prepare(
             "SELECT race_code, profile, general_features, specific_features, direction
              FROM course_features 
@@ -158,6 +165,8 @@ if (!function_exists('get_course_features')) {
              LIMIT 1",
             $course_name
         ));
+
+        set_transient($cache_key, $course_features ?: 'none', DAY_IN_SECONDS);
         
         return $course_features;
     }
@@ -1631,10 +1640,6 @@ add_shortcode('points_backtest', 'bricks_points_backtest_shortcode');
 function bricks_race_detail_shortcode($atts) {
     global $wpdb;
 
-    if (!fhor_user_has_paid_race_access()) {
-        return fhor_race_access_required_message();
-    }
-
     $atts = shortcode_atts(['race_id' => 0], $atts);
     $race_id = bricks_decode_entity_id($atts['race_id'], 'race');
     if (!$race_id) {
@@ -1650,47 +1655,42 @@ function bricks_race_detail_shortcode($atts) {
         return '<div style="color:red;padding:20px;">Error: Race ID is required</div>';
     }
     
-    // UPDATED: Determine which tables to use based on date
+    // Resolve race + table set in one pass.
     $today = date('Y-m-d');
     $tomorrow = date('Y-m-d', strtotime('+1 day'));
-    
-    // First, get race details to determine the date
+    $races_table = 'advance_daily_races_beta';
+    $runners_table = 'advance_daily_runners_beta';
+    $speed_table = 'speed&performance_table';
+
     $race = $wpdb->get_row($wpdb->prepare(
-        "SELECT race_id, meeting_date, course, race_type FROM advance_daily_races_beta WHERE race_id = %d",
+        "SELECT * FROM `$races_table` WHERE race_id = %d",
         $race_id
     ));
-    
-    // If not found in beta table, try the main table
+
     if (!$race) {
+        $races_table = 'advance_daily_races';
+        $runners_table = 'advance_daily_runners';
+        $speed_table = 'adv_speed&performance_table';
         $race = $wpdb->get_row($wpdb->prepare(
-            "SELECT race_id, meeting_date, course, race_type FROM advance_daily_races WHERE race_id = %d",
+            "SELECT * FROM `$races_table` WHERE race_id = %d",
+            $race_id
+        ));
+    } elseif ($race->meeting_date === $tomorrow) {
+        $races_table = 'advance_daily_races';
+        $runners_table = 'advance_daily_runners';
+        $speed_table = 'adv_speed&performance_table';
+        $race = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM `$races_table` WHERE race_id = %d",
             $race_id
         ));
     }
-    
+
     if (!$race) {
         return '<div style="color:red;padding:20px;">Error: Race not found</div>';
     }
-    // Get course features
-$course_features = get_course_features($race->course);
 
-    // Determine which tables to use based on race date
-    if ($race->meeting_date === $tomorrow) {
-        $races_table = 'advance_daily_races';
-        $runners_table = 'advance_daily_runners';
-        $speed_table = 'adv_speed&performance_table'; // Use advanced table for tomorrow
-        bricks_debug_log("Race Detail Debug - Using tomorrow tables: $races_table, $runners_table, $speed_table");
-    } else {
-        $races_table = 'advance_daily_races_beta';
-        $runners_table = 'advance_daily_runners_beta';
-        $speed_table = 'speed&performance_table'; // Use regular table for today
-        bricks_debug_log("Race Detail Debug - Using today tables: $races_table, $runners_table, $speed_table");
-    }
-    
-    // Get race details from the correct table
-    $race = $wpdb->get_row($wpdb->prepare(
-        "SELECT * FROM $races_table WHERE race_id = %d", $race_id
-    ));
+    $course_features = get_course_features($race->course);
+    bricks_debug_log("Race Detail Debug - Using tables: $races_table, $runners_table, $speed_table");
     
     $is_national_hunt = false;
     if ($race && $race->race_type) {
@@ -1704,9 +1704,7 @@ $course_features = get_course_features($race->course);
         );
     }
     
-    if (!$race) {
-        return '<div style="color:red;padding:20px;">Error: Race not found</div>';
-    }
+    $race_show_premium_data = bricks_race_detail_can_view_premium();
     
     // Check if this is tomorrow's race
     $is_tomorrow_race = ($race->meeting_date === $tomorrow);
@@ -1714,13 +1712,7 @@ $course_features = get_course_features($race->course);
     
     // Get all available races for the same date for quick navigation
     $race_date = $race->meeting_date;
-    $all_races = $wpdb->get_results($wpdb->prepare(
-        "SELECT race_id, course, scheduled_time, race_title, class 
-         FROM $races_table 
-         WHERE meeting_date = %s 
-         ORDER BY course ASC, scheduled_time ASC",
-        $race_date
-    ));
+    $all_races = bricks_race_detail_meeting_races_cached($races_table, $race_date);
     
     // Group races by course
     $races_by_course = [];
@@ -1765,35 +1757,38 @@ bricks_debug_log(sprintf(
 // Get Speed Rating data from the correct table (support both d-m-Y and Y-m-d Date formats)
 $date_dmy = convert_date_format($race->meeting_date, 'd-m-Y');
 $date_ymd = convert_date_format($race->meeting_date, 'Y-m-d');
+$speed_ratings = [];
+$speed_ratings_lookup = [];
+$speed_ratings_by_runner_id = [];
 
-// UPDATED: Use dynamic speed table
-// Primary: fetch by race_id only (more reliable if Date formatting differs)
-$speed_ratings = $wpdb->get_results($wpdb->prepare(
-    "SELECT sp.*, r.name as horse_name
-     FROM `$speed_table` sp
-     LEFT JOIN $runners_table r ON sp.race_id = r.race_id AND sp.runner_id = r.runner_id
-     WHERE sp.race_id = %d",
-    $race_id
-));
-
-// Fallback: if nothing found by race_id only, try strict Date match (supports d-m-Y and Y-m-d)
-if (!$speed_ratings || count($speed_ratings) === 0) {
+if ($race_show_premium_data || empty($race->advanced_going)) {
+    // Primary: fetch by race_id only (more reliable if Date formatting differs)
     $speed_ratings = $wpdb->get_results($wpdb->prepare(
-        "SELECT sp.*, r.name as horse_name 
+        "SELECT sp.*, r.name as horse_name
          FROM `$speed_table` sp
          LEFT JOIN $runners_table r ON sp.race_id = r.race_id AND sp.runner_id = r.runner_id
-         WHERE sp.race_id = %d AND sp.Date IN (%s, %s)", 
-        $race_id, 
-        $date_dmy,
-        $date_ymd
+         WHERE sp.race_id = %d",
+        $race_id
     ));
+
+    // Fallback: if nothing found by race_id only, try strict Date match (supports d-m-Y and Y-m-d)
+    if (!$speed_ratings || count($speed_ratings) === 0) {
+        $speed_ratings = $wpdb->get_results($wpdb->prepare(
+            "SELECT sp.*, r.name as horse_name 
+             FROM `$speed_table` sp
+             LEFT JOIN $runners_table r ON sp.race_id = r.race_id AND sp.runner_id = r.runner_id
+             WHERE sp.race_id = %d AND sp.Date IN (%s, %s)", 
+            $race_id, 
+            $date_dmy,
+            $date_ymd
+        ));
+    }
 }
 
 // Add debug info to see which table was used
 bricks_debug_log("Race Detail Debug - Race ID: $race_id, Date: {$race->meeting_date}, Speed table used: $speed_table, Speed ratings found: " . count($speed_ratings));
 
 // Create lookup for speed ratings
-$speed_ratings_lookup = [];
 if ($speed_ratings) {
     foreach ($speed_ratings as $rating) {
         // Prefer runner name from the joined runners table; if missing (join mismatch),
@@ -1829,8 +1824,19 @@ if (!empty($runners) && !empty($speed_ratings_by_runner_id)) {
     }
 }
 
-// Build a lightweight sire 5Y signal lookup for this race card using internal history only.
 $sire_5y_lookup = [];
+$trainer_course_lookup = [];
+$trainer_course_ranks = [];
+$race_points_scored = [];
+$race_points_by_key = [];
+$race_points_by_name = [];
+$race_points_picks = ['winner' => null, 'place' => []];
+$race_points_ew_simple = null;
+$race_points_ew_edge = null;
+
+if ($race_show_premium_data) {
+
+// Build a lightweight sire 5Y signal lookup for this race card using internal history only.
 $sire_backtest_to = date('Y-m-d', strtotime('-1 day'));
 $sire_backtest_from = date('Y-m-d', strtotime('-5 years', strtotime($sire_backtest_to)));
 $sire_names = [];
@@ -1908,190 +1914,14 @@ if (!empty($runners)) {
 $sire_names = array_values(array_unique(array_filter($sire_names)));
 bricks_debug_log('Race Detail Debug - Sire names candidate count: ' . count($sire_names));
 if (!empty($sire_names)) {
-    $lin5_cache_key = 'bricks_lin5_' . md5(wp_json_encode([
-        'race_id' => intval($race_id),
-        'from' => $sire_backtest_from,
-        'to' => $sire_backtest_to,
-        'sire_names' => $sire_names,
-    ]));
-    $lin5_cached = get_transient($lin5_cache_key);
-    if (is_array($lin5_cached) && isset($lin5_cached['lookup']) && is_array($lin5_cached['lookup'])) {
-        $sire_5y_lookup = $lin5_cached['lookup'];
-    } else {
-    $sire_placeholders = implode(',', array_fill(0, count($sire_names), '%s'));
-    // PRB-based lineage from historical runners/races (schema-safe; no dependency on daily_comment_history.sire).
-    // Reliability shrinkage: adjusted = (runs*raw + k*baseline) / (runs+k)
-    $sire_flat_filter = "
-          COALESCE(dracb.race_type, hracb.race_type) IS NOT NULL
-      AND COALESCE(dracb.race_type, hracb.race_type) != ''
-      AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%hurdle%'
-      AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%chase%'
-      AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%nh%'
-      AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%national hunt%'";
-
-    $sire_common_where = "
-          hrunb.sire_name IS NOT NULL
-      AND hrunb.sire_name != ''
-      AND hrunb.finish_position IS NOT NULL
-      AND hrunb.finish_position > 0
-      AND rf.field_size > 1
-      AND hracb.meeting_date BETWEEN %s AND %s
-      AND $sire_flat_filter";
-
-    $baseline_sql = "
-        SELECT ROUND(AVG((rf.field_size - hrunb.finish_position) / (rf.field_size - 1)) * 100, 1) AS baseline_prb
-        FROM historic_runners_beta hrunb
-        INNER JOIN historic_races_beta hracb ON hracb.race_id = hrunb.race_id
-        LEFT JOIN daily_races_beta dracb ON dracb.race_id = hrunb.race_id
-        INNER JOIN (
-            SELECT race_id, COUNT(*) AS field_size
-            FROM historic_runners_beta
-            WHERE finish_position IS NOT NULL AND finish_position > 0
-            GROUP BY race_id
-            HAVING COUNT(*) > 1
-        ) rf ON rf.race_id = hrunb.race_id
-        WHERE hracb.meeting_date BETWEEN %s AND %s
-          AND MONTH(hracb.meeting_date) BETWEEN 3 AND 10
-          AND $sire_flat_filter";
-    $baseline_prb = $wpdb->get_var($wpdb->prepare($baseline_sql, $sire_backtest_from, $sire_backtest_to));
-    $baseline_prb = ($baseline_prb !== null) ? floatval($baseline_prb) : 50.0;
-    $sire_shrink_k = 30.0;
-
-    // Level 1: Mar-Jun + 5-6f
-    $lvl1_sql = "
-        SELECT hrunb.sire_name AS sire_name,
-               COUNT(*) AS runs,
-               ROUND(AVG((rf.field_size - hrunb.finish_position) / (rf.field_size - 1)) * 100, 1) AS raw_prb_pct,
-               'Mar-Jun, 5-6f' AS context
-        FROM historic_runners_beta hrunb
-        INNER JOIN historic_races_beta hracb ON hracb.race_id = hrunb.race_id
-        LEFT JOIN daily_races_beta dracb ON dracb.race_id = hrunb.race_id
-        INNER JOIN (
-            SELECT race_id, COUNT(*) AS field_size
-            FROM historic_runners_beta
-            WHERE finish_position IS NOT NULL AND finish_position > 0
-            GROUP BY race_id
-            HAVING COUNT(*) > 1
-        ) rf ON rf.race_id = hrunb.race_id
-        WHERE hrunb.sire_name IN ($sire_placeholders)
-          AND MONTH(hracb.meeting_date) BETWEEN 3 AND 6
-          AND hracb.distance_yards BETWEEN 1100 AND 1320
-          AND $sire_common_where
-        GROUP BY hrunb.sire_name";
-    $lvl1_params = array_merge($sire_names, [$sire_backtest_from, $sire_backtest_to]);
-    $lvl1 = $wpdb->get_results($wpdb->prepare($lvl1_sql, ...$lvl1_params));
-
-    // Level 2: Mar-Jun any distance
-    $lvl2_sql = "
-        SELECT hrunb.sire_name AS sire_name,
-               COUNT(*) AS runs,
-               ROUND(AVG((rf.field_size - hrunb.finish_position) / (rf.field_size - 1)) * 100, 1) AS raw_prb_pct,
-               'Mar-Jun, any dist' AS context
-        FROM historic_runners_beta hrunb
-        INNER JOIN historic_races_beta hracb ON hracb.race_id = hrunb.race_id
-        LEFT JOIN daily_races_beta dracb ON dracb.race_id = hrunb.race_id
-        INNER JOIN (
-            SELECT race_id, COUNT(*) AS field_size
-            FROM historic_runners_beta
-            WHERE finish_position IS NOT NULL AND finish_position > 0
-            GROUP BY race_id
-            HAVING COUNT(*) > 1
-        ) rf ON rf.race_id = hrunb.race_id
-        WHERE hrunb.sire_name IN ($sire_placeholders)
-          AND MONTH(hracb.meeting_date) BETWEEN 3 AND 6
-          AND $sire_common_where
-        GROUP BY hrunb.sire_name";
-    $lvl2_params = array_merge($sire_names, [$sire_backtest_from, $sire_backtest_to]);
-    $lvl2 = $wpdb->get_results($wpdb->prepare($lvl2_sql, ...$lvl2_params));
-
-    // Level 3: Mar-Oct any distance
-    $lvl3_sql = "
-        SELECT hrunb.sire_name AS sire_name,
-               COUNT(*) AS runs,
-               ROUND(AVG((rf.field_size - hrunb.finish_position) / (rf.field_size - 1)) * 100, 1) AS raw_prb_pct,
-               'Mar-Oct, any dist' AS context
-        FROM historic_runners_beta hrunb
-        INNER JOIN historic_races_beta hracb ON hracb.race_id = hrunb.race_id
-        LEFT JOIN daily_races_beta dracb ON dracb.race_id = hrunb.race_id
-        INNER JOIN (
-            SELECT race_id, COUNT(*) AS field_size
-            FROM historic_runners_beta
-            WHERE finish_position IS NOT NULL AND finish_position > 0
-            GROUP BY race_id
-            HAVING COUNT(*) > 1
-        ) rf ON rf.race_id = hrunb.race_id
-        WHERE hrunb.sire_name IN ($sire_placeholders)
-          AND MONTH(hracb.meeting_date) BETWEEN 3 AND 10
-          AND $sire_common_where
-        GROUP BY hrunb.sire_name";
-    $lvl3_params = array_merge($sire_names, [$sire_backtest_from, $sire_backtest_to]);
-    $lvl3 = $wpdb->get_results($wpdb->prepare($lvl3_sql, ...$lvl3_params));
-
-    // Level 4: All Flat any distance (no seasonal filter)
-    $lvl4_sql = "
-        SELECT hrunb.sire_name AS sire_name,
-               COUNT(*) AS runs,
-               ROUND(AVG((rf.field_size - hrunb.finish_position) / (rf.field_size - 1)) * 100, 1) AS raw_prb_pct,
-               'All Flat' AS context
-        FROM historic_runners_beta hrunb
-        INNER JOIN historic_races_beta hracb ON hracb.race_id = hrunb.race_id
-        LEFT JOIN daily_races_beta dracb ON dracb.race_id = hrunb.race_id
-        INNER JOIN (
-            SELECT race_id, COUNT(*) AS field_size
-            FROM historic_runners_beta
-            WHERE finish_position IS NOT NULL AND finish_position > 0
-            GROUP BY race_id
-            HAVING COUNT(*) > 1
-        ) rf ON rf.race_id = hrunb.race_id
-        WHERE hrunb.sire_name IN ($sire_placeholders)
-          AND $sire_common_where
-        GROUP BY hrunb.sire_name";
-    $lvl4_params = array_merge($sire_names, [$sire_backtest_from, $sire_backtest_to]);
-    $lvl4 = $wpdb->get_results($wpdb->prepare($lvl4_sql, ...$lvl4_params));
-
-    // Merge levels with preference order 1 -> 2 -> 3 -> 4; prefer larger runs within same level
-    $by_sire = [];
-    $apply_level = function($rows) use (&$by_sire) {
-        foreach ($rows as $r) {
-            $sire_key = trim((string)$r->sire_name);
-            if ($sire_key === '') continue;
-            if (!isset($by_sire[$sire_key]) || intval($r->runs) > intval($by_sire[$sire_key]['runs'])) {
-                $by_sire[$sire_key] = [
-                    'runs' => intval($r->runs),
-                    'raw_prb_pct' => floatval($r->raw_prb_pct),
-                    'context' => (string)$r->context,
-                ];
-            }
-        }
-    };
-    $apply_level($lvl4);
-    $apply_level($lvl3);
-    $apply_level($lvl2);
-    $apply_level($lvl1);
-
-    if (!empty($by_sire)) {
-        foreach ($by_sire as $sire_key => $vals) {
-            $runs = isset($vals['runs']) ? intval($vals['runs']) : 0;
-            $raw_prb = isset($vals['raw_prb_pct']) ? floatval($vals['raw_prb_pct']) : $baseline_prb;
-            $adj_prb = ($runs > 0)
-                ? round((($runs * $raw_prb) + ($sire_shrink_k * $baseline_prb)) / ($runs + $sire_shrink_k), 1)
-                : round($baseline_prb, 1);
-            $vals['prb_pct'] = $adj_prb;
-            $vals['raw_prb_pct'] = round($raw_prb, 1);
-            $vals['baseline_prb_pct'] = round($baseline_prb, 1);
-            $vals['shrink_k'] = $sire_shrink_k;
-
-            $sire_key_lower = strtolower($sire_key);
-            $sire_key_norm = bricks_normalize_sire_name_key($sire_key);
-            $sire_5y_lookup[$sire_key] = $vals;
-            $sire_5y_lookup[$sire_key_lower] = $vals;
-            if ($sire_key_norm !== $sire_key_lower) {
-                $sire_5y_lookup[$sire_key_norm] = $vals;
-            }
-        }
-    }
-        set_transient($lin5_cache_key, ['lookup' => $sire_5y_lookup], 30 * MINUTE_IN_SECONDS);
-    }
+    $baseline_prb = bricks_race_detail_sire_baseline_prb_cached($sire_backtest_from, $sire_backtest_to);
+    $sire_5y_lookup = bricks_race_detail_lin5_lookup_cached(
+        $sire_names,
+        $sire_backtest_from,
+        $sire_backtest_to,
+        $baseline_prb,
+        30.0
+    );
 }
 
 // Sort runners by FSr (fhorsite_rating) from speed ratings - highest first
@@ -2183,7 +2013,7 @@ if (!empty($runners) && !empty($race->course)) {
                     ];
                 }
             }
-            set_transient($tfc_cache_key, $trainer_course_lookup, 30 * MINUTE_IN_SECONDS);
+            set_transient($tfc_cache_key, $trainer_course_lookup, DAY_IN_SECONDS);
         }
 
         if (!empty($trainer_course_lookup)) {
@@ -2334,8 +2164,8 @@ $race_points_picks = bricks_points_pick_winner_place($race_points_scored);
 $race_points_ew_simple = bricks_points_pick_each_way_simple($race_points_scored);
 $race_points_ew_edge = bricks_points_pick_each_way_edge($race_points_scored);
 
-if (function_exists('bricks_points_published_picks_save') && !empty($race->meeting_date)) {
-    bricks_points_published_picks_save(
+if (function_exists('bricks_points_published_picks_defer_save_if_changed') && !empty($race->meeting_date)) {
+    bricks_points_published_picks_defer_save_if_changed(
         $race_id,
         $race->meeting_date,
         $race_points_picks,
@@ -2344,7 +2174,9 @@ if (function_exists('bricks_points_published_picks_save') && !empty($race->meeti
     );
 }
 
-if (function_exists('bricks_debug_enabled') && bricks_debug_enabled()) {
+} // end premium-only enrichment
+
+if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_show_premium_data) {
     bricks_debug_log('Race Points Engine Debug - Payload: ' . wp_json_encode([
         'race_id' => intval($race_id),
         'winner' => $race_points_picks['winner']['horse_name'] ?? null,
@@ -2380,7 +2212,6 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled()) {
     ?>
 
     <style>
-          <style>
         /* Add these new styles to your existing CSS */
         .back-button-container {
             max-width: 1400px;
@@ -3817,11 +3648,12 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled()) {
         <?php if ($runners && count($runners) > 0): ?>
 
         <div class="premium-ratings-container">
-        <?php if (!function_exists('bricks_race_detail_can_view_premium') || !bricks_race_detail_can_view_premium()): ?>
+        <?php if (!bricks_race_detail_can_view_premium()): ?>
             <div class="premium-ratings-paywall-gate" style="padding:28px 24px;background:linear-gradient(135deg,#f8fafc 0%,#eef2ff 100%);border:1px solid #c7d2fe;border-radius:12px;text-align:center;">
                 <h2 style="margin:0 0 10px;font-size:22px;color:#1e3a8a;">Fhorsite &amp; speed ratings</h2>
                 <p style="margin:0 0 16px;color:#475569;max-width:560px;margin-left:auto;margin-right:auto;">
-                    Full runner ratings, Points Engine picks, and performance charts are available to registered members.
+                    Full runner ratings, Points Engine picks, and performance charts are available to Fhorsite Members.
+                    Every Wednesday, all ratings are free for everyone.
                 </p>
                 <p style="margin:0 0 18px;font-size:13px;color:#64748b;">
                     <?php
@@ -3835,7 +3667,16 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled()) {
                     }
                     ?>
                 </p>
-                <a href="<?php echo esc_url(wp_login_url(bricks_race_url($race_id))); ?>" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;text-decoration:none;">Log in to view ratings</a>
+                <?php
+                $signup_url = fhor_get_membership_signup_url();
+                if (!is_user_logged_in()): ?>
+                    <a href="<?php echo esc_url(wp_login_url(bricks_race_url($race_id))); ?>" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;text-decoration:none;margin-right:8px;">Log in</a>
+                    <?php if (!empty($signup_url)): ?>
+                    <a href="<?php echo esc_url($signup_url); ?>" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#0f766e;color:#fff;font-weight:700;text-decoration:none;">Register for Fhorsite Member</a>
+                    <?php endif; ?>
+                <?php elseif (!empty($signup_url)): ?>
+                    <a href="<?php echo esc_url($signup_url); ?>" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;text-decoration:none;">Become a Fhorsite Member</a>
+                <?php endif; ?>
             </div>
         <?php else: ?>
         
@@ -4641,9 +4482,11 @@ if ($speed_data) {
 
           <!-- Speed Rating Chart Section -->
         <?php
+        bricks_race_detail_enqueue_lazy_charts($race_id);
         $runner_count_chart = is_countable($runners) ? count($runners) : 0;
         $speed_chart_height_px = min(2400, max(500, ($runner_count_chart * 52) + 160));
         ?>
+        <div id="race-detail-charts-<?php echo intval($race_id); ?>"></div>
         <div style="background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.1);margin-top:30px;padding:30px;">
             <h2 style="color:#111827;margin-bottom:25px;text-align:center;font-size:24px;font-weight:700;">📊 Fhorsite and Speed Rating Analysis</h2>
             <div class="speed-rating-chart-container" style="position:relative;height:<?php echo (int) $speed_chart_height_px; ?>px;min-height:500px;margin:30px 0;background:linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);border-radius:8px;padding:20px;">
@@ -4733,13 +4576,9 @@ if ($speed_data) {
         </div>
         <?php endif; ?>
 
-         <!-- Chart.js Library -->
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        
-        <!-- Enhanced Chart Scripts -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    function initRaceDetailCharts_<?php echo $race_id; ?>() {
+        <!-- Chart init runs after lazy Chart.js load (see inc/race-detail-perf.php) -->
+        <script>
+        window.initRaceDetailCharts_<?php echo $race_id; ?> = function() {
         const raceDetailDebug = <?php echo bricks_debug_enabled() ? 'true' : 'false'; ?>;
         const dbg = function() {
             if (raceDetailDebug && window.console && typeof console.log === 'function') {
@@ -6132,12 +5971,8 @@ if (trainerPerformanceCtx) {
         if (raceDetailDebug && window.console && typeof console.groupEnd === 'function') {
             console.groupEnd();
         }
-    }
-    
-    // Initialize charts after DOM is ready
-    initRaceDetailCharts_<?php echo $race_id; ?>();
-    
-    // Keep charts in sync with the currently visible runner rows/order in the table.
+        };
+
     window.filterChartsByNonRunners_<?php echo $race_id; ?> = function() {
         if (!window.raceDetailCharts_<?php echo $race_id; ?> || !window.raceDetailChartData_<?php echo $race_id; ?>) {
             console.log('Charts not yet initialized, skipping filter');
@@ -6270,8 +6105,9 @@ if (trainerPerformanceCtx) {
         }
         <?php endif; ?>
     };
-});
+        </script>
 
+<script>
 // Toggle details rows
 jQuery(document).on('click', '.toggle-details-btn', function() {
     const index = jQuery(this).data('runner-index');
@@ -6920,6 +6756,35 @@ function update_details_handle_form_submission() {
 }
 
 /**
+ * Public membership signup / registration page URL (not account management).
+ *
+ * Resolution order: FHOR_MEMBERSHIP_SIGNUP_URL constant → option fhor_membership_signup_url
+ * → filter fhor_membership_signup_url → common published page slugs.
+ *
+ * @return string Escaped URL or empty string.
+ */
+function fhor_get_membership_signup_url() {
+    if (defined('FHOR_MEMBERSHIP_SIGNUP_URL') && FHOR_MEMBERSHIP_SIGNUP_URL !== '') {
+        return esc_url(FHOR_MEMBERSHIP_SIGNUP_URL);
+    }
+    $opt = get_option('fhor_membership_signup_url', '');
+    if (is_string($opt) && $opt !== '') {
+        return esc_url($opt);
+    }
+    $filtered = apply_filters('fhor_membership_signup_url', '');
+    if (is_string($filtered) && $filtered !== '') {
+        return esc_url($filtered);
+    }
+    foreach (['register', 'registration', 'sign-up', 'signup', 'join', 'membership', 'subscribe', 'get-started', 'pricing'] as $slug) {
+        $p = get_page_by_path($slug);
+        if ($p instanceof WP_Post && $p->post_status === 'publish') {
+            return esc_url(get_permalink($p));
+        }
+    }
+    return esc_url(wp_registration_url());
+}
+
+/**
  * Target URL for the “Manage subscription” CTA on [update_details].
  * Not in git history: a Bricks-only button on the page would vanish if the page was re-saved without it.
  *
@@ -6956,95 +6821,10 @@ function fhor_get_update_details_subscription_manage_url() {
 }
 
 /**
- * Race access policy:
- * - Wednesday: any logged-in user can view races.
- * - Other days: user must be a paid Bricks Members member.
+ * @deprecated Use fhor_can_view_race_premium_content() instead.
  */
 function fhor_user_has_paid_race_access($user_id = 0) {
-    if (!is_user_logged_in()) {
-        return false;
-    }
-
-    $user_id = $user_id ? intval($user_id) : get_current_user_id();
-    if ($user_id <= 0) {
-        return false;
-    }
-
-    if (user_can($user_id, 'manage_options')) {
-        return true;
-    }
-
-    try {
-        $race_tz = new DateTimeZone('Europe/London');
-    } catch (Exception $e) {
-        $race_tz = wp_timezone();
-    }
-    $now = new DateTimeImmutable('now', $race_tz);
-    if ($now->format('N') === '3') {
-        return true;
-    }
-
-    // Allow explicit site-level override via custom integration.
-    $override = apply_filters('fhor_bricks_members_paid_access', null, $user_id);
-    if (is_bool($override)) {
-        return $override;
-    }
-
-    $allowed_level_ids = [5];
-    $allowed_level_names = ['fhorsite member'];
-
-    $user_level_ids = [];
-    $user_level_names = [];
-
-    $raw_levels = null;
-    if (function_exists('bricks_members_get_user_levels')) {
-        $raw_levels = bricks_members_get_user_levels($user_id);
-    } elseif (function_exists('bm_get_user_levels')) {
-        $raw_levels = bm_get_user_levels($user_id);
-    }
-
-    if (is_array($raw_levels)) {
-        foreach ($raw_levels as $lvl) {
-            if (is_numeric($lvl)) {
-                $user_level_ids[] = intval($lvl);
-                continue;
-            }
-            if (is_object($lvl)) {
-                if (isset($lvl->id) && is_numeric($lvl->id)) {
-                    $user_level_ids[] = intval($lvl->id);
-                }
-                if (isset($lvl->name)) {
-                    $user_level_names[] = strtolower(trim((string) $lvl->name));
-                }
-                continue;
-            }
-            if (is_array($lvl)) {
-                if (isset($lvl['id']) && is_numeric($lvl['id'])) {
-                    $user_level_ids[] = intval($lvl['id']);
-                }
-                if (isset($lvl['name'])) {
-                    $user_level_names[] = strtolower(trim((string) $lvl['name']));
-                }
-            }
-        }
-    }
-
-    $user_level_ids = array_values(array_unique(array_filter($user_level_ids, function($v) {
-        return $v > 0;
-    })));
-    $user_level_names = array_values(array_unique(array_filter($user_level_names, function($name) {
-        return $name !== '';
-    })));
-
-    if (!empty($allowed_level_ids) && !empty(array_intersect($allowed_level_ids, $user_level_ids))) {
-        return true;
-    }
-
-    if (!empty($allowed_level_names) && !empty(array_intersect($allowed_level_names, $user_level_names))) {
-        return true;
-    }
-
-    return false;
+    return fhor_can_view_race_premium_content($user_id);
 }
 
 function fhor_race_access_required_message() {
@@ -7055,7 +6835,7 @@ function fhor_race_access_required_message() {
         <div style="font-size:28px;margin-bottom:10px;">🔒</div>
         <div style="font-size:18px;font-weight:700;color:#111827;margin-bottom:8px;">Race access is for paid members</div>
         <div style="color:#6b7280;max-width:520px;margin:0 auto 14px;">
-            On Wednesdays, all logged-in users can view races. On other days, an active paid membership is required.
+            On Wednesdays, all race data is free for everyone. On other days, detailed ratings require an active Fhorsite Member subscription.
         </div>
         <?php if (!is_user_logged_in()): ?>
             <a href="<?php echo esc_url(wp_login_url(get_permalink())); ?>" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Log in</a>
