@@ -1828,21 +1828,7 @@ function bricks_race_detail_shortcode($atts) {
     }
 
     if (!function_exists('fhor_can_view_race_detail_page') || !fhor_can_view_race_detail_page()) {
-        $content = '';
-        if (function_exists('bricks_is_standalone_page') && bricks_is_standalone_page() && !headers_sent()) {
-            ob_start();
-            get_header();
-            $content .= ob_get_clean();
-            $content .= '<main class="main-content"><div class="content-container">';
-        }
-        $content .= fhor_race_detail_access_gate_html($race_id, $race);
-        if (function_exists('bricks_is_standalone_page') && bricks_is_standalone_page()) {
-            $content .= '</div></main>';
-            ob_start();
-            get_footer();
-            $content .= ob_get_clean();
-        }
-        return $content;
+        return fhor_race_detail_access_gate_html($race_id, $race);
     }
 
     $course_features = get_course_features($race->course);
@@ -6540,7 +6526,7 @@ function bricks_is_standalone_page() {
     // Check if we're on a page that should have full page layout
     $current_url = $_SERVER['REQUEST_URI'];
 
-    // Race pages use race-detail.php (header/footer + shortcode). Do not wrap again.
+    // Race pages use race-detail.php (get_header/get_footer + shortcode). Do not wrap again.
     if (get_query_var('race_id')) {
         return false;
     }
