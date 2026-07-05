@@ -250,7 +250,7 @@ add_action('bricks_daily_filter_cache_flush', 'bricks_run_daily_filter_cache_flu
 
 if (!function_exists('fhor_is_race_wednesday_open_day')) {
     /**
-     * Wednesdays (UK time): all race data is open to everyone for that day.
+     * Wednesdays (UK time): logged-in users get full race detail access without paid membership.
      */
     function fhor_is_race_wednesday_open_day() {
         try {
@@ -398,15 +398,87 @@ if (!function_exists('fhor_user_is_paid_member')) {
     }
 }
 
-if (!function_exists('fhor_can_view_race_premium_content')) {
+if (!function_exists('fhor_can_view_race_detail_page')) {
     /**
-     * Premium race content (ratings tables, graphs, picks): paid members, or everyone on Wednesdays.
+     * Full race detail page: must be logged in; Fhorsite Member on Mon–Tue/Thu–Sun;
+     * any logged-in account on Wednesdays (UK time).
      */
-    function fhor_can_view_race_premium_content($user_id = 0) {
+    function fhor_can_view_race_detail_page($user_id = 0) {
+        if (function_exists('bricks_seo_is_search_crawler') && bricks_seo_is_search_crawler()) {
+            return true;
+        }
+
+        $user_id = $user_id ? intval($user_id) : get_current_user_id();
+        if ($user_id <= 0) {
+            return false;
+        }
+
         if (fhor_is_race_wednesday_open_day()) {
             return true;
         }
 
         return fhor_user_is_paid_member($user_id);
+    }
+}
+
+if (!function_exists('fhor_can_view_race_premium_content')) {
+    /**
+     * Premium race content uses the same rules as the race detail page.
+     */
+    function fhor_can_view_race_premium_content($user_id = 0) {
+        return fhor_can_view_race_detail_page($user_id);
+    }
+}
+
+if (!function_exists('fhor_race_detail_access_gate_html')) {
+    function fhor_race_detail_access_gate_html($race_id, $race = null) {
+        $race_id = intval($race_id);
+        $race_url = function_exists('bricks_race_url') && $race_id > 0
+            ? bricks_race_url($race_id)
+            : home_url(isset($_SERVER['REQUEST_URI']) ? esc_url_raw(wp_unslash($_SERVER['REQUEST_URI'])) : '/');
+
+        $title = ($race && !empty($race->race_title)) ? (string) $race->race_title : 'Race ratings';
+        $course = ($race && !empty($race->course)) ? (string) $race->course : '';
+        $signup_url = function_exists('fhor_get_membership_signup_url') ? fhor_get_membership_signup_url() : '';
+        $is_wednesday = fhor_is_race_wednesday_open_day();
+
+        ob_start();
+        ?>
+        <div style="max-width:640px;margin:48px auto 32px;padding:0 20px;font-family:inherit;">
+            <div style="text-align:center;padding:32px 24px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,0.06);">
+                <div style="font-size:40px;margin-bottom:12px;">🔒</div>
+                <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#111827;">Members-only race page</h1>
+                <?php if ($course !== ''): ?>
+                <p style="margin:0 0 6px;font-size:15px;color:#374151;font-weight:600;"><?php echo esc_html($title); ?></p>
+                <p style="margin:0 0 16px;font-size:13px;color:#64748b;"><?php echo esc_html($course); ?></p>
+                <?php endif; ?>
+                <p style="margin:0 0 20px;color:#6b7280;font-size:14px;line-height:1.5;">
+                    <?php if (!is_user_logged_in()): ?>
+                        Please log in to view full Fhorsite ratings and Points Engine picks for this race.
+                        <?php if ($is_wednesday): ?>
+                        On <strong>Wednesdays</strong>, any logged-in account can view race pages for free.
+                        <?php else: ?>
+                        An active <strong>Fhorsite Member</strong> subscription is required on other days.
+                        <?php endif; ?>
+                    <?php else: ?>
+                        Full race ratings are available to <strong>Fhorsite Members</strong>.
+                        On <strong>Wednesdays</strong>, any logged-in account can view race pages for free.
+                    <?php endif; ?>
+                </p>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;">
+                    <?php if (!is_user_logged_in()): ?>
+                    <a href="<?php echo esc_url(wp_login_url($race_url)); ?>" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;text-decoration:none;">Log in</a>
+                    <?php if ($signup_url !== ''): ?>
+                    <a href="<?php echo esc_url($signup_url); ?>" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#0f766e;color:#fff;font-weight:700;text-decoration:none;">Register</a>
+                    <?php endif; ?>
+                    <?php elseif (!$is_wednesday && $signup_url !== ''): ?>
+                    <a href="<?php echo esc_url($signup_url); ?>" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;text-decoration:none;">Become a Fhorsite Member</a>
+                    <?php endif; ?>
+                    <a href="<?php echo esc_url(home_url('/daily/')); ?>" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#f3f4f6;color:#374151;font-weight:600;text-decoration:none;">← Daily races</a>
+                </div>
+            </div>
+        </div>
+        <?php
+        return ob_get_clean();
     }
 }

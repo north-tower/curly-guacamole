@@ -1827,6 +1827,24 @@ function bricks_race_detail_shortcode($atts) {
         return '<div style="color:red;padding:20px;">Error: Race not found</div>';
     }
 
+    if (!function_exists('fhor_can_view_race_detail_page') || !fhor_can_view_race_detail_page()) {
+        $content = '';
+        if (function_exists('bricks_is_standalone_page') && bricks_is_standalone_page() && !headers_sent()) {
+            ob_start();
+            get_header();
+            $content .= ob_get_clean();
+            $content .= '<main class="main-content"><div class="content-container">';
+        }
+        $content .= fhor_race_detail_access_gate_html($race_id, $race);
+        if (function_exists('bricks_is_standalone_page') && bricks_is_standalone_page()) {
+            $content .= '</div></main>';
+            ob_start();
+            get_footer();
+            $content .= ob_get_clean();
+        }
+        return $content;
+    }
+
     $course_features = get_course_features($race->course);
     bricks_debug_log("Race Detail Debug - Using tables: $races_table, $runners_table, $speed_table");
     
@@ -3789,37 +3807,6 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
         <?php if ($runners && count($runners) > 0): ?>
 
         <div class="premium-ratings-container">
-        <?php if (!bricks_race_detail_can_view_premium()): ?>
-            <div class="premium-ratings-paywall-gate" style="padding:28px 24px;background:linear-gradient(135deg,#f8fafc 0%,#eef2ff 100%);border:1px solid #c7d2fe;border-radius:12px;text-align:center;">
-                <h2 style="margin:0 0 10px;font-size:22px;color:#1e3a8a;">Fhorsite &amp; speed ratings</h2>
-                <p style="margin:0 0 16px;color:#475569;max-width:560px;margin-left:auto;margin-right:auto;">
-                    Full runner ratings, Points Engine picks, and performance charts are available to Fhorsite Members.
-                    Every Wednesday, all ratings are free for everyone.
-                </p>
-                <p style="margin:0 0 18px;font-size:13px;color:#64748b;">
-                    <?php
-                    $runner_names = array_map(function ($r) {
-                        return trim((string) ($r->name ?? ''));
-                    }, $runners);
-                    $runner_names = array_values(array_filter($runner_names));
-                    echo esc_html(count($runner_names) . ' runners: ' . implode(', ', array_slice($runner_names, 0, 12)));
-                    if (count($runner_names) > 12) {
-                        echo esc_html(' …');
-                    }
-                    ?>
-                </p>
-                <?php
-                $signup_url = fhor_get_membership_signup_url();
-                if (!is_user_logged_in()): ?>
-                    <a href="<?php echo esc_url(wp_login_url(bricks_race_url($race_id))); ?>" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;text-decoration:none;margin-right:8px;">Log in</a>
-                    <?php if (!empty($signup_url)): ?>
-                    <a href="<?php echo esc_url($signup_url); ?>" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#0f766e;color:#fff;font-weight:700;text-decoration:none;">Register for Fhorsite Member</a>
-                    <?php endif; ?>
-                <?php elseif (!empty($signup_url)): ?>
-                    <a href="<?php echo esc_url($signup_url); ?>" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;text-decoration:none;">Become a Fhorsite Member</a>
-                <?php endif; ?>
-            </div>
-        <?php else: ?>
         
         <!-- Runners Table -->
         <div class="runners-card">
@@ -6302,7 +6289,6 @@ jQuery(document).on('click', '.toggle-details-btn', function() {
     });
     </script>
 
-        <?php endif; ?>
         </div><!-- .premium-ratings-container -->
         
         <?php else: ?>
@@ -6969,23 +6955,11 @@ function fhor_user_has_paid_race_access($user_id = 0) {
 }
 
 function fhor_race_access_required_message() {
-    ob_start();
-    $manage_url = fhor_get_update_details_subscription_manage_url();
-    ?>
-    <div style="text-align:center;padding:28px 20px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;">
-        <div style="font-size:28px;margin-bottom:10px;">🔒</div>
-        <div style="font-size:18px;font-weight:700;color:#111827;margin-bottom:8px;">Race access is for paid members</div>
-        <div style="color:#6b7280;max-width:520px;margin:0 auto 14px;">
-            On Wednesdays, all race data is free for everyone. On other days, detailed ratings require an active Fhorsite Member subscription.
-        </div>
-        <?php if (!is_user_logged_in()): ?>
-            <a href="<?php echo esc_url(wp_login_url(get_permalink())); ?>" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Log in</a>
-        <?php elseif (!empty($manage_url)): ?>
-            <a href="<?php echo esc_url($manage_url); ?>" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Manage subscription</a>
-        <?php endif; ?>
-    </div>
-    <?php
-    return ob_get_clean();
+    $race_id = function_exists('get_query_var') ? get_query_var('race_id') : 0;
+    if (function_exists('fhor_race_detail_access_gate_html')) {
+        return fhor_race_detail_access_gate_html($race_id, null);
+    }
+    return '';
 }
 
 /**
