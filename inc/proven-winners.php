@@ -46,58 +46,61 @@ if (!function_exists('bricks_proven_winners_parse_sp_decimal')) {
     }
 }
 
-if (!function_exists('bricks_proven_winners_compute_single_race_roi')) {
+if (!function_exists('bricks_proven_winners_normalize_horse')) {
+    function bricks_proven_winners_normalize_horse($name) {
+        if (function_exists('bricks_points_engine_normalize_horse_name')) {
+            return bricks_points_engine_normalize_horse_name($name);
+        }
+        return strtolower(trim(preg_replace('/\s+/', ' ', (string) $name)));
+    }
+}
+
+if (!function_exists('bricks_proven_winners_pick_from_runner')) {
     /**
-     * Per-strategy profit (1pt units) for one race using published picks.
+     * Build a lightweight pick payload from a historic runner row (no Points Engine scoring).
      *
+     * @return array<string, mixed>|null
+     */
+    function bricks_proven_winners_pick_from_runner($horse_name, array $runners_by_name) {
+        $norm = bricks_proven_winners_normalize_horse($horse_name);
+        if ($norm === '' || empty($runners_by_name[$norm])) {
+            return null;
+        }
+        $row = $runners_by_name[$norm];
+        $sp_frac = isset($row->starting_price) ? (string) $row->starting_price : '';
+        $sp_dec = null;
+        if (isset($row->starting_price_decimal) && is_numeric($row->starting_price_decimal) && floatval($row->starting_price_decimal) > 1) {
+            $sp_dec = floatval($row->starting_price_decimal);
+        } else {
+            $sp_dec = bricks_proven_winners_parse_sp_decimal($sp_frac);
+        }
+
+        return [
+            'horse_name' => (string) ($row->horse_name ?? $horse_name),
+            'finish_position' => $row->finish_position ?? '',
+            'settlement_odds_decimal' => $sp_dec,
+            'odds_decimal' => $sp_dec,
+            'odds_fractional' => $sp_frac,
+        ];
+    }
+}
+
+if (!function_exists('bricks_proven_winners_roi_from_snapshot_and_runners')) {
+    /**
+     * Per-strategy profit from published picks + historic runners (no day-wide backtest fetch).
+     *
+     * @param array $snapshot bricks_points_published_picks_get() shape
+     * @param array $runners_by_name normalized horse name => runner object
      * @return array<string, array{profit:float, hit:bool, horse:string, sp:string}>|null
      */
-    function bricks_proven_winners_compute_single_race_roi($race_id, $meeting_date) {
-        if (
-            !function_exists('bricks_points_backtest_fetch_rows')
-            || !function_exists('bricks_points_backtest_score_race')
-            || !function_exists('bricks_points_published_picks_get')
-            || !function_exists('bricks_points_picks_from_published_snapshot')
-        ) {
+    function bricks_proven_winners_roi_from_snapshot_and_runners(array $snapshot, array $runners_by_name) {
+        if (empty($snapshot['win_horse']) || count($runners_by_name) < 2) {
             return null;
         }
 
-        $race_id = intval($race_id);
-        if ($race_id <= 0 || !preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $meeting_date)) {
-            return null;
-        }
-
-        static $cache = [];
-        $key = $race_id . '|' . $meeting_date;
-        if (isset($cache[$key])) {
-            return $cache[$key];
-        }
-
-        $rows = bricks_points_backtest_fetch_rows($meeting_date, $meeting_date, '');
-        $race_rows = [];
-        foreach ((array) $rows as $row) {
-            if (intval($row->race_id ?? 0) === $race_id) {
-                $race_rows[] = $row;
-            }
-        }
-        if (count($race_rows) < 2) {
-            $cache[$key] = null;
-            return null;
-        }
-
-        $snapshot = bricks_points_published_picks_get($race_id, $meeting_date);
-        if (!$snapshot || empty($snapshot['win_horse'])) {
-            $cache[$key] = null;
-            return null;
-        }
-
-        $scored = bricks_points_backtest_score_race($race_rows);
-        $published = bricks_points_picks_from_published_snapshot($snapshot, $scored);
-        $picks = ['winner' => $published['winner'], 'place' => $published['place']];
-        $ew_simple = $published['ew_simple'];
-        $ew_edge = $published['ew_edge'];
+        $field_size = count($runners_by_name);
         $place_terms = function_exists('bricks_points_place_terms_count')
-            ? bricks_points_place_terms_count(count($race_rows))
+            ? bricks_points_place_terms_count($field_size)
             : 3;
 
         $pick_odds = function ($pick) {
@@ -123,14 +126,24 @@ if (!function_exists('bricks_proven_winners_compute_single_race_roi')) {
             return $odds !== null ? (string) $odds : '';
         };
 
+        $win = bricks_proven_winners_pick_from_runner($snapshot['win_horse'] ?? '', $runners_by_name);
+        $place = [];
+        foreach ((array) ($snapshot['place_horses'] ?? []) as $name) {
+            $p = bricks_proven_winners_pick_from_runner($name, $runners_by_name);
+            if ($p) {
+                $place[] = $p;
+            }
+        }
+        $ew_simple = bricks_proven_winners_pick_from_runner($snapshot['ew_simple_horse'] ?? '', $runners_by_name);
+        $ew_edge = bricks_proven_winners_pick_from_runner($snapshot['ew_edge_horse'] ?? '', $runners_by_name);
+
         $out = [];
 
-        $win = $picks['winner'] ?? null;
         $win_odds = $pick_odds($win);
         $win_hit = $win && function_exists('bricks_points_finish_is_win')
             && bricks_points_finish_is_win($win['finish_position'] ?? '');
         $out['win'] = [
-            'horse' => $win['horse_name'] ?? '',
+            'horse' => $win['horse_name'] ?? (string) ($snapshot['win_horse'] ?? ''),
             'sp' => $fmt_sp($win),
             'profit' => ($win_hit && $win_odds !== null) ? round($win_odds - 1.0, 2) : -1.0,
             'hit' => (bool) $win_hit,
@@ -139,30 +152,28 @@ if (!function_exists('bricks_proven_winners_compute_single_race_roi')) {
         $place_profit = 0.0;
         $place_hits = 0;
         $place_bets = 0;
-        if (!empty($picks['place'])) {
-            foreach (array_slice($picks['place'], 0, 3) as $pp) {
-                $odds = $pick_odds($pp);
-                if ($odds === null) {
-                    continue;
-                }
-                $place_bets++;
-                $placed = function_exists('bricks_points_finish_is_placed')
-                    && bricks_points_finish_is_placed($pp['finish_position'] ?? '', $place_terms);
-                if ($placed) {
-                    $place_hits++;
-                }
-                $place_profit += $placed ? (($odds - 1.0) * 0.25) : -1.0;
+        foreach (array_slice($place, 0, 3) as $pp) {
+            $odds = $pick_odds($pp);
+            if ($odds === null) {
+                continue;
             }
+            $place_bets++;
+            $placed = function_exists('bricks_points_finish_is_placed')
+                && bricks_points_finish_is_placed($pp['finish_position'] ?? '', $place_terms);
+            if ($placed) {
+                $place_hits++;
+            }
+            $place_profit += $placed ? (($odds - 1.0) * 0.25) : -1.0;
         }
         $out['place'] = [
-            'horse' => isset($picks['place'][0]['horse_name']) ? $picks['place'][0]['horse_name'] : '',
-            'sp' => isset($picks['place'][0]) ? $fmt_sp($picks['place'][0]) : '',
+            'horse' => isset($place[0]['horse_name']) ? $place[0]['horse_name'] : '',
+            'sp' => isset($place[0]) ? $fmt_sp($place[0]) : '',
             'profit' => round($place_profit, 2),
             'hit' => $place_hits > 0,
             'bets' => $place_bets,
         ];
 
-        $ew_calc = function ($pick) use ($pick_odds, $place_terms) {
+        $ew_calc = function ($pick) use ($pick_odds, $place_terms, $fmt_sp) {
             $odds = $pick_odds($pick);
             if (!$pick || $odds === null) {
                 return ['horse' => '', 'sp' => '', 'profit' => 0.0, 'hit' => false];
@@ -174,7 +185,7 @@ if (!function_exists('bricks_proven_winners_compute_single_race_roi')) {
             $profit = ($is_win ? ($odds - 1.0) : -1.0) + ($placed ? (($odds - 1.0) * 0.25) : -1.0);
             return [
                 'horse' => $pick['horse_name'] ?? '',
-                'sp' => !empty($pick['odds_fractional']) ? (string) $pick['odds_fractional'] : (string) $odds,
+                'sp' => $fmt_sp($pick),
                 'profit' => round($profit, 2),
                 'hit' => $is_win || $placed,
             ];
@@ -183,6 +194,72 @@ if (!function_exists('bricks_proven_winners_compute_single_race_roi')) {
         $out['ew_simple'] = $ew_calc($ew_simple);
         $out['ew_edge'] = $ew_calc($ew_edge);
 
+        return $out;
+    }
+}
+
+if (!function_exists('bricks_proven_winners_compute_single_race_roi')) {
+    /**
+     * Per-strategy profit (1pt units) for one race using published picks.
+     *
+     * @return array<string, array{profit:float, hit:bool, horse:string, sp:string}>|null
+     */
+    function bricks_proven_winners_compute_single_race_roi($race_id, $meeting_date) {
+        global $wpdb;
+
+        $race_id = intval($race_id);
+        if ($race_id <= 0 || !preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $meeting_date)) {
+            return null;
+        }
+
+        static $cache = [];
+        $key = $race_id . '|' . $meeting_date;
+        if (array_key_exists($key, $cache)) {
+            return $cache[$key];
+        }
+
+        if (!function_exists('bricks_points_published_picks_get')) {
+            $cache[$key] = null;
+            return null;
+        }
+
+        $snapshot = bricks_points_published_picks_get($race_id, $meeting_date);
+        if (!$snapshot || empty($snapshot['win_horse'])) {
+            $cache[$key] = null;
+            return null;
+        }
+
+        $runners_table = 'historic_runners_beta';
+        if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $runners_table)) !== $runners_table) {
+            $cache[$key] = null;
+            return null;
+        }
+
+        $runner_cols = $wpdb->get_col("SHOW COLUMNS FROM `$runners_table`");
+        $name_col = in_array('name', (array) $runner_cols, true) ? 'name' : 'horse_name';
+        $sp_select = in_array('starting_price', (array) $runner_cols, true) ? ', starting_price' : ", '' AS starting_price";
+        $spd_select = in_array('starting_price_decimal', (array) $runner_cols, true)
+            ? ', starting_price_decimal'
+            : ', NULL AS starting_price_decimal';
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT `$name_col` AS horse_name, finish_position $sp_select $spd_select
+             FROM `$runners_table`
+             WHERE race_id = %d
+               AND `$name_col` IS NOT NULL
+               AND `$name_col` != ''",
+            $race_id
+        ));
+
+        $runners_by_name = [];
+        foreach ((array) $rows as $row) {
+            $norm = bricks_proven_winners_normalize_horse($row->horse_name ?? '');
+            if ($norm !== '') {
+                $runners_by_name[$norm] = $row;
+            }
+        }
+
+        $out = bricks_proven_winners_roi_from_snapshot_and_runners($snapshot, $runners_by_name);
         $cache[$key] = $out;
         return $out;
     }
@@ -219,11 +296,12 @@ if (!function_exists('bricks_proven_winners_fetch_db_cases')) {
         }
 
         $runner_cols = $wpdb->get_col("SHOW COLUMNS FROM `$runners_table`");
-        $name_col = in_array('name', $runner_cols, true) ? 'name' : 'horse_name';
-        $sp_col = in_array('starting_price', $runner_cols, true) ? 'starting_price' : '';
+        $name_col = in_array('name', (array) $runner_cols, true) ? 'name' : 'horse_name';
+        $sp_col = in_array('starting_price', (array) $runner_cols, true) ? 'starting_price' : '';
+        $spd_col = in_array('starting_price_decimal', (array) $runner_cols, true) ? 'starting_price_decimal' : '';
         $race_cols = $wpdb->get_col("SHOW COLUMNS FROM `$races_table`");
-        $title_col = in_array('race_title', $race_cols, true) ? 'race_title' : '';
-        $time_col = in_array('scheduled_time', $race_cols, true) ? 'scheduled_time' : '';
+        $title_col = in_array('race_title', (array) $race_cols, true) ? 'race_title' : '';
+        $time_col = in_array('scheduled_time', (array) $race_cols, true) ? 'scheduled_time' : '';
 
         $winner_sql = "(
             ru.finish_position = 1 OR ru.finish_position = '1'
@@ -235,7 +313,8 @@ if (!function_exists('bricks_proven_winners_fetch_db_cases')) {
         $title_select = $title_col !== '' ? ", r.`" . esc_sql($title_col) . "` AS race_title" : ", '' AS race_title";
         $time_select = $time_col !== '' ? ", r.`" . esc_sql($time_col) . "` AS scheduled_time" : ", '' AS scheduled_time";
 
-        $sql = "SELECT pp.meeting_date, pp.win_horse, r.race_id, r.course
+        $sql = "SELECT pp.meeting_date, pp.win_horse, pp.place_horses, pp.ew_simple_horse, pp.ew_edge_horse,
+                       r.race_id, r.course
                        $title_select
                        $time_select
                        $sp_select
@@ -251,20 +330,79 @@ if (!function_exists('bricks_proven_winners_fetch_db_cases')) {
         $rows = (array) $wpdb->get_results($wpdb->prepare($sql, $limit * 3));
         $wpdb->suppress_errors(false);
 
-        $cases = [];
+        if (empty($rows)) {
+            return [];
+        }
+
+        $candidate_rows = [];
+        $race_ids = [];
         foreach ($rows as $row) {
             $sp_decimal = bricks_proven_winners_parse_sp_decimal($row->starting_price ?? '');
             if ($min_sp_decimal > 0 && ($sp_decimal === null || $sp_decimal < $min_sp_decimal)) {
                 continue;
             }
-
             $race_id = intval($row->race_id ?? 0);
             $meeting_date = (string) ($row->meeting_date ?? '');
             if ($race_id <= 0 || $meeting_date === '') {
                 continue;
             }
+            $row->_sp_decimal = $sp_decimal;
+            $candidate_rows[] = $row;
+            $race_ids[$race_id] = $race_id;
+            if (count($candidate_rows) >= $limit) {
+                break;
+            }
+        }
 
-            $strategies = bricks_proven_winners_compute_single_race_roi($race_id, $meeting_date);
+        $runners_by_race = [];
+        if (!empty($race_ids)) {
+            $id_list = implode(',', array_map('intval', array_values($race_ids)));
+            $sp_select_all = $sp_col !== '' ? ', starting_price' : ", '' AS starting_price";
+            $spd_select_all = $spd_col !== '' ? ', starting_price_decimal' : ', NULL AS starting_price_decimal';
+            $runner_rows = $wpdb->get_results(
+                "SELECT race_id, `$name_col` AS horse_name, finish_position $sp_select_all $spd_select_all
+                 FROM `$runners_table`
+                 WHERE race_id IN ($id_list)
+                   AND `$name_col` IS NOT NULL
+                   AND `$name_col` != ''"
+            );
+            foreach ((array) $runner_rows as $rr) {
+                $rid = intval($rr->race_id ?? 0);
+                $norm = bricks_proven_winners_normalize_horse($rr->horse_name ?? '');
+                if ($rid <= 0 || $norm === '') {
+                    continue;
+                }
+                if (!isset($runners_by_race[$rid])) {
+                    $runners_by_race[$rid] = [];
+                }
+                $runners_by_race[$rid][$norm] = $rr;
+            }
+        }
+
+        $cases = [];
+        foreach ($candidate_rows as $row) {
+            $race_id = intval($row->race_id ?? 0);
+            $meeting_date = (string) ($row->meeting_date ?? '');
+            $sp_decimal = $row->_sp_decimal ?? null;
+
+            $place = [];
+            if (!empty($row->place_horses)) {
+                $decoded = json_decode((string) $row->place_horses, true);
+                if (is_array($decoded)) {
+                    $place = $decoded;
+                }
+            }
+            $snapshot = [
+                'win_horse' => (string) ($row->win_horse ?? ''),
+                'place_horses' => $place,
+                'ew_simple_horse' => (string) ($row->ew_simple_horse ?? ''),
+                'ew_edge_horse' => (string) ($row->ew_edge_horse ?? ''),
+            ];
+            $strategies = bricks_proven_winners_roi_from_snapshot_and_runners(
+                $snapshot,
+                $runners_by_race[$race_id] ?? []
+            );
+
             $course = function_exists('bricks_track_format_display_name')
                 ? bricks_track_format_display_name($row->course ?? '')
                 : str_replace('_', ' ', (string) ($row->course ?? ''));
@@ -288,10 +426,6 @@ if (!function_exists('bricks_proven_winners_fetch_db_cases')) {
                 'is_featured' => ($sp_decimal !== null && $sp_decimal >= 10.0),
                 'source' => 'database',
             ];
-
-            if (count($cases) >= $limit) {
-                break;
-            }
         }
 
         return $cases;
@@ -311,7 +445,7 @@ if (!function_exists('bricks_proven_winners_manual_cases')) {
 if (!function_exists('bricks_proven_winners_get_cases')) {
     function bricks_proven_winners_get_cases($limit = 48, $min_sp_decimal = 0.0) {
         $limit = max(1, min(120, intval($limit)));
-        $cache_key = 'bricks_proven_winners_v1_' . $limit . '_' . floatval($min_sp_decimal);
+        $cache_key = 'bricks_proven_winners_v2_' . $limit . '_' . floatval($min_sp_decimal);
         $cached = get_transient($cache_key);
         if (is_array($cached)) {
             return $cached;
@@ -353,7 +487,7 @@ if (!function_exists('bricks_proven_winners_get_cases')) {
         });
 
         $merged = array_slice($merged, 0, $limit);
-        set_transient($cache_key, $merged, 15 * MINUTE_IN_SECONDS);
+        set_transient($cache_key, $merged, 6 * HOUR_IN_SECONDS);
         return $merged;
     }
 }
@@ -365,25 +499,34 @@ if (!function_exists('bricks_proven_winners_summary_stats')) {
      * @return array{from_date:string,to_date:string,days:int,summary:array<string,array<string,mixed>>}
      */
     function bricks_proven_winners_summary_stats($days = 365) {
+        $days = max(30, intval($days));
         $empty = [
             'from_date' => '',
             'to_date' => '',
-            'days' => max(30, intval($days)),
+            'days' => $days,
             'summary' => [],
         ];
         if (!function_exists('bricks_points_backtest_calculate')) {
             return $empty;
         }
-        $days = max(30, intval($days));
+
         $yesterday = wp_date('Y-m-d', strtotime('-1 day', current_time('timestamp')));
         $from = wp_date('Y-m-d', strtotime('-' . $days . ' days', strtotime($yesterday)));
+        $cache_key = 'bricks_proven_winners_stats_v1_' . $days . '_' . $yesterday;
+        $cached = get_transient($cache_key);
+        if (is_array($cached) && isset($cached['summary'])) {
+            return $cached;
+        }
+
         $result = bricks_points_backtest_calculate($from, $yesterday, '', 'published');
-        return [
+        $payload = [
             'from_date' => $from,
             'to_date' => $yesterday,
             'days' => $days,
             'summary' => $result['summary'] ?? [],
         ];
+        set_transient($cache_key, $payload, 12 * HOUR_IN_SECONDS);
+        return $payload;
     }
 }
 
