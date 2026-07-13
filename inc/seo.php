@@ -385,6 +385,61 @@ if (!function_exists('bricks_seo_is_track_guide_request')) {
     }
 }
 
+if (!function_exists('bricks_seo_build_track_characteristics_phrase')) {
+    /**
+     * Keyword phrase for meta descriptions from course direction / profile.
+     * Example: "right-handed track layouts"
+     */
+    function bricks_seo_build_track_characteristics_phrase($course) {
+        $course = trim((string) $course);
+        $fallback = 'course layout and track profile';
+
+        if ($course === '' || !function_exists('bricks_track_get_features_rows')) {
+            return $fallback;
+        }
+
+        $direction = '';
+        $profile = '';
+        foreach (bricks_track_get_features_rows($course) as $row) {
+            if ($direction === '' && !empty($row->direction)) {
+                $direction = trim((string) $row->direction);
+            }
+            if ($profile === '' && !empty($row->profile)) {
+                $profile = trim((string) $row->profile);
+            }
+            if ($direction !== '' && $profile !== '') {
+                break;
+            }
+        }
+
+        $dir_lower = strtolower($direction);
+        if ($dir_lower !== '') {
+            if (strpos($dir_lower, 'right') !== false) {
+                return 'right-handed track layouts';
+            }
+            if (strpos($dir_lower, 'left') !== false) {
+                return 'left-handed track layouts';
+            }
+            // Preserve DB wording but keep it phrase-friendly.
+            $normalized = preg_replace('/\s+/', ' ', $direction);
+            $normalized = rtrim((string) $normalized, '.');
+            if ($normalized !== '') {
+                return strtolower($normalized) . ' track layouts';
+            }
+        }
+
+        if ($profile !== '') {
+            $normalized = preg_replace('/\s+/', ' ', $profile);
+            $normalized = rtrim((string) $normalized, '.');
+            if ($normalized !== '') {
+                return strtolower($normalized);
+            }
+        }
+
+        return $fallback;
+    }
+}
+
 if (!function_exists('bricks_seo_build_track_meta_title')) {
     function bricks_seo_build_track_meta_title() {
         $directory_type = bricks_seo_is_racecourses_directory_request();
@@ -409,21 +464,10 @@ if (!function_exists('bricks_seo_build_track_meta_title')) {
             return '';
         }
 
-        $display = $context['display'];
-        $is_aw = function_exists('bricks_seo_course_is_all_weather')
-            ? bricks_seo_course_is_all_weather($context['course'])
-            : false;
-
-        if ($is_aw) {
-            return sprintf(
-                '%s Racecourse Guide — All-Weather Speed Figures, AW Ratings & Today\'s Card | Fhorsite',
-                $display
-            );
-        }
-
+        // Individual course pages: keyword template for UK track SERP queries.
         return sprintf(
-            '%s Racecourse Guide — Turf Speed Ratings, Draw Bias & Today\'s Card | Fhorsite',
-            $display
+            '%s Racecourse Stats, Draw Bias & Speed Ratings | Fhorsite',
+            $context['display']
         );
     }
 }
@@ -453,21 +497,12 @@ if (!function_exists('bricks_seo_build_track_meta_description')) {
         }
 
         $display = $context['display'];
-        $has_today = function_exists('bricks_track_has_meeting_today') && bricks_track_has_meeting_today($context['course']);
-        $is_aw = function_exists('bricks_seo_course_is_all_weather')
-            ? bricks_seo_course_is_all_weather($context['course'])
-            : false;
-
-        $ratings_phrase = $is_aw
-            ? 'All-Weather speed figures and AW ratings'
-            : 'turf speed ratings and draw bias';
+        $characteristics = bricks_seo_build_track_characteristics_phrase($context['course'] ?? '');
 
         return sprintf(
-            '%s racecourse guide — %s, racecourse specs, straight-course notes, and Fhorsite Points Engine winners at %s%s.',
+            'Analyze %s racecourse statistics. Access elite horse racing speed ratings, %s, and historic track analytics.',
             $display,
-            $ratings_phrase,
-            $display,
-            $has_today ? ', plus today\'s live UK & Irish race card' : ''
+            $characteristics
         );
     }
 }

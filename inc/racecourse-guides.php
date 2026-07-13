@@ -760,6 +760,95 @@ if (!function_exists('bricks_track_maybe_enqueue_index_scripts')) {
 }
 add_action('wp_enqueue_scripts', 'bricks_track_maybe_enqueue_index_scripts', 25);
 
+if (!function_exists('bricks_track_profile_map_alt')) {
+    /**
+     * Hyphenated alt text for track map / layout / logo images.
+     * Example: perth-racecourse-track-profile-map
+     */
+    function bricks_track_profile_map_alt($display_or_slug) {
+        $slug = sanitize_title((string) $display_or_slug);
+        if ($slug === '') {
+            $slug = 'racecourse';
+        }
+        return $slug . '-racecourse-track-profile-map';
+    }
+}
+
+if (!function_exists('bricks_track_get_profile_map_url')) {
+    /**
+     * Optional track map / layout image URL (empty unless filtered or option set).
+     *
+     * @param array{course?:string,slug?:string,display?:string} $context
+     */
+    function bricks_track_get_profile_map_url(array $context) {
+        $slug = sanitize_title((string) ($context['slug'] ?? ''));
+        $option_key = $slug !== '' ? 'bricks_track_map_url_' . $slug : '';
+        $from_option = $option_key !== '' ? get_option($option_key, '') : '';
+        $url = is_string($from_option) ? trim($from_option) : '';
+
+        return (string) apply_filters('bricks_track_profile_map_url', $url, $context);
+    }
+}
+
+if (!function_exists('bricks_track_render_profile_map')) {
+    function bricks_track_render_profile_map(array $context) {
+        $url = bricks_track_get_profile_map_url($context);
+        if ($url === '') {
+            return '';
+        }
+
+        $alt = bricks_track_profile_map_alt($context['display'] ?? ($context['slug'] ?? ''));
+
+        ob_start();
+        ?>
+        <figure class="racecourse-guide-map">
+            <img
+                src="<?php echo esc_url($url); ?>"
+                alt="<?php echo esc_attr($alt); ?>"
+                loading="lazy"
+                decoding="async"
+            />
+        </figure>
+        <?php
+        return ob_get_clean();
+    }
+}
+
+if (!function_exists('bricks_track_render_funnel_cta')) {
+    /**
+     * Logged-out acquisition CTA at the bottom of each track page.
+     * Renders at most once per request so combined shortcodes do not duplicate it.
+     */
+    function bricks_track_render_funnel_cta(array $context) {
+        static $rendered = false;
+        if ($rendered || is_user_logged_in()) {
+            return '';
+        }
+        $rendered = true;
+
+        $display = trim((string) ($context['display'] ?? 'this racecourse'));
+        $destination = home_url('/');
+        if (function_exists('fhor_get_membership_signup_url')) {
+            $signup = fhor_get_membership_signup_url();
+            if (is_string($signup) && $signup !== '') {
+                $destination = $signup;
+            }
+        }
+        $destination = (string) apply_filters('bricks_track_funnel_cta_url', $destination, $context);
+        $label = sprintf("View Today's Live Speed Ratings for %s", $display);
+
+        ob_start();
+        ?>
+        <aside class="racecourse-guide-cta" aria-label="Get live speed ratings">
+            <a class="racecourse-guide-cta-btn" href="<?php echo esc_url($destination); ?>">
+                <?php echo esc_html($label); ?>
+            </a>
+        </aside>
+        <?php
+        return ob_get_clean();
+    }
+}
+
 if (!function_exists('bricks_track_render_static_section')) {
     function bricks_track_render_static_section($context, $atts = []) {
         if (!$context) {
@@ -783,6 +872,7 @@ if (!function_exists('bricks_track_render_static_section')) {
             : 'speed ratings';
         $region = bricks_track_infer_course_region($course, $country);
         $region_def = bricks_track_get_region_definition($region);
+        $profile_map_html = bricks_track_render_profile_map($context);
 
         ob_start();
         ?>
@@ -799,7 +889,7 @@ if (!function_exists('bricks_track_render_static_section')) {
             </nav>
             <header class="racecourse-guide-hero">
                 <h1 class="racecourse-guide-title">
-                    <?php echo esc_html($display); ?> Racecourse Guide
+                    <?php echo esc_html($display); ?> Racecourse Statistics &amp; Speed Ratings
                 </h1>
                 <p class="racecourse-guide-lead">
                     <?php if ($is_aw): ?>
@@ -812,11 +902,14 @@ if (!function_exists('bricks_track_render_static_section')) {
                         There is a meeting at <?php echo esc_html($display); ?> today — see the live UK &amp; Irish race card below.
                     <?php endif; ?>
                 </p>
+                <?php echo $profile_map_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in renderer ?>
             </header>
 
-            <?php if (!empty($features)): ?>
-            <section class="racecourse-guide-section" aria-labelledby="rcg-specs-<?php echo esc_attr($context['slug']); ?>">
-                <h2 id="rcg-specs-<?php echo esc_attr($context['slug']); ?>">Racecourse specifications</h2>
+            <?php if (!empty($features) || !empty($draw_bias)): ?>
+            <section class="racecourse-guide-section" aria-labelledby="rcg-draw-<?php echo esc_attr($context['slug']); ?>">
+                <h2 id="rcg-draw-<?php echo esc_attr($context['slug']); ?>">Historic Draw Bias &amp; Track Profile Analytics</h2>
+
+                <?php if (!empty($features)): ?>
                 <div class="racecourse-guide-spec-grid">
                     <?php foreach ($features as $row): ?>
                     <div class="racecourse-guide-spec-card">
@@ -839,12 +932,9 @@ if (!function_exists('bricks_track_render_static_section')) {
                     </div>
                     <?php endforeach; ?>
                 </div>
-            </section>
-            <?php endif; ?>
+                <?php endif; ?>
 
-            <?php if (!empty($draw_bias)): ?>
-            <section class="racecourse-guide-section" aria-labelledby="rcg-draw-<?php echo esc_attr($context['slug']); ?>">
-                <h2 id="rcg-draw-<?php echo esc_attr($context['slug']); ?>">Historic draw bias</h2>
+                <?php if (!empty($draw_bias)): ?>
                 <p class="racecourse-guide-note">Stalls with the strongest win share (min. 20 runners in sample). Useful for <?php echo esc_html($display); ?> <?php echo esc_html($ratings_phrase); ?> and draw-bias searches.</p>
                 <div class="racecourse-guide-table-wrap">
                     <table class="racecourse-guide-table">
@@ -870,6 +960,7 @@ if (!function_exists('bricks_track_render_static_section')) {
                         </tbody>
                     </table>
                 </div>
+                <?php endif; ?>
             </section>
             <?php endif; ?>
 
@@ -928,6 +1019,11 @@ if (!function_exists('bricks_track_enqueue_styles')) {
         .racecourse-guide-table th{background:#f8fafc;font-weight:600}
         .racecourse-guide-card{margin-top:2rem;padding-top:1.5rem;border-top:2px solid #e2e8f0}
         .racecourse-guide-card h2{margin:0 0 1rem;font-size:1.35rem}
+        .racecourse-guide-map{margin:1.25rem 0 0}
+        .racecourse-guide-map img{display:block;width:100%;max-width:720px;height:auto;border-radius:10px;border:1px solid #e2e8f0}
+        .racecourse-guide-cta{margin:2.5rem 0 1rem;padding:1.5rem;text-align:center;border:1px solid #bbf7d0;border-radius:12px;background:linear-gradient(180deg,#f0fdf4 0%,#fff 100%)}
+        .racecourse-guide-cta-btn{display:inline-block;padding:.9rem 1.4rem;border-radius:10px;background:#16a34a;color:#fff;font-weight:700;font-size:1.05rem;text-decoration:none;line-height:1.35;box-shadow:0 4px 14px rgba(22,163,74,.25);transition:background .2s ease,transform .2s ease}
+        .racecourse-guide-cta-btn:hover,.racecourse-guide-cta-btn:focus-visible{background:#15803d;outline:none;transform:translateY(-1px)}
         .racecourse-guide-error{padding:1rem;border:1px solid #fecaca;background:#fef2f2;border-radius:8px;color:#991b1b}
         .racecourse-guide-index-page{--rcg-brand-green:#16a34a;--rcg-brand-green-soft:#ecfdf5;position:relative}
         .rcg-index-toolbar{margin:1.25rem 0 1.5rem;display:flex;flex-direction:column;gap:.75rem}
@@ -1029,7 +1125,7 @@ if (!function_exists('bricks_racecourse_guide_card_shortcode')) {
         ?>
         <section class="racecourse-guide-card" aria-labelledby="rcg-card-<?php echo esc_attr($context['slug']); ?>">
             <h2 id="rcg-card-<?php echo esc_attr($context['slug']); ?>">
-                <?php echo esc_html($context['display']); ?> — today's card
+                Live Going &amp; Performance Data
             </h2>
             <?php echo do_shortcode('[race_table course="' . esc_attr($context['course']) . '" lock_course="' . esc_attr($race_table_atts['lock_course']) . '" hide_course_filter="' . esc_attr($race_table_atts['hide_course_filter']) . '"]'); ?>
         </section>
@@ -1437,9 +1533,9 @@ if (!function_exists('bricks_track_customize_virtual_post')) {
             }
             $context = bricks_track_resolve_slug($slug);
             if ($context) {
-                $title = $context['display'] . ' Racecourse Guide';
+                $title = $context['display'] . ' Racecourse Statistics & Speed Ratings';
             } else {
-                $title = ucwords(str_replace('-', ' ', $slug)) . ' Racecourse Guide';
+                $title = ucwords(str_replace('-', ' ', $slug)) . ' Racecourse Statistics & Speed Ratings';
             }
         }
 
