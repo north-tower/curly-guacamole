@@ -6,11 +6,38 @@
 
 get_header();
 ?>
+<style id="race-detail-page-shell-styles">
+    .race-detail-page-shell {
+        max-width: 1400px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 0 20px 24px;
+        box-sizing: border-box;
+    }
+    .race-detail-page-shell .back-button-container,
+    .race-detail-page-shell .race-quick-nav,
+    .race-detail-page-shell .race-detail-container,
+    .race-detail-page-shell .pace-map,
+    .race-detail-page-shell .pace-map-error {
+        max-width: none;
+        width: 100%;
+        margin-left: 0;
+        margin-right: 0;
+        padding-left: 0;
+        padding-right: 0;
+        box-sizing: border-box;
+    }
+    .race-detail-page-shell .race-detail-container {
+        padding-top: 20px;
+        padding-bottom: 20px;
+    }
+</style>
 <main id="brx-content" class="race-detail-page-shell">
     <?php
     $race_id = get_query_var('race_id');
     if ($race_id) {
         echo do_shortcode('[race_detail]');
+        echo do_shortcode('[pace_map]');
     } else {
         ?>
         <div style="text-align:center;padding:60px;font-family:sans-serif;">
