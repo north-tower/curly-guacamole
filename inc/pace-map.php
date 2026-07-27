@@ -765,20 +765,19 @@ if (!function_exists('bricks_pace_map_render')) {
             <div class="pace-map-legend">
                 <span><span class="pace-map-dot pace-map-dot-fast"></span> Top-3 FSr / LTO speed</span>
                 <span><span class="pace-map-dot pace-map-dot-slow"></span> Bottom-3 LTO speed</span>
-                <span><strong>FSr</strong> = Fhorsite speed rating · <strong>LTO</strong> = last-time-out speed · <strong>PMS</strong> = pace projection</span>
+                <span><strong>FSr</strong> = Fhorsite speed rating · <strong>LTO</strong> = last-time-out speed · <strong>Net</strong> = running-style net leader score · <strong>PMS</strong> = pace projection (* proxy fallback)</span>
             </div>
 
             <details class="pace-map-method">
                 <summary>How the Pace Mapping Score (PMS) is derived</summary>
                 <p>
-                    This data set has no explicit run-style figure, so PMS is a
-                    <strong>derived proxy</strong> for a horse's likely early
-                    position. It blends draw prominence, course/distance draw-bias
-                    edge, recency of last run, and front-of-field form momentum —
-                    deliberately kept independent of the FSr/LTO <em>speed</em> axis
-                    so the pace-vs-speed cross-reference stays meaningful. Zones are
-                    assigned by PMS rank; a race is flagged
-                    <em>contested</em> when multiple runners project as pace setters.
+                    PMS now prioritises <strong>historic running-style rates</strong>
+                    parsed from in-race comments (via net leader score), then blends
+                    in the original draw/form proxy as a fallback where style history
+                    is missing. This keeps pace projection independent from the
+                    FSr/LTO <em>speed</em> axis so pace-vs-speed cross-reference
+                    remains meaningful. A trailing <strong>*</strong> on PMS means
+                    the value came from proxy fallback only.
                 </p>
             </details>
         </section>
@@ -838,6 +837,7 @@ if (!function_exists('bricks_pace_map_styles')) {
         .pace-map-chip{font-size:.68rem;font-weight:700;padding:.15rem .4rem;border-radius:5px;background:#f1f5f9;color:#334155;white-space:nowrap}
         .pace-map-chip-fsr{background:#dcfce7;color:#166534}
         .pace-map-chip-lto{background:#e0f2fe;color:#075985}
+        .pace-map-chip-net{background:#fff7ed;color:#9a3412}
         .pace-map-chip-pms{background:#ede9fe;color:#5b21b6}
         .pace-map-empty{color:#cbd5e1;text-align:center;padding:.5rem 0}
         .pace-map-legend{margin-top:.85rem;display:flex;flex-wrap:wrap;gap:.75rem 1.25rem;font-size:.75rem;color:#64748b;align-items:center}

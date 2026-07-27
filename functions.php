@@ -42,6 +42,7 @@ require_once __DIR__ . '/inc/tracker.php';
 require_once __DIR__ . '/inc/race-table.php';
 require_once __DIR__ . '/inc/speed-performance.php';
 require_once __DIR__ . '/inc/pace-map.php';
+require_once __DIR__ . '/inc/running-style.php';
 require_once __DIR__ . '/inc/horse-history.php';
 require_once __DIR__ . '/inc/race-comments.php';
 require_once __DIR__ . '/inc/sire-insights.php';

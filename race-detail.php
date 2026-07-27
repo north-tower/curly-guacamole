@@ -17,6 +17,7 @@ get_header();
     .race-detail-page-shell .back-button-container,
     .race-detail-page-shell .race-quick-nav,
     .race-detail-page-shell .race-detail-container,
+    .race-detail-page-shell .cpc,
     .race-detail-page-shell .pace-map,
     .race-detail-page-shell .pace-map-error {
         max-width: none;
@@ -37,6 +38,7 @@ get_header();
     $race_id = get_query_var('race_id');
     if ($race_id) {
         echo do_shortcode('[race_detail]');
+        echo do_shortcode('[competitors_pace_card]');
         echo do_shortcode('[pace_map]');
     } else {
         ?>
