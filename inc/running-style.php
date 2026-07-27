@@ -988,6 +988,10 @@ if (!function_exists('bricks_competitors_pace_card_shortcode')) {
             return '<div class="pace-map-error" style="padding:1rem;border:1px solid #fecaca;background:#fef2f2;border-radius:8px;color:#991b1b;">Competitors Pace Card: a <code>race_id</code> is required.</div>';
         }
 
+        if (!function_exists('fhor_can_view_race_detail_page') || !fhor_can_view_race_detail_page()) {
+            return '';
+        }
+
         $race = null;
         if (function_exists('bricks_pace_map_resolve_race')) {
             $resolved = bricks_pace_map_resolve_race($race_id);
