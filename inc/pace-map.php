@@ -474,9 +474,10 @@ if (!function_exists('bricks_pace_map_compute')) {
             $r->_key           = $key;
             $r->fsr_val        = $fsr_val;
             $r->lto_val        = $lto_val;
-            $r->is_top3_fsr    = isset($fsr['top'][$key]);
-            $r->is_top3_lto    = isset($lto['top'][$key]);
-            $r->is_bottom3_lto = isset($lto['bottom'][$key]);
+            $r->is_top3_fsr     = isset($fsr['top'][$key]);
+            $r->is_top3_lto     = isset($lto['top'][$key]);
+            $r->is_bottom3_fsr  = isset($fsr['bottom'][$key]);
+            $r->is_bottom3_lto  = isset($lto['bottom'][$key]);
             $r->is_max_fsr     = ($fsr['max'] !== null && $fsr_val !== null && $fsr_val >= $fsr['max']);
             $r->is_max_lto     = ($lto['max'] !== null && $lto_val !== null && $lto_val >= $lto['max']);
         }
@@ -560,24 +561,27 @@ if (!function_exists('bricks_pace_map_build_alerts')) {
 
         // 🚀 Dangerous Lone Leader (Golden Bet): exactly one pace setter whose
         // FSr OR SR_LTO ranks top-3 in the field.
+        $lone_leaders = [];
         if (count($zone1) === 1) {
             $leader = $zone1[0];
             if (!empty($leader->is_top3_fsr) || !empty($leader->is_top3_lto)) {
+                $lone_leaders[] = $leader;
                 $alerts[] = [
                     'type'   => 'lone_leader',
                     'icon'   => '🚀',
                     'title'  => 'Dangerous Lone Leader',
                     'tone'   => 'golden',
                     'horses' => [$leader],
-                    'note'   => 'Uncontested pace setter that also owns top-3 raw speed — a potential Golden Bet setup.',
+                    'note'   => 'Uncontested pace setter that also owns top-3 FSr or LTO speed — a potential Golden Bet setup.',
                 ];
             }
         }
 
-        // ⚠️ Vulnerable Leader: a pace setter whose SR_LTO is bottom-3 in the field.
+        // ⚠️ Vulnerable Leader: a pace setter whose FSr is bottom-3 in the field.
+        // Skip horses already flagged as dangerous lone leaders (e.g. top-3 FSr but bottom-3 LTO).
         $vulnerable = [];
         foreach ($zone1 as $leader) {
-            if (!empty($leader->is_bottom3_lto)) {
+            if (!empty($leader->is_bottom3_fsr) && !in_array($leader, $lone_leaders, true)) {
                 $vulnerable[] = $leader;
             }
         }
@@ -588,7 +592,7 @@ if (!function_exists('bricks_pace_map_build_alerts')) {
                 'title'  => 'Vulnerable Leader',
                 'tone'   => 'warning',
                 'horses' => $vulnerable,
-                'note'   => 'Projected to set the pace but carries bottom-3 raw speed — likely to be swallowed up late.',
+                'note'   => 'Projected to set the pace but carries bottom-3 FSr — likely to be swallowed up late.',
             ];
         }
 
