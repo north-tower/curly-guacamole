@@ -25,46 +25,100 @@ if (!function_exists('bricks_running_style_keywords')) {
     function bricks_running_style_keywords() {
         return (array) apply_filters('running_style_keywords', [
             'leader' => [
+                'made all the running',
                 'made all',
-                'set pace',
+                'made the running',
                 'made running',
+                'set a strong pace',
+                'set the pace',
+                'set pace',
+                'dictated',
+                'went clear',
+                'soon led',
+                'quickly led',
+                'led throughout',
+                'led until',
+                'led early',
                 'led',
                 'ld',
             ],
             'closeup' => [
-                'tracked leader',
+                'pressed the leader',
                 'pressed leader',
+                'pressed leaders',
+                'pressed pace',
+                'tracked the leader',
+                'tracked leader',
+                'disputed lead',
+                'with leaders',
                 'close up',
+                'closeup',
+                'handy',
+                'racing prominently',
+                'raced prominently',
+                'raced prominent',
                 'prominent',
                 'prom',
             ],
             'chaser' => [
+                'chased the leaders',
                 'chased leaders',
+                'chased the leader',
                 'chased leader',
+                'tracked the leaders',
                 'tracked leaders',
+                'in touch with leaders',
+                'just behind leaders',
                 'chsd lds',
+                'chsd ld',
             ],
             'heldup' => [
                 'held up in touch',
+                'held up behind',
+                'held up towards',
+                'held up in midfield',
+                'settled in midfield',
                 'settled midfield',
+                'settled towards rear',
+                'dropped in',
                 'held up',
                 'hld up',
+                'waited with',
             ],
             'midi' => [
+                'raced in mid-division',
+                'raced mid-division',
+                'in mid-division',
                 'mid-division',
+                'mid division',
                 'raced midfield',
+                'in midfield',
                 'in mid-pack',
+                'mid-pack',
                 'mid-div',
                 'midfield',
             ],
             'lagger' => [
                 'held up in rear',
+                'held up last',
+                'always in rear',
                 'always towards rear',
+                'always behind',
+                'towards rear',
+                'in rear',
+                'last away',
                 'slowly away',
                 'slwly awy',
-                'in rear',
+                'very slowly away',
+                'badly away',
+                'missed break',
+                'lost many lengths',
                 'detached',
+                'tailed off',
+                'dwelt badly',
                 'dwelt',
+                'outpaced early',
+                'reared start',
             ],
         ]);
     }
@@ -82,6 +136,81 @@ if (!function_exists('bricks_running_style_skip_patterns')) {
             'non-runner',
             'non runner',
             'nonrunner',
+            'refused to race',
+            'left at start',
+            'took no part',
+        ]);
+    }
+}
+
+if (!function_exists('bricks_running_style_negation_patterns')) {
+    /**
+     * Category => phrases that cancel a positive keyword hit in the same fragment.
+     *
+     * @return array<string, string[]>
+     */
+    function bricks_running_style_negation_patterns() {
+        return (array) apply_filters('running_style_negation_patterns', [
+            'leader' => [
+                'never led',
+                'not led',
+                'unable to lead',
+                'failed to lead',
+                'could not lead',
+                'no chance to lead',
+            ],
+            'closeup' => [
+                'never prominent',
+                'not prominent',
+                'never close up',
+                'never closeup',
+            ],
+            'chaser' => [
+                'never chased',
+                'not chased',
+            ],
+            'heldup' => [
+                'never held up',
+                'not held up',
+            ],
+            'midi' => [
+                'never midfield',
+                'not mid-division',
+            ],
+            'lagger' => [
+                'never in rear',
+                'not in rear',
+            ],
+        ]);
+    }
+}
+
+if (!function_exists('bricks_running_style_abbreviation_map')) {
+    /**
+     * Expand common Racing Post abbreviations before keyword matching.
+     *
+     * @return array<string, string> pattern => replacement
+     */
+    function bricks_running_style_abbreviation_map() {
+        return (array) apply_filters('running_style_abbreviation_map', [
+            '/\bhld\s*up\b/u' => 'held up',
+            '/\bheldup\b/u' => 'held up',
+            '/\bchsd\s+lds\b/u' => 'chased leaders',
+            '/\bchsd\s+ld\b/u' => 'chased leader',
+            '/\btrkd\s+lds\b/u' => 'tracked leaders',
+            '/\btrkd\s+ld\b/u' => 'tracked leader',
+            '/\btrk\s+ld\b/u' => 'tracked leader',
+            '/\bprs\s+ld\b/u' => 'pressed leader',
+            '/\bprs\s+lds\b/u' => 'pressed leaders',
+            '/\bslwly\s+awy\b/u' => 'slowly away',
+            '/\bslowly\s+awy\b/u' => 'slowly away',
+            '/\bmid\s*div\b/u' => 'mid-division',
+            '/\bmiddiv\b/u' => 'mid-division',
+            '/\bmid\s*field\b/u' => 'midfield',
+            '/\bin\s+rr\b/u' => 'in rear',
+            '/\btwd\s+rr\b/u' => 'towards rear',
+            '/\bprom\b/u' => 'prominent',
+            '/\bcloseup\b/u' => 'close up',
         ]);
     }
 }
@@ -94,8 +223,16 @@ if (!function_exists('bricks_running_style_normalize_comment')) {
     function bricks_running_style_normalize_comment($comment) {
         $text = strtolower(trim((string) $comment));
         $text = str_replace(["\r", "\n", "\t"], ' ', $text);
+        // Normalize punctuation so "led," / "led;" still tokenise cleanly.
+        $text = str_replace([';', ';', ':', '/', '\\', '(', ')', '[', ']', '"', "'"], ' ', $text);
         $text = preg_replace('/\s+/', ' ', $text);
-        return $text;
+        $text = trim((string) $text);
+
+        foreach (bricks_running_style_abbreviation_map() as $pattern => $replacement) {
+            $text = preg_replace($pattern, $replacement, $text);
+        }
+
+        return preg_replace('/\s+/', ' ', trim((string) $text));
     }
 }
 
@@ -106,7 +243,7 @@ if (!function_exists('bricks_running_style_is_skipped')) {
             return true;
         }
         foreach (bricks_running_style_skip_patterns() as $pattern) {
-            $pattern = strtolower(trim((string) $pattern));
+            $pattern = bricks_running_style_normalize_comment($pattern);
             if ($pattern !== '' && strpos($text, $pattern) !== false) {
                 return true;
             }
@@ -117,7 +254,7 @@ if (!function_exists('bricks_running_style_is_skipped')) {
 
 if (!function_exists('bricks_running_style_keyword_matches')) {
     /**
-     * Word-boundary match for short tokens; substring match for multi-word phrases.
+     * Always use word-boundary matching so short tokens stay precise.
      */
     function bricks_running_style_keyword_matches($haystack, $keyword) {
         $keyword = strtolower(trim((string) $keyword));
@@ -125,37 +262,67 @@ if (!function_exists('bricks_running_style_keyword_matches')) {
             return false;
         }
 
-        // Short abbreviation tokens need word boundaries (e.g. "ld", "prom").
-        if (strpos($keyword, ' ') === false && strlen($keyword) <= 4) {
-            return (bool) preg_match(
-                '/\b' . preg_quote($keyword, '/') . '\b/u',
-                $haystack
-            );
-        }
+        $parts = preg_split('/\s+/', $keyword);
+        $escaped = array_map(function ($part) {
+            return preg_quote($part, '/');
+        }, $parts);
 
-        return strpos($haystack, $keyword) !== false;
+        // Require the full phrase as contiguous tokens.
+        $pattern = '/\b' . implode('\s+', $escaped) . '\b/u';
+        return (bool) preg_match($pattern, $haystack);
     }
 }
 
-if (!function_exists('bricks_running_style_classify_comment')) {
+if (!function_exists('bricks_running_style_apply_negations')) {
     /**
-     * Classify a single in-race comment.
+     * Drop category hits cancelled by negation phrases in the same fragment.
      *
-     * @return array<string,bool>|null  hit map, or null if the row is skipped
+     * @param array<string,bool> $hits
+     * @param string $text
+     * @return array<string,bool>
      */
-    function bricks_running_style_classify_comment($comment) {
-        if (bricks_running_style_is_skipped($comment)) {
-            return null;
+    function bricks_running_style_apply_negations(array $hits, $text) {
+        if (empty($hits)) {
+            return $hits;
         }
 
-        $text = bricks_running_style_normalize_comment($comment);
+        foreach (bricks_running_style_negation_patterns() as $category => $patterns) {
+            if (empty($hits[$category])) {
+                continue;
+            }
+            foreach ((array) $patterns as $pattern) {
+                $pattern = bricks_running_style_normalize_comment($pattern);
+                if ($pattern !== '' && bricks_running_style_keyword_matches($text, $pattern)) {
+                    unset($hits[$category]);
+                    break;
+                }
+            }
+        }
+
+        return $hits;
+    }
+}
+
+if (!function_exists('bricks_running_style_classify_fragment')) {
+    /**
+     * Classify one comment fragment (usually a comma-separated clause).
+     *
+     * @return array<string,bool>
+     */
+    function bricks_running_style_classify_fragment($fragment) {
+        $original = bricks_running_style_normalize_comment($fragment);
+        if ($original === '') {
+            return [];
+        }
+
+        $text = $original;
         $keywords = bricks_running_style_keywords();
 
         // Flatten + sort longest-first so "held up in rear" claims before "held up".
         $flat = [];
         foreach ($keywords as $category => $phrases) {
             foreach ((array) $phrases as $phrase) {
-                $phrase = strtolower(trim((string) $phrase));
+                $phrase = bricks_running_style_normalize_comment($phrase);
                 if ($phrase === '') {
                     continue;
                 }
@@ -163,6 +330,9 @@ if (!function_exists('bricks_running_style_classify_comment')) {
             }
         }
         usort($flat, function ($a, $b) {
+            if ($a[2] === $b[2]) {
+                return strcmp($a[1], $b[1]);
+            }
             return $b[2] <=> $a[2];
         });
 
@@ -171,18 +341,111 @@ if (!function_exists('bricks_running_style_classify_comment')) {
             if (bricks_running_style_keyword_matches($text, $phrase)) {
                 $hits[$category] = true;
                 // Remove matched phrase so shorter overlapping keywords don't also fire.
-                if (strpos($phrase, ' ') !== false || strlen($phrase) > 4) {
-                    $text = str_ireplace($phrase, ' ', $text);
-                } else {
-                    $text = preg_replace(
-                        '/\b' . preg_quote($phrase, '/') . '\b/ui',
-                        ' ',
-                        $text
-                    );
-                }
-                $text = preg_replace('/\s+/', ' ', trim($text));
+                $parts = preg_split('/\s+/', $phrase);
+                $escaped = array_map(function ($part) {
+                    return preg_quote($part, '/');
+                }, $parts);
+                $text = preg_replace(
+                    '/\b' . implode('\s+', $escaped) . '\b/u',
+                    ' ',
+                    $text
+                );
+                $text = preg_replace('/\s+/', ' ', trim((string) $text));
             }
         }
+
+        return bricks_running_style_apply_negations($hits, $original);
+    }
+}
+
+if (!function_exists('bricks_running_style_early_window')) {
+    /**
+     * Prefer the early part of a comment (where running style usually lives).
+     * Keeps enough text for multi-clause early descriptions.
+     */
+    function bricks_running_style_early_window($comment) {
+        $text = bricks_running_style_normalize_comment($comment);
+        if ($text === '') {
+            return '';
+        }
+
+        // Cut at common late-race outcome markers if they appear later.
+        $cutters = [
+            ' weakened',
+            ' faded',
+            ' no extra',
+            ' one paced',
+            ' kept on',
+            ' stayed on',
+            ' no impression',
+            ' never dangerous',
+            ' finished',
+        ];
+        $cut_at = null;
+        foreach ($cutters as $cutter) {
+            $pos = strpos($text, $cutter);
+            if ($pos !== false && $pos > 12) {
+                $cut_at = ($cut_at === null) ? $pos : min($cut_at, $pos);
+            }
+        }
+        if ($cut_at !== null) {
+            $text = trim(substr($text, 0, $cut_at));
+        }
+
+        // Soft cap: first ~18 words still covers most early-position notes.
+        $words = preg_split('/\s+/', $text);
+        if (count($words) > 18) {
+            $text = implode(' ', array_slice($words, 0, 18));
+        }
+
+        return $text;
+    }
+}
+
+if (!function_exists('bricks_running_style_classify_comment')) {
+    /**
+     * Classify a single in-race comment.
+     *
+     * Splits on commas (Racing Post style) so each clause can contribute
+     * independently — matching the Bucklow Hill multi-tag test case.
+     *
+     * @return array<string,bool>|null  hit map, or null if the row is skipped
+     */
+    function bricks_running_style_classify_comment($comment) {
+        if (bricks_running_style_is_skipped($comment)) {
+            return null;
+        }
+
+        $window = bricks_running_style_early_window($comment);
+        if ($window === '') {
+            return [];
+        }
+
+        // Split into clauses, but also classify the joined early window once
+        // so multi-word phrases spanning soft punctuation still match.
+        $fragments = preg_split('/\s*(?:,| and )\s*/u', $window);
+        $fragments[] = $window;
+
+        $hits = [];
+        foreach ($fragments as $fragment) {
+            $fragment = trim((string) $fragment);
+            if ($fragment === '') {
+                continue;
+            }
+            foreach (bricks_running_style_classify_fragment($fragment) as $category => $on) {
+                if ($on) {
+                    $hits[$category] = true;
+                }
+            }
+        }
+
+        // Mutual exclusion sharpening: rear/lagger should not also count as
+        // generic held-up when the more specific rear language won.
+        if (!empty($hits['lagger']) && !empty($hits['heldup'])) {
+            unset($hits['heldup']);
+        }
+        // Midfield settlement phrases that also tripped midi stay as heldup+midi
+        // only when both genuinely appear; no extra pruning needed.
 
         return $hits;
     }
@@ -202,36 +465,71 @@ if (!function_exists('bricks_running_style_empty_counts')) {
     }
 }
 
+if (!function_exists('bricks_running_style_run_weight')) {
+    /**
+     * Recency weight for the Nth most-recent completed run (0 = latest).
+     * Last 5 runs carry the most influence; older form still counts.
+     */
+    function bricks_running_style_run_weight($index) {
+        $index = max(0, intval($index));
+        if ($index < 5) {
+            return 3.0;
+        }
+        if ($index < 10) {
+            return 2.0;
+        }
+        return 1.0;
+    }
+}
+
 if (!function_exists('bricks_running_style_aggregate_comments')) {
     /**
-     * Aggregate raw category counts from a list of comments.
+     * Aggregate category totals from comments (newest-first preferred).
      *
-     * @param string[] $comments
-     * @return array<string,int>
+     * Returns both integer hit counts (for transparency / runs) and weighted
+     * sums used for sharper rate calculation.
+     *
+     * @param string[] $comments newest first when available
+     * @return array{runs:int,leader:int,closeup:int,chaser:int,heldup:int,midi:int,lagger:int,weight_sum:float,w_leader:float,w_closeup:float,w_chaser:float,w_heldup:float,w_midi:float,w_lagger:float}
      */
     function bricks_running_style_aggregate_comments(array $comments) {
         $counts = bricks_running_style_empty_counts();
+        $counts['weight_sum'] = 0.0;
+        foreach (['leader', 'closeup', 'chaser', 'heldup', 'midi', 'lagger'] as $cat) {
+            $counts['w_' . $cat] = 0.0;
+        }
+
+        $completed_index = 0;
         foreach ($comments as $comment) {
             $hits = bricks_running_style_classify_comment($comment);
             if ($hits === null) {
                 continue;
             }
+
             $counts['runs']++;
+            $weight = bricks_running_style_run_weight($completed_index);
+            $counts['weight_sum'] += $weight;
+            $completed_index++;
+
             foreach (['leader', 'closeup', 'chaser', 'heldup', 'midi', 'lagger'] as $cat) {
                 if (!empty($hits[$cat])) {
                     $counts[$cat]++;
+                    $counts['w_' . $cat] += $weight;
                 }
             }
         }
+
         return $counts;
     }
 }
 
 if (!function_exists('bricks_running_style_rates_from_counts')) {
     /**
-     * Convert raw counts into career rates + net_leader_score.
+     * Convert aggregates into career rates + net_leader_score.
      *
-     * @param array<string,int> $counts
+     * Rates use recency-weighted sums when available; falls back to raw counts.
+     *
+     * @param array $counts
      * @return array{
      *   runs:int,
      *   leader:float|null, closeup:float|null, chaser:float|null,
@@ -252,9 +550,16 @@ if (!function_exists('bricks_running_style_rates_from_counts')) {
             return $out;
         }
 
+        $weight_sum = floatval($counts['weight_sum'] ?? 0);
+        $use_weighted = $weight_sum > 0;
+
         $rates = ['runs' => $runs, 'available' => true];
         foreach ($cats as $cat) {
-            $rates[$cat] = round(intval($counts[$cat] ?? 0) / $runs, 2);
+            if ($use_weighted) {
+                $rates[$cat] = round(floatval($counts['w_' . $cat] ?? 0) / $weight_sum, 2);
+            } else {
+                $rates[$cat] = round(intval($counts[$cat] ?? 0) / $runs, 2);
+            }
         }
         $rates['net_leader_score'] = round(
             ($rates['leader'] + $rates['closeup'])
@@ -275,6 +580,7 @@ if (!function_exists('bricks_running_style_fetch_comments_by_runners')) {
      * Fetch historic in-race comments for a set of runner_ids.
      *
      * Prefers historic_runners_beta; falls back to daily_comment_history.
+     * Comments are returned newest-first for recency weighting.
      *
      * @param int[] $runner_ids
      * @return array<int, array{comments:string[], avg_btn:float|null}>
@@ -288,7 +594,8 @@ if (!function_exists('bricks_running_style_fetch_comments_by_runners')) {
         }
 
         sort($runner_ids);
-        $cache_key = 'bricks_runstyle_cmt_' . md5(implode(',', $runner_ids));
+        // Bump version whenever classification / weighting rules change.
+        $cache_key = 'bricks_runstyle_cmt_v3_' . md5(implode(',', $runner_ids));
         $cached = get_transient($cache_key);
         if (is_array($cached)) {
             return $cached;
@@ -300,14 +607,27 @@ if (!function_exists('bricks_running_style_fetch_comments_by_runners')) {
             $out[$rid] = ['comments' => [], 'avg_btn' => null];
         }
 
+        $rows = [];
         $table = 'historic_runners_beta';
         $exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
         if ($exists === $table) {
-            $sql = "SELECT runner_id, in_race_comment, distance_beaten
-                    FROM `$table`
-                    WHERE runner_id IN ($placeholders)
-                      AND in_race_comment IS NOT NULL
-                      AND in_race_comment != ''";
+            $races_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', 'historic_races_beta'));
+            if ($races_exists === 'historic_races_beta') {
+                $sql = "SELECT hrunb.runner_id, hrunb.in_race_comment, hrunb.distance_beaten,
+                               hracb.meeting_date
+                        FROM `historic_runners_beta` hrunb
+                        LEFT JOIN `historic_races_beta` hracb ON hracb.race_id = hrunb.race_id
+                        WHERE hrunb.runner_id IN ($placeholders)
+                          AND hrunb.in_race_comment IS NOT NULL
+                          AND hrunb.in_race_comment != ''
+                        ORDER BY hrunb.runner_id ASC, hracb.meeting_date DESC, hrunb.race_id DESC";
+            } else {
+                $sql = "SELECT runner_id, in_race_comment, distance_beaten, NULL AS meeting_date
+                        FROM `$table`
+                        WHERE runner_id IN ($placeholders)
+                          AND in_race_comment IS NOT NULL
+                          AND in_race_comment != ''";
+            }
             $rows = $wpdb->get_results($wpdb->prepare($sql, ...$runner_ids));
         } else {
             $table = 'daily_comment_history';
@@ -316,11 +636,12 @@ if (!function_exists('bricks_running_style_fetch_comments_by_runners')) {
                 set_transient($cache_key, $out, 15 * MINUTE_IN_SECONDS);
                 return $out;
             }
-            $sql = "SELECT runner_id, in_race_comment, distance_beaten
+            $sql = "SELECT runner_id, in_race_comment, distance_beaten, meeting_date
                     FROM `$table`
                     WHERE runner_id IN ($placeholders)
                       AND in_race_comment IS NOT NULL
-                      AND in_race_comment != ''";
+                      AND in_race_comment != ''
+                    ORDER BY runner_id ASC, meeting_date DESC, race_id DESC";
             $rows = $wpdb->get_results($wpdb->prepare($sql, ...$runner_ids));
         }
 
@@ -642,7 +963,7 @@ if (!function_exists('bricks_competitors_pace_card_render')) {
             <div class="cpc-legend">
                 <span><span class="cpc-swatch"></span> Highlighted cells are ≥ 0.40</span>
                 <span><strong>Net Leader</strong> = (leader + closeup) − (heldup + midi + lagger)</span>
-                <span>Withdrawn / non-runners excluded from career runs</span>
+                <span>Rates weight the last 5 runs heaviest · Withdrawn / non-runners excluded</span>
             </div>
         </section>
         <?php
