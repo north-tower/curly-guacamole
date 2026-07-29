@@ -2778,13 +2778,12 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
             }
             
             .runners-table-wrapper {
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
+                overflow-x: visible;
             }
             
             .runners-table {
                 font-size: 12px;
-                min-width: 1000px;
+                min-width: 0;
             }
             
             .runners-table th,
@@ -3888,6 +3887,34 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
         </span>
     </div>
             
+            <div class="runners-mobile-toolbar">
+                <label class="runners-mobile-toolbar__label" for="runnersMobileSort">Sort by</label>
+                <select id="runnersMobileSort" class="runners-mobile-toolbar__select" aria-label="Sort runners">
+                    <option value="fsr|number" selected>FSr</option>
+                    <option value="model_points|number">Pts</option>
+                    <?php if (!$is_tomorrow_race): ?>
+                    <option value="win_pct|number">WIN%</option>
+                    <option value="place_pct|number">Pla%</option>
+                    <?php endif; ?>
+                    <option value="fsrr|number">FSRr</option>
+                    <option value="comb|number">Comb</option>
+                    <option value="sire_5y|number">Lin5</option>
+                    <option value="dslr|number">DSLR</option>
+                    <option value="cloth_number|number">No.</option>
+                    <?php if (!$is_national_hunt): ?>
+                    <option value="stall_number|number">Stall</option>
+                    <option value="draw_bias_pct|number">Db%</option>
+                    <?php endif; ?>
+                    <?php if ($show_maturity_edge): ?>
+                    <option value="maturity_edge|number">Mat</option>
+                    <?php endif; ?>
+                    <option value="cls|number">Cls</option>
+                    <option value="or_diff|number">OR+/-</option>
+                    <option value="jockey|text">Jockey</option>
+                    <option value="name|text">Name</option>
+                </select>
+            </div>
+
             <div class="runners-table-wrapper">
                <table class="runners-table <?php echo $is_national_hunt ? 'national-hunt' : 'flat-race'; ?>">
 
@@ -4199,9 +4226,9 @@ if ($speed_data) {
                         data-runner-id="<?php echo esc_attr($runner->runner_id ?: ''); ?>">
                         
                         <!-- No. -->
-                        <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+                        <td class="runner-cell runner-cell--cloth" data-label="No.">
                             <div style="display:flex;align-items:center;gap:8px;">
-                                <div style="background:linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);color:white;width:35px;height:35px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;box-shadow:0 2px 8px rgba(59,130,246,0.3);">
+                                <div class="cloth-badge" style="background:linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);color:white;width:35px;height:35px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;box-shadow:0 2px 8px rgba(59,130,246,0.3);">
                                     <?php echo esc_html($runner->cloth_number ?: ''); ?>
                                 </div>
                                 <?php if ($is_non_runner): ?>
@@ -4212,40 +4239,40 @@ if ($speed_data) {
                                 
                                       <?php if (!$is_national_hunt): ?>
         <!-- Stall -->
-        <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+        <td class="runner-cell" data-label="Stall">
             <div style="font-weight:600;color:#374151;"><?php echo esc_html($stall_number); ?></div>
         </td>
         
         <!-- Db% -->
-        <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+        <td class="runner-cell" data-label="Db%">
             <div class="<?php echo (floatval(str_replace('%', '', $draw_bias_pct)) >= 12) ? 'green-text' : ''; ?>" style="font-weight:600;"><?php echo esc_html($draw_bias_pct); ?></div>
         </td>
         <?php endif; ?>
                                 
                                 <?php if (!$is_tomorrow_race): ?>
                                 <!-- Win% -->
-                                <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+                                <td class="runner-cell runner-cell--stat" data-label="WIN%">
                                     <div class="<?php echo (floatval(str_replace('%', '', $win_percentage)) >= 60) ? 'green-text' : ''; ?>" style="font-weight:600;"><?php echo esc_html($win_percentage); ?></div>
                                 </td>
                                 
                                 <!-- Pla% -->
-                                <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+                                <td class="runner-cell runner-cell--stat" data-label="Pla%">
                                     <div class="<?php echo (floatval(str_replace('%', '', $place_percentage)) >= 60) ? 'green-text' : ''; ?>" style="font-weight:600;"><?php echo esc_html($place_percentage); ?></div>
                                 </td>
                                 <?php endif; ?>
                                 
                                 <!-- FSr -->
-                                <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+                                <td class="runner-cell runner-cell--stat runner-cell--primary" data-label="FSr">
                                     <div class="<?php echo (floatval($fsr) >= 80) ? 'green-text sr-highlight' : ''; ?>" style="font-weight:600;"><?php echo esc_html($fsr); ?></div>
                                 </td>
                                 
                                 <!-- FSRr -->
-                                <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+                                <td class="runner-cell runner-cell--stat" data-label="FSRr">
                                     <div style="font-weight:600;color:#059669;"><?php echo esc_html($fsrr); ?></div>
                                 </td>
 
                                 <!-- Points -->
-                                <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+                                <td class="runner-cell runner-cell--stat runner-cell--primary" data-label="Pts">
                                     <div title="<?php echo esc_attr('Model score 0-100. Reasons: ' . $points_reasons_text); ?>" style="font-weight:800;color:#1e3a8a;">
                                         <?php echo esc_html(number_format($points_score, 1)); ?>
                                     </div>
@@ -4253,41 +4280,41 @@ if ($speed_data) {
 
                                 
                                 <!-- Comb -->
-                                <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+                                <td class="runner-cell runner-cell--stat" data-label="Comb">
                                     <div class="<?php echo (floatval(str_replace('%', '', $comb)) >= 70) ? 'green-text' : ''; ?>" style="font-weight:600;"><?php echo esc_html($comb); ?></div>
                                 </td>
                                 
                                 <!-- Form -->
-                                <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+                                <td class="runner-cell" data-label="Form">
                                     <div style="font-weight:600;color:#059669;font-family:monospace;font-size:11px;"><?php echo esc_html($form); ?></div>
                                 </td>
                                 
                                 <!-- dslr -->
-                                <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+                                <td class="runner-cell" data-label="DSLR">
                                     <div class="<?php echo (floatval($dslr) >= 50) ? 'red-text' : ''; ?>" style="font-weight:600;"><?php echo esc_html($dslr); ?></div>
                                 </td>
                                 
                                 <!-- Wgt -->
-                                <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+                                <td class="runner-cell" data-label="Wgt">
                                     <div style="font-weight:600;color:#059669;font-family:monospace;"><?php echo esc_html($weight_formatted); ?></div>
                                 </td>
                                 
                                 <!-- C/D/G -->
-                                <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+                                <td class="runner-cell" data-label="C/D/G">
                                     <div style="font-weight:600;color:#059669;"><?php echo esc_html($wins_display); ?></div>
                                 </td>
                                 
                               
                                 
                                 <!-- LBF -->
-                                <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+                                <td class="runner-cell" data-label="LBF">
                                     <div class="<?php echo (floatval($lbf) >= 1) ? 'green-text' : ''; ?>" style="font-weight:600;"><?php echo esc_html($lbf); ?></div>
                                 </td>
                                 
                                 <!-- Name -->
                                <!-- Name -->
      <!-- Name (update this cell to show non-runner status) -->
-                        <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+                        <td class="runner-cell runner-cell--name" data-label="Name">
                             <?php if ($runner->runner_id): ?>
                                 <a href="<?php echo esc_url(bricks_horse_history_url($runner->runner_id)); ?>" 
                                    class="horse-name-link"
@@ -4347,7 +4374,7 @@ if ($speed_data) {
 
                                 <?php if ($show_maturity_edge): ?>
                                 <!-- Maturity -->
-                                <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+                                <td class="runner-cell" data-label="Mat">
                                     <?php if ($maturity_edge): ?>
                                         <span
                                             class="maturity-edge-badge <?php echo esc_attr($maturity_edge['class']); ?>"
@@ -4363,7 +4390,7 @@ if ($speed_data) {
 
 
                                 <!-- Lineage 5Y -->
-                                <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+                                <td class="runner-cell runner-cell--stat" data-label="Lin5">
                                     <div
                                         title="<?php echo esc_attr($sire_5y_title); ?>"
                                         class="<?php echo ($sire_5y_pct !== null && $sire_5y_pct >= 14) ? 'green-text' : ''; ?>"
@@ -4379,19 +4406,19 @@ if ($speed_data) {
 
                                 
                                 <!-- Continue with all remaining columns... -->
-                                <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+                                <td class="runner-cell" data-label="Cls">
                                     <div class="<?php echo (floatval($cls) < 0) ? 'green-text' : (floatval($cls) > 0 ? 'red-text' : ''); ?>" style="font-weight:600;"><?php echo esc_html($cls); ?></div>
                                 </td>
-                                <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+                                <td class="runner-cell" data-label="OR+/-">
                                     <div class="<?php echo (floatval($or_diff) < 0) ? 'red-text' : (floatval($or_diff) >= 0 ? 'green-text' : ''); ?>" style="font-weight:600;"><?php echo esc_html($or_diff); ?></div>
                                 </td>
-                                <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+                                <td class="runner-cell runner-cell--wide" data-label="Jockey">
                                     <div style="font-weight:500;color:#374151;"><?php echo esc_html($runner->jockey_name ?: 'N/A'); ?></div>
                                     <?php if ($runner->jockey_claim): ?>
                                         <div style="font-size:11px;color:#059669;margin-top:2px;">(<?php echo esc_html($runner->jockey_claim); ?>lb)</div>
                                     <?php endif; ?>
                                 </td>
-                               <td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;">
+                               <td class="runner-cell runner-cell--wide" data-label="Trainer / RTF%">
     <div style="font-weight:500;color:#374151;"><?php echo esc_html($runner->trainer_name ?: 'N/A'); ?></div>
     <?php
     $trainer_name_key = isset($runner->trainer_name) ? trim((string) $runner->trainer_name) : '';
@@ -4430,7 +4457,7 @@ if ($speed_data) {
                                 
                                 <!-- Speed Ratings with highlighting -->
                               <!-- Details Toggle Button -->
-<td style="padding:15px 12px;border-bottom:1px solid <?php echo $border_color; ?>;text-align:center;">
+<td class="runner-cell runner-cell--details" data-label="Details" style="text-align:center;">
     <button class="toggle-details-btn" data-runner-index="<?php echo $index; ?>" style="background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px;transition:all 0.2s ease;">
         <span class="toggle-icon">▼</span> View
     </button>
@@ -4438,7 +4465,7 @@ if ($speed_data) {
 </tr>
 
 <!-- Hidden Details Row -->
-<tr class="details-row details-row-<?php echo $index; ?>" style="display:none;background:rgba(59,130,246,0.05);">
+<tr class="details-row details-row-<?php echo $index; ?>" style="background:rgba(59,130,246,0.05);">
     <td colspan="<?php echo $is_national_hunt ? '16' : ($show_maturity_edge ? '20' : '19'); ?>">
 
         <div class="runner-sr-history">
@@ -6278,12 +6305,12 @@ jQuery(document).on('click', '.toggle-details-btn', function() {
     const detailsRow = jQuery('.details-row-' + index);
     const icon = jQuery(this).find('.toggle-icon');
     
-    if (detailsRow.is(':visible')) {
-        detailsRow.hide();
+    if (detailsRow.hasClass('is-open')) {
+        detailsRow.removeClass('is-open');
         icon.text('▼');
         jQuery(this).html('<span class="toggle-icon">▼</span> View');
     } else {
-        detailsRow.show();
+        detailsRow.addClass('is-open');
         icon.text('▲');
         jQuery(this).html('<span class="toggle-icon">▲</span> Hide');
     }
@@ -6380,6 +6407,15 @@ jQuery(document).on('click', '.toggle-details-btn', function() {
                 document.querySelectorAll('.runner-row').forEach(function(row) {
                     if (row.dataset.isNonRunner === '1') {
                         row.classList.toggle('hidden', hide);
+                        var next = row.nextElementSibling;
+                        if (next && next.classList.contains('details-row')) {
+                            if (hide) {
+                                next.style.display = 'none';
+                                next.classList.add('hidden');
+                            } else {
+                                next.classList.remove('hidden');
+                            }
+                        }
                     }
                 });
                 updateActiveRunnerCount();
@@ -6431,7 +6467,8 @@ jQuery(document).on('click', '.toggle-details-btn', function() {
                     'sire_5y': 'sire5y',
                     'cls': 'cls',
                     'or_diff': 'orDiff',
-                    'jockey': 'jockey'
+                    'jockey': 'jockey',
+                    'name': 'name'
                 };
                 var attr = map[column];
                 if (!attr) return '';
@@ -6446,7 +6483,7 @@ jQuery(document).on('click', '.toggle-details-btn', function() {
                 return isNaN(num) ? -9999 : num;
             }
 
-            function sortRunnersTable(column, sortType) {
+            function sortRunnersTable(column, sortType, forceDefaultDir) {
                 var table = document.querySelector('.runners-table');
                 if (!table) return;
 
@@ -6454,7 +6491,10 @@ jQuery(document).on('click', '.toggle-details-btn', function() {
                 if (!tbody) return;
 
                 // Determine sort direction
-                if (currentSortColumn === column) {
+                if (forceDefaultDir) {
+                    currentSortColumn = column;
+                    currentSortDirection = sortType === 'number' ? 'desc' : 'asc';
+                } else if (currentSortColumn === column) {
                     currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
                 } else {
                     currentSortColumn = column;
@@ -6537,10 +6577,32 @@ jQuery(document).on('click', '.toggle-details-btn', function() {
                         var sortType = this.getAttribute('data-sort');
                         if (column) {
                             sortRunnersTable(column, sortType);
+                            syncMobileSortSelect(column, sortType);
                         }
                     });
                 });
+
+                var mobileSort = document.getElementById('runnersMobileSort');
+                if (mobileSort) {
+                    mobileSort.addEventListener('change', function() {
+                        var parts = (this.value || '').split('|');
+                        if (parts.length === 2) {
+                            sortRunnersTable(parts[0], parts[1], true);
+                        }
+                    });
+                }
             }
+
+            function syncMobileSortSelect(column, sortType) {
+                var mobileSort = document.getElementById('runnersMobileSort');
+                if (!mobileSort) return;
+                var value = column + '|' + sortType;
+                if (Array.prototype.some.call(mobileSort.options, function(opt) { return opt.value === value; })) {
+                    mobileSort.value = value;
+                }
+            }
+
+            window.sortRunnersTable = sortRunnersTable;
 
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', initSortableHeaders);
