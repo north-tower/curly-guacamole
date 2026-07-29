@@ -6,6 +6,15 @@ add_action( 'wp_enqueue_scripts', function() {
 	// Enqueue your files on the canvas & frontend, not the builder panel. Otherwise custom CSS might affect builder)
 	if ( ! bricks_is_builder_main() ) {
 		wp_enqueue_style( 'bricks-child', get_stylesheet_uri(), ['bricks-frontend'], filemtime( get_stylesheet_directory() . '/style.css' ) );
+		$fhor_ui = get_stylesheet_directory() . '/fhor-ui.css';
+		if (file_exists($fhor_ui)) {
+			wp_enqueue_style(
+				'fhor-ui',
+				get_stylesheet_directory_uri() . '/fhor-ui.css',
+				['bricks-child'],
+				filemtime($fhor_ui)
+			);
+		}
 	}
 } );
 
@@ -2711,7 +2720,7 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
             }
             
             .race-details-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
                 gap: 12px;
             }
             
@@ -3447,7 +3456,7 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
             }
 
             .race-details-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
 
             .runners-table {
@@ -3457,6 +3466,12 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
             .runners-table th,
             .runners-table td {
                 padding: 10px 8px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .race-details-grid {
+                grid-template-columns: 1fr;
             }
         }
 
@@ -3819,19 +3834,19 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
                 <?php endif; ?>
             </div>
 
-            <div style="background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border:1px solid #93c5fd;border-radius:12px;padding:14px 16px;margin:0 0 16px 0;">
-                <div style="font-weight:800;color:#1e3a8a;font-size:13px;margin-bottom:8px;">Points Engine Picks</div>
-                <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:12px;line-height:1.4;">
-                    <span title="Top model score among active runners." style="background:#fff;border:1px solid #bfdbfe;border-radius:999px;padding:6px 10px;color:#1e40af;font-weight:700;">
+            <div class="fhor-picks">
+                <div class="fhor-picks__title">Points Engine Picks</div>
+                <div class="fhor-picks__list">
+                    <span class="fhor-picks__chip" title="Top model score among active runners.">
                         Win: <?php echo esc_html($race_points_picks['winner']['horse_name'] ?? 'N/A'); ?>
                     </span>
-                    <span title="Top 3 model-ranked runners for place profile." style="background:#fff;border:1px solid #bfdbfe;border-radius:999px;padding:6px 10px;color:#1e40af;font-weight:700;">
+                    <span class="fhor-picks__chip" title="Top 3 model-ranked runners for place profile.">
                         Place: <?php echo esc_html(implode(', ', array_map(function($p){ return $p['horse_name'] ?? ''; }, $race_points_picks['place'] ?? [])) ?: 'N/A'); ?>
                     </span>
-                    <span title="Simple each-way signal: odds 5/1+ and highest model score." style="background:#fff7ed;border:1px solid #fdba74;border-radius:999px;padding:6px 10px;color:#9a3412;font-weight:700;">
+                    <span class="fhor-picks__chip fhor-picks__chip--ew-simple" title="Simple each-way signal: odds 5/1+ and highest model score.">
                         EW Simple: <?php echo esc_html($race_points_ew_simple['horse_name'] ?? 'N/A'); ?>
                     </span>
-                    <span title="Edge each-way signal: odds 5/1+ with strong model-vs-market edge." style="background:#f5f3ff;border:1px solid #c4b5fd;border-radius:999px;padding:6px 10px;color:#5b21b6;font-weight:700;">
+                    <span class="fhor-picks__chip fhor-picks__chip--ew-edge" title="Edge each-way signal: odds 5/1+ with strong model-vs-market edge.">
                         EW Edge: <?php echo esc_html($race_points_ew_edge['horse_name'] ?? 'N/A'); ?>
                     </span>
                 </div>
@@ -3855,7 +3870,7 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
             <span id="activeRunnersCount"><?php echo count($runners); ?></span> runners shown
         </div>
     </div>
-    <div style="margin:8px 0 14px 0;font-size:12px;color:#6b7280;line-height:1.5;">
+    <div class="lin5-legend">
         <strong style="color:#374151;">Legend:</strong>
         <strong style="color:#111827;">Lin5</strong> = Lineage 5Y signal (internal): sire PRB% in the locked backtest scope
         (last 5 years to yesterday, Flat races, Mar-Oct).
@@ -4424,172 +4439,166 @@ if ($speed_data) {
 
 <!-- Hidden Details Row -->
 <tr class="details-row details-row-<?php echo $index; ?>" style="display:none;background:rgba(59,130,246,0.05);">
-    <td colspan="<?php echo $is_national_hunt ? '16' : ($show_maturity_edge ? '20' : '19'); ?>" style="padding:20px;">
+    <td colspan="<?php echo $is_national_hunt ? '16' : ($show_maturity_edge ? '20' : '19'); ?>">
 
-        <div style="background:white;border-radius:8px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-            <h4 style="margin:0 0 16px 0;color:#1e293b;font-size:16px;font-weight:700;">📊 Speed Rating History - <?php echo esc_html($runner->name); ?></h4>
+        <div class="runner-sr-history">
+            <h4 class="runner-sr-history__title">📊 Speed Rating History - <?php echo esc_html($runner->name); ?></h4>
             
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;">
+            <div class="runner-sr-history__grid">
                 <!-- Last Time Out -->
-                <div style="background:linear-gradient(135deg,#f8f9fa 0%,#e9ecef 100%);padding:12px;border-radius:6px;border-left:4px solid #3b82f6;">
-                    <div style="font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Last Time Out</div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;color:#64748b;">SR:</span>
-                        <span class="<?php echo (floatval($sr_lto) >= 80) ? 'green-text' : ''; ?>" style="font-weight:700;font-size:14px;"><?php echo esc_html($sr_lto); ?></span>
+                <div class="runner-sr-card" style="border-left-color:#3b82f6;">
+                    <div class="runner-sr-card__label">Last Time Out</div>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">SR:</span>
+                        <span class="runner-sr-card__val <?php echo (floatval($sr_lto) >= 80) ? 'green-text' : ''; ?>"><?php echo esc_html($sr_lto); ?></span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;color:#64748b;">Class:</span>
-                        <span style="font-weight:600;font-size:13px;color:#059669;"><?php echo esc_html($cl_lto); ?></span>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Class:</span>
+                        <span class="runner-sr-card__val"><?php echo esc_html($cl_lto); ?></span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;color:#64748b;">Distance:</span>
-                        <span style="font-weight:600;font-size:13px;color:#059669;"><?php echo esc_html($df_lto); ?>f</span>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Distance:</span>
+                        <span class="runner-sr-card__val"><?php echo esc_html($df_lto); ?>f</span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <span style="font-size:12px;color:#64748b;">Going:</span>
-                        <span style="font-weight:600;font-size:13px;color:#059669;"><?php echo esc_html($going_lto); ?></span>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Going:</span>
+                        <span class="runner-sr-card__val"><?php echo esc_html($going_lto); ?></span>
                     </div>
                 </div>
                 
                 <!-- 2nd Last Run -->
-                <div style="background:linear-gradient(135deg,#f8f9fa 0%,#e9ecef 100%);padding:12px;border-radius:6px;border-left:4px solid #10b981;">
-                    <div style="font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;margin-bottom:6px;">2nd Last Run</div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;color:#64748b;">SR:</span>
-                        <span class="<?php echo (floatval($sr_2) >= 80) ? 'green-text' : ''; ?>" style="font-weight:700;font-size:14px;"><?php echo esc_html($sr_2); ?></span>
+                <div class="runner-sr-card" style="border-left-color:#10b981;">
+                    <div class="runner-sr-card__label">2nd Last Run</div>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">SR:</span>
+                        <span class="runner-sr-card__val <?php echo (floatval($sr_2) >= 80) ? 'green-text' : ''; ?>"><?php echo esc_html($sr_2); ?></span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;color:#64748b;">Class:</span>
-                        <span style="font-weight:600;font-size:13px;color:#059669;"><?php echo esc_html($cr_2); ?></span>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Class:</span>
+                        <span class="runner-sr-card__val"><?php echo esc_html($cr_2); ?></span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;color:#64748b;">Distance:</span>
-                        <span style="font-weight:600;font-size:13px;color:#059669;"><?php echo esc_html($df_2); ?>f</span>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Distance:</span>
+                        <span class="runner-sr-card__val"><?php echo esc_html($df_2); ?>f</span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <span style="font-size:12px;color:#64748b;">Going:</span>
-                        <span style="font-weight:600;font-size:13px;color:#059669;"><?php echo esc_html($going_2); ?></span>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Going:</span>
+                        <span class="runner-sr-card__val"><?php echo esc_html($going_2); ?></span>
                     </div>
                 </div>
                 
                 <!-- 3rd Last Run -->
-                <div style="background:linear-gradient(135deg,#f8f9fa 0%,#e9ecef 100%);padding:12px;border-radius:6px;border-left:4px solid #f59e0b;">
-                    <div style="font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;margin-bottom:6px;">3rd Last Run</div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;color:#64748b;">SR:</span>
-                        <span class="<?php echo (floatval($sr_3) >= 80) ? 'green-text' : ''; ?>" style="font-weight:700;font-size:14px;"><?php echo esc_html($sr_3); ?></span>
+                <div class="runner-sr-card" style="border-left-color:#f59e0b;">
+                    <div class="runner-sr-card__label">3rd Last Run</div>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">SR:</span>
+                        <span class="runner-sr-card__val <?php echo (floatval($sr_3) >= 80) ? 'green-text' : ''; ?>"><?php echo esc_html($sr_3); ?></span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;color:#64748b;">Class:</span>
-                        <span style="font-weight:600;font-size:13px;color:#059669;"><?php echo esc_html($cr_3); ?></span>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Class:</span>
+                        <span class="runner-sr-card__val"><?php echo esc_html($cr_3); ?></span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;color:#64748b;">Distance:</span>
-                        <span style="font-weight:600;font-size:13px;color:#059669;"><?php echo esc_html($df_3); ?>f</span>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Distance:</span>
+                        <span class="runner-sr-card__val"><?php echo esc_html($df_3); ?>f</span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <span style="font-size:12px;color:#64748b;">Going:</span>
-                        <span style="font-weight:600;font-size:13px;color:#059669;"><?php echo esc_html($going_3); ?></span>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Going:</span>
+                        <span class="runner-sr-card__val"><?php echo esc_html($going_3); ?></span>
                     </div>
                 </div>
                 
                 <!-- 4th Last Run -->
-                <div style="background:linear-gradient(135deg,#f8f9fa 0%,#e9ecef 100%);padding:12px;border-radius:6px;border-left:4px solid #8b5cf6;">
-                    <div style="font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;margin-bottom:6px;">4th Last Run</div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;color:#64748b;">SR:</span>
-                        <span class="<?php echo (floatval($sr_4) >= 80) ? 'green-text' : ''; ?>" style="font-weight:700;font-size:14px;"><?php echo esc_html($sr_4); ?></span>
+                <div class="runner-sr-card" style="border-left-color:#8b5cf6;">
+                    <div class="runner-sr-card__label">4th Last Run</div>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">SR:</span>
+                        <span class="runner-sr-card__val <?php echo (floatval($sr_4) >= 80) ? 'green-text' : ''; ?>"><?php echo esc_html($sr_4); ?></span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;color:#64748b;">Class:</span>
-                        <span style="font-weight:600;font-size:13px;color:#059669;"><?php echo esc_html($cr_4); ?></span>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Class:</span>
+                        <span class="runner-sr-card__val"><?php echo esc_html($cr_4); ?></span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;color:#64748b;">Distance:</span>
-                        <span style="font-weight:600;font-size:13px;color:#059669;"><?php echo esc_html($df_4); ?>f</span>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Distance:</span>
+                        <span class="runner-sr-card__val"><?php echo esc_html($df_4); ?>f</span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <span style="font-size:12px;color:#64748b;">Going:</span>
-                        <span style="font-weight:600;font-size:13px;color:#059669;"><?php echo esc_html($going_4); ?></span>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Going:</span>
+                        <span class="runner-sr-card__val"><?php echo esc_html($going_4); ?></span>
                     </div>
                 </div>
                 
                 <!-- 5th Last Run -->
-                <div style="background:linear-gradient(135deg,#f8f9fa 0%,#e9ecef 100%);padding:12px;border-radius:6px;border-left:4px solid #ec4899;">
-                    <div style="font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;margin-bottom:6px;">5th Last Run</div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;color:#64748b;">SR:</span>
-                        <span class="<?php echo (floatval($sr_5) >= 80) ? 'green-text' : ''; ?>" style="font-weight:700;font-size:14px;"><?php echo esc_html($sr_5); ?></span>
+                <div class="runner-sr-card" style="border-left-color:#ec4899;">
+                    <div class="runner-sr-card__label">5th Last Run</div>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">SR:</span>
+                        <span class="runner-sr-card__val <?php echo (floatval($sr_5) >= 80) ? 'green-text' : ''; ?>"><?php echo esc_html($sr_5); ?></span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;color:#64748b;">Class:</span>
-                        <span style="font-weight:600;font-size:13px;color:#059669;"><?php echo esc_html($cr_5); ?></span>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Class:</span>
+                        <span class="runner-sr-card__val"><?php echo esc_html($cr_5); ?></span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;color:#64748b;">Distance:</span>
-                        <span style="font-weight:600;font-size:13px;color:#059669;"><?php echo esc_html($df_5); ?>f</span>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Distance:</span>
+                        <span class="runner-sr-card__val"><?php echo esc_html($df_5); ?>f</span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <span style="font-size:12px;color:#64748b;">Going:</span>
-                        <span style="font-weight:600;font-size:13px;color:#059669;"><?php echo esc_html($going_5); ?></span>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Going:</span>
+                        <span class="runner-sr-card__val"><?php echo esc_html($going_5); ?></span>
                     </div>
                 </div>
                 
                 <!-- 6th Last Run -->
-                <div style="background:linear-gradient(135deg,#f8f9fa 0%,#e9ecef 100%);padding:12px;border-radius:6px;border-left:4px solid #06b6d4;">
-                    <div style="font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;margin-bottom:6px;">6th Last Run</div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;color:#64748b;">SR:</span>
-                        <span class="<?php echo (floatval($sr_6) >= 80) ? 'green-text' : ''; ?>" style="font-weight:700;font-size:14px;"><?php echo esc_html($sr_6); ?></span>
+                <div class="runner-sr-card" style="border-left-color:#06b6d4;">
+                    <div class="runner-sr-card__label">6th Last Run</div>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">SR:</span>
+                        <span class="runner-sr-card__val <?php echo (floatval($sr_6) >= 80) ? 'green-text' : ''; ?>"><?php echo esc_html($sr_6); ?></span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;color:#64748b;">Class:</span>
-                        <span style="font-weight:600;font-size:13px;color:#059669;"><?php echo esc_html($cr_6); ?></span>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Class:</span>
+                        <span class="runner-sr-card__val"><?php echo esc_html($cr_6); ?></span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;color:#64748b;">Distance:</span>
-                        <span style="font-weight:600;font-size:13px;color:#059669;"><?php echo esc_html($df_6); ?>f</span>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Distance:</span>
+                        <span class="runner-sr-card__val"><?php echo esc_html($df_6); ?>f</span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <span style="font-size:12px;color:#64748b;">Going:</span>
-                        <span style="font-weight:600;font-size:13px;color:#059669;"><?php echo esc_html($going_6); ?></span>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Going:</span>
+                        <span class="runner-sr-card__val"><?php echo esc_html($going_6); ?></span>
                     </div>
                 </div>
             </div>
-            <!-- Add these three new cards at the end of the grid, before the closing </div> -->
 
-<!-- Official Rating Card -->
-<div style="background:linear-gradient(135deg,#f8f9fa 0%,#e9ecef 100%);padding:12px;border-radius:6px;border-left:4px solid #10b981;">
-    <div style="font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Official Rating</div>
-    <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:12px;color:#64748b;">OR:</span>
-        <span style="font-weight:700;font-size:18px;color:#059669;"><?php echo esc_html($runner->official_rating ?: '-'); ?></span>
-    </div>
-</div>
-
-<!-- Forecast Odds Card -->
-<div style="background:linear-gradient(135deg,#f8f9fa 0%,#e9ecef 100%);padding:12px;border-radius:6px;border-left:4px solid #f59e0b;">
-    <div style="font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Forecast Odds</div>
-    <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:12px;color:#64748b;">Odds:</span>
-        <span style="font-weight:700;font-size:18px;color:#059669;"><?php echo esc_html($odds ?: 'N/A'); ?></span>
-    </div>
-</div>
-
-<!-- Decimal Odds Card -->
-<div style="background:linear-gradient(135deg,#f8f9fa 0%,#e9ecef 100%);padding:12px;border-radius:6px;border-left:4px solid #8b5cf6;">
-    <div style="font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Decimal Odds</div>
-    <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:12px;color:#64748b;">Dec:</span>
-        <span style="font-weight:700;font-size:18px;color:#059669;"><?php echo esc_html($dec_odds); ?></span>
-    </div>
-</div>
-
+            <div class="runner-sr-history__meta">
+                <div class="runner-sr-card" style="border-left-color:#10b981;">
+                    <div class="runner-sr-card__label">Official Rating</div>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">OR:</span>
+                        <span class="runner-sr-card__val" style="font-size:18px;"><?php echo esc_html($runner->official_rating ?: '-'); ?></span>
+                    </div>
+                </div>
+                <div class="runner-sr-card" style="border-left-color:#f59e0b;">
+                    <div class="runner-sr-card__label">Forecast Odds</div>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Odds:</span>
+                        <span class="runner-sr-card__val" style="font-size:18px;"><?php echo esc_html($odds ?: 'N/A'); ?></span>
+                    </div>
+                </div>
+                <div class="runner-sr-card" style="border-left-color:#8b5cf6;">
+                    <div class="runner-sr-card__label">Decimal Odds</div>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Dec:</span>
+                        <span class="runner-sr-card__val" style="font-size:18px;"><?php echo esc_html($dec_odds); ?></span>
+                    </div>
+                </div>
+            </div>
         </div>
     </td>
 </tr>
 
-                            </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
@@ -4603,44 +4612,41 @@ if ($speed_data) {
         $speed_chart_height_px = min(2400, max(500, ($runner_count_chart * 52) + 160));
         ?>
         <div id="race-detail-charts-<?php echo intval($race_id); ?>"></div>
-        <div style="background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.1);margin-top:30px;padding:30px;">
-            <h2 style="color:#111827;margin-bottom:25px;text-align:center;font-size:24px;font-weight:700;">📊 Fhorsite and Speed Rating Analysis</h2>
-            <div class="speed-rating-chart-container" style="position:relative;height:<?php echo (int) $speed_chart_height_px; ?>px;min-height:500px;margin:30px 0;background:linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);border-radius:8px;padding:20px;">
-                <div style="text-align:center;margin-bottom:10px;font-size:12px;color:#6b7280;font-style:italic;">💡 Click on legend items to filter the chart</div>
+        <div class="fhor-panel">
+            <h2 class="fhor-panel__title">📊 Fhorsite and Speed Rating Analysis</h2>
+            <div class="fhor-chart-box speed-rating-chart-container" style="height:<?php echo (int) $speed_chart_height_px; ?>px;min-height:420px;">
+                <p class="fhor-panel__hint">💡 Tap legend items to filter the chart</p>
                 <canvas id="speedRatingChart_<?php echo $race_id; ?>"></canvas>
                 <div id="speedRatingNoData_<?php echo $race_id; ?>" style="display:none;text-align:center;padding:40px;color:#666;">
                     <h3 style="margin:0 0 8px 0;">No Speed Rating Data Available</h3>
                     <p style="margin:0;">The Speed Rating columns were not found for this race date.</p>
                 </div>
             </div>
-
         </div>
         
         <!-- RTF Performance Charts Section -->
-        <div style="background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.1);margin-top:30px;padding:30px;">
-            <h2 style="color:#111827;margin-bottom:25px;text-align:center;font-size:24px;font-weight:700;">📈 RTF Performance Analysis</h2>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(500px,1fr));gap:30px;margin:20px 0;">
-                <!-- Left Chart: RTF_Trainer -->
-                <div style="background:#f8f9fa;border-radius:8px;padding:20px;">
-                    <h3 style="color:#111827;margin-bottom:20px;text-align:center;font-size:18px;font-weight:600;">RTF_Trainer</h3>
-                    <div style="position:relative;height:350px;">
+        <div class="fhor-panel">
+            <h2 class="fhor-panel__title">📈 RTF Performance Analysis</h2>
+            <div class="fhor-chart-grid">
+                <div class="fhor-chart-card">
+                    <h3>RTF Trainer</h3>
+                    <div class="fhor-chart-card__canvas">
                         <canvas id="rtfTrainerChart_<?php echo $race_id; ?>"></canvas>
                     </div>
                 </div>
-                <!-- Right Chart: RTF_Trainer/Jockey -->
-                <div style="background:#f8f9fa;border-radius:8px;padding:20px;">
-                    <h3 style="color:#111827;margin-bottom:20px;text-align:center;font-size:18px;font-weight:600;">RTF_Trainer/Jockey</h3>
-                    <div style="position:relative;height:350px;">
+                <div class="fhor-chart-card">
+                    <h3>RTF Trainer / Jockey</h3>
+                    <div class="fhor-chart-card__canvas">
                         <canvas id="rtfTrainerJockeyChart_<?php echo $race_id; ?>"></canvas>
                     </div>
-                    <div style="display:flex;justify-content:center;gap:20px;margin-top:15px;">
-                        <div style="display:flex;align-items:center;gap:6px;">
-                            <div style="width:16px;height:16px;background:#36a2eb;border-radius:3px;"></div>
-                            <span style="font-size:12px;color:#374151;">RTF%</span>
+                    <div class="fhor-legend-row">
+                        <div class="fhor-legend-item">
+                            <span class="fhor-legend-swatch" style="background:#36a2eb;"></span>
+                            <span>RTF%</span>
                         </div>
-                        <div style="display:flex;align-items:center;gap:6px;">
-                            <div style="width:16px;height:16px;background:#4bc0c0;border-radius:3px;"></div>
-                            <span style="font-size:12px;color:#374151;">JkyPlcPct14d</span>
+                        <div class="fhor-legend-item">
+                            <span class="fhor-legend-swatch" style="background:#4bc0c0;"></span>
+                            <span>JkyPlcPct14d</span>
                         </div>
                     </div>
                 </div>
@@ -4648,45 +4654,42 @@ if ($speed_data) {
         </div>
         
         <!-- Trainer Performance Statistics Chart Section -->
-        <div style="background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.1);margin-top:30px;padding:30px;">
-            <h2 style="color:#111827;margin-bottom:25px;text-align:center;font-size:24px;font-weight:700;">📊 % Rivals Beaten By Trainer</h2>
-
-           <div style="position:relative;height:<?php echo count($runners) > 10 ? '700px' : '500px'; ?>;margin:30px 0;background:linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);border-radius:8px;padding:20px;">
-
+        <div class="fhor-panel">
+            <h2 class="fhor-panel__title">📊 % Rivals Beaten By Trainer</h2>
+            <div class="fhor-chart-box" style="height:<?php echo count($runners) > 10 ? '560px' : '420px'; ?>;min-width:<?php echo max(320, count($runners) * 56); ?>px;">
                 <canvas id="trainerPerformanceChart_<?php echo $race_id; ?>"></canvas>
             </div>
-            <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:25px;margin-top:30px;padding:20px;background:#f8f9fa;border-radius:8px;">
-    <div style="display:flex;align-items:center;gap:10px;">
-        <div style="width:24px;height:24px;background:#87CEEB;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.1);"></div>
-        <span style="font-weight:600;color:#374151;font-size:14px;">21 Days RBT%</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:10px;">
-        <div style="width:24px;height:24px;background:#8A2BE2;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.1);"></div>
-        <span style="font-weight:600;color:#374151;font-size:14px;">42 Days RBT%</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:10px;">
-        <div style="width:24px;height:24px;background:#32CD32;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.1);"></div>
-        <span style="font-weight:600;color:#374151;font-size:14px;">5 Years RBT%</span>
-    </div>
-</div>
-
+            <div class="fhor-legend-row">
+                <div class="fhor-legend-item">
+                    <span class="fhor-legend-swatch" style="background:#87CEEB;"></span>
+                    <span>21 Days RBT%</span>
+                </div>
+                <div class="fhor-legend-item">
+                    <span class="fhor-legend-swatch" style="background:#8A2BE2;"></span>
+                    <span>42 Days RBT%</span>
+                </div>
+                <div class="fhor-legend-item">
+                    <span class="fhor-legend-swatch" style="background:#32CD32;"></span>
+                    <span>5 Years RBT%</span>
+                </div>
+            </div>
         </div>
 
         <?php if (!$is_tomorrow_race): ?>
         <!-- Runner, Course, Distance, Class, Direction WINS Chart Section -->
-        <div style="background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.1);margin-top:30px;padding:30px;">
-            <h2 style="color:#111827;margin-bottom:25px;text-align:center;font-size:24px;font-weight:700;">📊 Runner, Course, Distance, Class, Direction WINS Strike rate</h2>
-            <div style="position:relative;height:<?php echo count($runners) > 10 ? '700px' : '500px'; ?>;margin:30px 0;background:linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);border-radius:8px;padding:20px;">
-                <div style="text-align:center;margin-bottom:10px;font-size:12px;color:#6b7280;font-style:italic;">💡 Click on legend items to filter the chart</div>
+        <div class="fhor-panel">
+            <h2 class="fhor-panel__title">📊 Wins Strike Rate</h2>
+            <p class="fhor-panel__hint">Runner · Course · Distance · Class · Direction — tap legend to filter</p>
+            <div class="fhor-chart-box" style="height:<?php echo count($runners) > 10 ? '560px' : '420px'; ?>;min-width:<?php echo max(360, count($runners) * 72); ?>px;">
                 <canvas id="winsStrikeChart_<?php echo $race_id; ?>"></canvas>
             </div>
         </div>
 
         <!-- Runner, Course, Distance, Class, Direction PLACES Chart Section -->
-        <div style="background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.1);margin-top:30px;padding:30px;">
-            <h2 style="color:#111827;margin-bottom:25px;text-align:center;font-size:24px;font-weight:700;">📊 Runner, Course, Distance, Class, Direction PLACES</h2>
-            <div style="position:relative;height:<?php echo count($runners) > 10 ? '700px' : '500px'; ?>;margin:30px 0;background:linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);border-radius:8px;padding:20px;">
-                <div style="text-align:center;margin-bottom:10px;font-size:12px;color:#6b7280;font-style:italic;">💡 Click on legend items to filter the chart</div>
+        <div class="fhor-panel">
+            <h2 class="fhor-panel__title">📊 Places Strike Rate</h2>
+            <p class="fhor-panel__hint">Runner · Course · Distance · Class · Direction — tap legend to filter</p>
+            <div class="fhor-chart-box" style="height:<?php echo count($runners) > 10 ? '560px' : '420px'; ?>;min-width:<?php echo max(360, count($runners) * 72); ?>px;">
                 <canvas id="placesStrikeChart_<?php echo $race_id; ?>"></canvas>
             </div>
         </div>
@@ -4701,6 +4704,17 @@ if ($speed_data) {
                 console.log.apply(console, arguments);
             }
         };
+        const isMobileChart = window.matchMedia('(max-width: 768px)').matches;
+        const chartLegendOpts = {
+            position: 'top',
+            labels: {
+                usePointStyle: true,
+                boxWidth: isMobileChart ? 8 : 12,
+                padding: isMobileChart ? 10 : 20,
+                font: { size: isMobileChart ? 10 : 13, weight: '600' }
+            }
+        };
+        const chartTickFont = { size: isMobileChart ? 10 : 12, weight: '600' };
         if (typeof Chart === 'undefined') { 
             dbg('Chart.js not ready, retrying...');
             setTimeout(initRaceDetailCharts_<?php echo $race_id; ?>, 100); 
@@ -4977,7 +4991,9 @@ const chartData = {
         
         // Chart configuration
         const runnerLabelCount = chartData.labels.length;
-        const yTickFontSize = runnerLabelCount > 24 ? 10 : (runnerLabelCount > 16 ? 11 : 13);
+        const yTickFontSize = isMobileChart
+            ? (runnerLabelCount > 20 ? 9 : 10)
+            : (runnerLabelCount > 24 ? 10 : (runnerLabelCount > 16 ? 11 : 13));
         const config = {
             type: 'bar',
             data: chartData,
@@ -4995,7 +5011,7 @@ const chartData = {
                         },
                         ticks: {
                             stepSize: stepSize,
-                            font: { size: 12, weight: '600' },
+                            font: chartTickFont,
                             color: '#666'
                         }
                     },
@@ -5005,30 +5021,28 @@ const chartData = {
                             autoSkip: false,
                             includeBounds: true,
                             font: { size: yTickFontSize, weight: '600' },
-                            color: '#333'
+                            color: '#333',
+                            callback: function(value) {
+                                const label = this.getLabelForValue(value);
+                                if (!isMobileChart || typeof label !== 'string') return label;
+                                return label.length > 16 ? label.slice(0, 14) + '…' : label;
+                            }
                         }
                     }
                 },
                 elements: {
                     bar: {
                         borderWidth: 0,
-                        borderRadius: 8,
+                        borderRadius: isMobileChart ? 4 : 8,
                         borderSkipped: false,
                         categoryPercentage: runnerLabelCount > 20 ? 0.88 : 0.95,
                         barPercentage: runnerLabelCount > 20 ? 0.82 : 0.95
                     }
                 },
-                layout: { padding: { top: 20, bottom: 20 } },
+                layout: { padding: { top: isMobileChart ? 8 : 20, bottom: isMobileChart ? 8 : 20 } },
                 interaction: { intersect: false, mode: 'index', axis: 'y' },
                 plugins: {
-                    legend: {
-                        position: 'top',
-                        labels: {
-                            usePointStyle: true,
-                            padding: 25,
-                            font: { size: 14, weight: '600' }
-                        }
-                    },
+                    legend: chartLegendOpts,
                     title: {
                         display: false
                     },
@@ -5044,9 +5058,9 @@ const chartData = {
                         borderWidth: 1,
                         cornerRadius: 8,
                         displayColors: true,
-                        titleFont: { size: 14, weight: 'bold' },
-                        bodyFont: { size: 13, weight: '500' },
-                        padding: 12,
+                        titleFont: { size: isMobileChart ? 12 : 14, weight: 'bold' },
+                        bodyFont: { size: isMobileChart ? 11 : 13, weight: '500' },
+                        padding: isMobileChart ? 8 : 12,
                         callbacks: {
                             title: function(context) {
                                 return 'Horse: ' + context[0].label;
@@ -5140,13 +5154,19 @@ if (rtfTrainerCtx) {
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false }, title: { display: false } },
                     scales: {
-                        x: { beginAtZero: true, suggestedMax: 100, grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { stepSize: 10 } },
+                        x: { beginAtZero: true, suggestedMax: 100, grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { stepSize: 10, font: chartTickFont } },
                         y: { 
                             grid: { color: 'rgba(0,0,0,0.1)' },
                             ticks: {
                                 stepSize: 1,
                                 maxTicksLimit: 1000,
-                                autoSkip: false
+                                autoSkip: false,
+                                font: { size: isMobileChart ? 9 : 11, weight: '600' },
+                                callback: function(value) {
+                                    const label = this.getLabelForValue(value);
+                                    if (!isMobileChart || typeof label !== 'string') return label;
+                                    return label.length > 14 ? label.slice(0, 12) + '…' : label;
+                                }
                             }
                         }
                     },
@@ -5310,7 +5330,7 @@ if (rtfTrainerJockeyCtx) {
                     suggestedMax: 140, 
                     stacked: true, 
                     grid: { color: 'rgba(0,0,0,0.1)' }, 
-                    ticks: { stepSize: 20 } 
+                    ticks: { stepSize: 20, font: chartTickFont } 
                 },
                 y: { 
                     stacked: true, 
@@ -5318,7 +5338,13 @@ if (rtfTrainerJockeyCtx) {
                     ticks: {
                         stepSize: 1,
                         maxTicksLimit: 1000,
-                        autoSkip: false
+                        autoSkip: false,
+                        font: { size: isMobileChart ? 9 : 11, weight: '600' },
+                        callback: function(value) {
+                            const label = this.getLabelForValue(value);
+                            if (!isMobileChart || typeof label !== 'string') return label;
+                            return label.length > 14 ? label.slice(0, 12) + '…' : label;
+                        }
                     }
                 }
             },
@@ -5484,15 +5510,23 @@ if (trainerPerformanceCtx) {
         x: { 
             grid: { color: 'rgba(0,0,0,0.1)' }, 
             ticks: { 
-                font: { size: 11, weight: '600' }, 
+                font: { size: isMobileChart ? 9 : 11, weight: '600' }, 
                 color: '#333',
-                maxRotation: 45,
-                minRotation: 0,
+                maxRotation: isMobileChart ? 60 : 45,
+                minRotation: isMobileChart ? 45 : 0,
                 autoSkip: false,
                 callback: function(value, index) {
                     // Multi-line labels: trainerNames[index] is an array ['Trainer', 'Cloth. Horse']
                     const label = trainerNames[index];
                     if (Array.isArray(label)) {
+                        if (isMobileChart) {
+                            const trainer = String(label[0] || '');
+                            const horse = String(label[1] || '');
+                            return [
+                                trainer.length > 12 ? trainer.slice(0, 10) + '…' : trainer,
+                                horse.length > 14 ? horse.slice(0, 12) + '…' : horse
+                            ];
+                        }
                         return label; // Chart.js renders arrays as multi-line
                     }
                     return label;
@@ -5745,8 +5779,9 @@ if (trainerPerformanceCtx) {
                             },
                             labels: {
                                 usePointStyle: true,
-                                padding: 25,
-                                font: { size: 14, weight: '600' }
+                                boxWidth: isMobileChart ? 8 : 12,
+                                padding: isMobileChart ? 8 : 20,
+                                font: { size: isMobileChart ? 10 : 13, weight: '600' }
                             }
                         }, 
                         title: { display: false },
@@ -5765,10 +5800,16 @@ if (trainerPerformanceCtx) {
                         x: { 
                             grid: { display: false },
                             ticks: { 
-                                font: { size: 12, weight: '600' }, 
+                                font: { size: isMobileChart ? 9 : 12, weight: '600' }, 
                                 color: '#333',
-                                maxRotation: 45,
-                                minRotation: 45
+                                maxRotation: 60,
+                                minRotation: 45,
+                                autoSkip: false,
+                                callback: function(value) {
+                                    const label = this.getLabelForValue(value);
+                                    if (!isMobileChart || typeof label !== 'string') return label;
+                                    return label.length > 12 ? label.slice(0, 10) + '…' : label;
+                                }
                             } 
                         },
                         y: { 
@@ -6014,8 +6055,9 @@ if (trainerPerformanceCtx) {
                             },
                             labels: {
                                 usePointStyle: true,
-                                padding: 25,
-                                font: { size: 14, weight: '600' }
+                                boxWidth: isMobileChart ? 8 : 12,
+                                padding: isMobileChart ? 8 : 20,
+                                font: { size: isMobileChart ? 10 : 13, weight: '600' }
                             }
                         }, 
                         title: { display: false },
@@ -6034,10 +6076,16 @@ if (trainerPerformanceCtx) {
                         x: { 
                             grid: { display: false },
                             ticks: { 
-                                font: { size: 12, weight: '600' }, 
+                                font: { size: isMobileChart ? 9 : 12, weight: '600' }, 
                                 color: '#333',
-                                maxRotation: 45,
-                                minRotation: 45
+                                maxRotation: 60,
+                                minRotation: 45,
+                                autoSkip: false,
+                                callback: function(value) {
+                                    const label = this.getLabelForValue(value);
+                                    if (!isMobileChart || typeof label !== 'string') return label;
+                                    return label.length > 12 ? label.slice(0, 10) + '…' : label;
+                                }
                             } 
                         },
                         y: { 
@@ -6286,6 +6334,13 @@ jQuery(document).on('click', '.toggle-details-btn', function() {
                 <h3 style="color:#64748b;margin:0;">No runners found for this race</h3>
             </div>
         </div>
+        <?php endif; ?>
+
+        <?php if ($race_show_premium_data): ?>
+        <?php
+        echo do_shortcode('[competitors_pace_card race_id="' . intval($race_id) . '"]');
+        echo do_shortcode('[pace_map race_id="' . intval($race_id) . '"]');
+        ?>
         <?php endif; ?>
     </div>
 

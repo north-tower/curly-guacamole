@@ -11,26 +11,31 @@ get_header();
         max-width: 1400px;
         width: 100%;
         margin: 0 auto;
-        padding: 0 20px 24px;
+        padding: 12px 12px calc(28px + var(--fhor-fab-clearance, 72px));
         box-sizing: border-box;
+        overflow-x: clip;
+        background: var(--fhor-bg, #f1f5f9);
     }
     .race-detail-page-shell .back-button-container,
     .race-detail-page-shell .race-quick-nav,
     .race-detail-page-shell .race-detail-container,
     .race-detail-page-shell .cpc,
     .race-detail-page-shell .pace-map,
-    .race-detail-page-shell .pace-map-error {
+    .race-detail-page-shell .pace-map-error,
+    .race-detail-page-shell .fhor-panel {
         max-width: none;
         width: 100%;
         margin-left: 0;
         margin-right: 0;
-        padding-left: 0;
-        padding-right: 0;
         box-sizing: border-box;
     }
+    .race-detail-page-shell .back-button-container,
+    .race-detail-page-shell .race-quick-nav {
+        padding-left: 0;
+        padding-right: 0;
+    }
     .race-detail-page-shell .race-detail-container {
-        padding-top: 20px;
-        padding-bottom: 20px;
+        padding: 0;
     }
 </style>
 <main id="brx-content" class="race-detail-page-shell">
@@ -38,8 +43,6 @@ get_header();
     $race_id = get_query_var('race_id');
     if ($race_id) {
         echo do_shortcode('[race_detail]');
-        echo do_shortcode('[competitors_pace_card]');
-        echo do_shortcode('[pace_map]');
     } else {
         ?>
         <div style="text-align:center;padding:60px;font-family:sans-serif;">

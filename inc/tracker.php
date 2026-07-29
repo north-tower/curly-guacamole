@@ -537,37 +537,39 @@ function bricks_tracker_floating_quick_link() {
         return;
     }
     ?>
-    <div style="position:fixed;right:18px;bottom:18px;z-index:9999;display:flex;flex-direction:column;gap:8px;">
-        <a
-            href="<?php echo esc_url(home_url('/my-tracker/')); ?>"
-            title="Open My Tracker"
-            style="display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);color:#fff;font-weight:700;font-size:13px;text-decoration:none;box-shadow:0 8px 20px rgba(109,40,217,0.35);"
-        >📝 My Tracker</a>
-        <?php if (function_exists('bricks_user_can_access_points_backtest') && bricks_user_can_access_points_backtest()): ?>
-        <a
-            href="<?php echo esc_url(home_url('/today-picks/')); ?>"
-            title="Open Today's Picks (audit sheet)"
-            style="display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:linear-gradient(135deg, #0f766e 0%, #115e59 100%);color:#fff;font-weight:700;font-size:13px;text-decoration:none;box-shadow:0 8px 20px rgba(17,94,89,0.35);"
-        >📋 Today's Picks</a>
-        <a
-            href="<?php echo esc_url(home_url('/points-backtest/')); ?>"
-            title="Open Points Backtest"
-            style="display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);color:#fff;font-weight:700;font-size:13px;text-decoration:none;box-shadow:0 8px 20px rgba(30,64,175,0.35);"
-        >📊 Points Backtest</a>
-        <?php endif; ?>
-        <a
-            href="<?php echo esc_url(home_url('/daily_sires_insights/')); ?>"
-            title="Open Daily Sires Insights"
-            style="display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:linear-gradient(135deg, #059669 0%, #047857 100%);color:#fff;font-weight:700;font-size:13px;text-decoration:none;box-shadow:0 8px 20px rgba(4,120,87,0.35);"
-        >🧬 Daily Sires</a>
-        <?php if (current_user_can('manage_options')): ?>
-        <a
-            href="<?php echo esc_url(home_url('/admin-pnl/')); ?>"
-            title="Open Admin P&L"
-            style="display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);color:#fff;font-weight:700;font-size:13px;text-decoration:none;box-shadow:0 8px 20px rgba(185,28,28,0.35);"
-        >💷 Admin P&amp;L</a>
-        <?php endif; ?>
+    <div class="fhor-fab" id="fhorFabMenu">
+        <div class="fhor-fab__links" id="fhorFabLinks">
+            <a class="fhor-fab__link fhor-fab__link--tracker" href="<?php echo esc_url(home_url('/my-tracker/')); ?>" title="Open My Tracker">📝 My Tracker</a>
+            <?php if (function_exists('bricks_user_can_access_points_backtest') && bricks_user_can_access_points_backtest()): ?>
+            <a class="fhor-fab__link fhor-fab__link--picks" href="<?php echo esc_url(home_url('/today-picks/')); ?>" title="Open Today's Picks (audit sheet)">📋 Today's Picks</a>
+            <a class="fhor-fab__link fhor-fab__link--backtest" href="<?php echo esc_url(home_url('/points-backtest/')); ?>" title="Open Points Backtest">📊 Points Backtest</a>
+            <?php endif; ?>
+            <a class="fhor-fab__link fhor-fab__link--sires" href="<?php echo esc_url(home_url('/daily_sires_insights/')); ?>" title="Open Daily Sires Insights">🧬 Daily Sires</a>
+            <?php if (current_user_can('manage_options')): ?>
+            <a class="fhor-fab__link fhor-fab__link--admin" href="<?php echo esc_url(home_url('/admin-pnl/')); ?>" title="Open Admin P&L">💷 Admin P&amp;L</a>
+            <?php endif; ?>
+        </div>
+        <button type="button" class="fhor-fab__toggle" id="fhorFabToggle" aria-expanded="false" aria-controls="fhorFabLinks" title="Quick links">☰</button>
     </div>
+    <script>
+    (function () {
+        var root = document.getElementById('fhorFabMenu');
+        var toggle = document.getElementById('fhorFabToggle');
+        if (!root || !toggle) return;
+        toggle.addEventListener('click', function () {
+            var open = root.classList.toggle('is-open');
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            toggle.textContent = open ? '✕' : '☰';
+        });
+        document.addEventListener('click', function (e) {
+            if (!root.contains(e.target) && root.classList.contains('is-open')) {
+                root.classList.remove('is-open');
+                toggle.setAttribute('aria-expanded', 'false');
+                toggle.textContent = '☰';
+            }
+        });
+    })();
+    </script>
     <?php
 }
 add_action('wp_footer', 'bricks_tracker_floating_quick_link', 1001);

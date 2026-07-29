@@ -972,14 +972,15 @@ $dates[] = [
         /* Responsive Design */
         @media (max-width: 768px) {
             .race-table-wrapper {
-                padding: 16px;
+                padding: 12px;
                 margin-bottom: 20px;
+                overflow-x: hidden;
             }
             
             .race-filters {
-                grid-template-columns: 1fr;
-                gap: 12px;
-                padding: 16px;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+                padding: 12px;
             }
             
             .filter-group label {
@@ -990,35 +991,38 @@ $dates[] = [
             .race-filters input[type="number"],
             .race-filters input[type="date"] {
                 font-size: 16px; /* Prevents zoom on iOS */
-                padding: 12px;
+                padding: 10px;
             }
             
             .race-reset-button {
                 width: 100%;
                 padding: 12px;
                 font-size: 14px;
+                grid-column: 1 / -1;
             }
             
             .race-date-tabs {
-                flex-direction: column;
+                flex-direction: row;
                 gap: 8px;
-                padding: 12px;
+                padding: 8px;
             }
             
             .race-date-tab {
-                padding: 12px 20px;
-                font-size: 14px;
-                width: 100%;
+                padding: 10px 14px;
+                font-size: 13px;
+                flex: 1;
+                width: auto;
             }
             
-            .race-table-wrapper {
+            #race-table-container {
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
+                border-radius: 10px;
             }
             
             .race-table {
                 font-size: 11px;
-                min-width: 800px; /* Ensure table doesn't get too compressed */
+                min-width: 720px;
             }
             
             .race-table th,
@@ -1044,11 +1048,12 @@ $dates[] = [
         
         @media (max-width: 480px) {
             .race-table-wrapper {
-                padding: 12px;
+                padding: 10px;
             }
             
             .race-filters {
-                padding: 12px;
+                grid-template-columns: 1fr;
+                padding: 10px;
             }
             
             .race-table {
