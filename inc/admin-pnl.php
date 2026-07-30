@@ -280,56 +280,94 @@ if (!function_exists('bricks_admin_pnl_dashboard_shortcode')) {
 
         ob_start();
         ?>
-        <div style="max-width:1200px;margin:24px auto;padding:0 16px 30px;">
-            <h1 style="margin:0 0 6px;color:#111827;font-size:30px;font-weight:800;">Admin P&amp;L Dashboard</h1>
-            <p style="margin:0 0 14px;color:#6b7280;">Audit-grade settlement: configurable stakes, EW fraction, optional fixed place terms, and optional commission on positive net profit. 1pt = £1.</p>
+        <div class="admin-pnl-dashboard">
+            <div class="fhor-page-header admin-pnl-header">
+                <h1>Admin P&amp;L Dashboard</h1>
+                <p>Audit-grade settlement: configurable stakes, EW fraction, optional fixed place terms, and optional commission on positive net profit. 1pt = £1.</p>
+            </div>
 
-            <form method="get" style="display:flex;flex-wrap:wrap;gap:10px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin-bottom:14px;">
+            <button type="button" class="race-filters-toggle pnl-filters-toggle" id="pnlFiltersToggle" aria-expanded="false" aria-controls="pnlFiltersPanel">
+                <span>Settings</span>
+                <span class="race-filters-toggle__state">Show</span>
+            </button>
+
+            <form method="get" class="admin-pnl-form" id="pnlFiltersPanel">
                 <input type="hidden" name="my_admin_pnl_page" value="1" />
-                <label style="font-size:12px;color:#374151;">From<br><input type="date" name="ap_from" value="<?php echo esc_attr($from_date); ?>" style="padding:8px;border:1px solid #d1d5db;border-radius:8px;"></label>
-                <label style="font-size:12px;color:#374151;">To<br><input type="date" name="ap_to" value="<?php echo esc_attr($to_date); ?>" style="padding:8px;border:1px solid #d1d5db;border-radius:8px;"></label>
-                <label style="font-size:12px;color:#374151;">Race Type<br><input type="text" name="ap_race_type" value="<?php echo esc_attr($race_type_filter); ?>" placeholder="Optional exact match" style="padding:8px;border:1px solid #d1d5db;border-radius:8px;"></label>
-                <fieldset style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;min-width:230px;">
-                    <legend style="font-size:12px;color:#374151;padding:0 4px;">Indicators</legend>
-                    <?php foreach ($all_labels as $strategy_key => $strategy_label): ?>
-                        <label style="display:block;font-size:12px;color:#111827;line-height:1.6;">
-                            <input type="checkbox" name="ap_strategies[]" value="<?php echo esc_attr($strategy_key); ?>" <?php checked(in_array($strategy_key, $selected_strategies, true)); ?>>
-                            <?php echo esc_html($strategy_label); ?>
-                        </label>
-                    <?php endforeach; ?>
-                </fieldset>
-                <label style="font-size:12px;color:#374151;">Win Stake (pt)<br><input type="number" step="0.01" min="0" name="ap_stake_win" value="<?php echo esc_attr($stake_win); ?>" style="width:100px;padding:8px;border:1px solid #d1d5db;border-radius:8px;"></label>
-                <label style="font-size:12px;color:#374151;">Place Stake (pt)<br><input type="number" step="0.01" min="0" name="ap_stake_place" value="<?php echo esc_attr($stake_place); ?>" style="width:100px;padding:8px;border:1px solid #d1d5db;border-radius:8px;"></label>
-                <label style="font-size:12px;color:#374151;">EW Total Stake (pt)<br><input type="number" step="0.01" min="0" name="ap_stake_ew" value="<?php echo esc_attr($stake_ew); ?>" style="width:120px;padding:8px;border:1px solid #d1d5db;border-radius:8px;"></label>
-                <label style="font-size:12px;color:#374151;">EW Fraction<br><input type="number" step="0.01" min="0.01" max="1" name="ap_ew_fraction" value="<?php echo esc_attr($ew_fraction); ?>" style="width:95px;padding:8px;border:1px solid #d1d5db;border-radius:8px;"></label>
-                <label style="font-size:12px;color:#374151;">Fixed Places (0=auto)<br><input type="number" step="1" min="0" max="8" name="ap_ew_places" value="<?php echo esc_attr($ew_places_override); ?>" style="width:120px;padding:8px;border:1px solid #d1d5db;border-radius:8px;"></label>
-                <label style="font-size:12px;color:#374151;">Commission %<br><input type="number" step="0.1" min="0" max="100" name="ap_commission" value="<?php echo esc_attr($commission_pct); ?>" style="width:100px;padding:8px;border:1px solid #d1d5db;border-radius:8px;"></label>
-                <div style="align-self:flex-end;"><button type="submit" style="padding:9px 14px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;">Run P&amp;L</button></div>
+                <div class="admin-pnl-form-grid">
+                    <label class="admin-pnl-field">
+                        <span class="admin-pnl-label">From</span>
+                        <input type="date" name="ap_from" value="<?php echo esc_attr($from_date); ?>">
+                    </label>
+                    <label class="admin-pnl-field">
+                        <span class="admin-pnl-label">To</span>
+                        <input type="date" name="ap_to" value="<?php echo esc_attr($to_date); ?>">
+                    </label>
+                    <label class="admin-pnl-field admin-pnl-field--wide">
+                        <span class="admin-pnl-label">Race Type</span>
+                        <input type="text" name="ap_race_type" value="<?php echo esc_attr($race_type_filter); ?>" placeholder="Optional exact match">
+                    </label>
+                    <fieldset class="admin-pnl-fieldset">
+                        <legend class="admin-pnl-label">Indicators</legend>
+                        <?php foreach ($all_labels as $strategy_key => $strategy_label): ?>
+                            <label class="admin-pnl-check">
+                                <input type="checkbox" name="ap_strategies[]" value="<?php echo esc_attr($strategy_key); ?>" <?php checked(in_array($strategy_key, $selected_strategies, true)); ?>>
+                                <?php echo esc_html($strategy_label); ?>
+                            </label>
+                        <?php endforeach; ?>
+                    </fieldset>
+                    <label class="admin-pnl-field">
+                        <span class="admin-pnl-label">Win Stake (pt)</span>
+                        <input type="number" step="0.01" min="0" name="ap_stake_win" value="<?php echo esc_attr($stake_win); ?>">
+                    </label>
+                    <label class="admin-pnl-field">
+                        <span class="admin-pnl-label">Place Stake (pt)</span>
+                        <input type="number" step="0.01" min="0" name="ap_stake_place" value="<?php echo esc_attr($stake_place); ?>">
+                    </label>
+                    <label class="admin-pnl-field">
+                        <span class="admin-pnl-label">EW Total Stake (pt)</span>
+                        <input type="number" step="0.01" min="0" name="ap_stake_ew" value="<?php echo esc_attr($stake_ew); ?>">
+                    </label>
+                    <label class="admin-pnl-field">
+                        <span class="admin-pnl-label">EW Fraction</span>
+                        <input type="number" step="0.01" min="0.01" max="1" name="ap_ew_fraction" value="<?php echo esc_attr($ew_fraction); ?>">
+                    </label>
+                    <label class="admin-pnl-field">
+                        <span class="admin-pnl-label">Fixed Places (0=auto)</span>
+                        <input type="number" step="1" min="0" max="8" name="ap_ew_places" value="<?php echo esc_attr($ew_places_override); ?>">
+                    </label>
+                    <label class="admin-pnl-field">
+                        <span class="admin-pnl-label">Commission %</span>
+                        <input type="number" step="0.1" min="0" max="100" name="ap_commission" value="<?php echo esc_attr($commission_pct); ?>">
+                    </label>
+                </div>
+                <div class="admin-pnl-form-actions">
+                    <button type="submit" class="fhor-btn fhor-btn--primary">Run P&amp;L</button>
+                </div>
             </form>
 
             <?php if (!empty($result['error'])): ?>
-                <div style="margin-bottom:12px;padding:10px 12px;border:1px solid #fecaca;background:#fef2f2;border-radius:8px;color:#991b1b;"><?php echo esc_html($result['error']); ?></div>
+                <div class="fhor-alert fhor-alert--error"><?php echo esc_html($result['error']); ?></div>
             <?php endif; ?>
 
-            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
-                <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;font-size:12px;color:#374151;">Races: <strong><?php echo esc_html($result['race_count'] ?? 0); ?></strong></div>
-                <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;font-size:12px;color:#374151;">Runners: <strong><?php echo esc_html($result['runner_count'] ?? 0); ?></strong></div>
+            <div class="admin-pnl-stats">
+                <div class="fhor-stat-chip">Races: <strong><?php echo esc_html($result['race_count'] ?? 0); ?></strong></div>
+                <div class="fhor-stat-chip">Runners: <strong><?php echo esc_html($result['runner_count'] ?? 0); ?></strong></div>
             </div>
 
-            <div style="overflow:auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:16px;">
-                <table style="width:100%;border-collapse:collapse;min-width:900px;">
+            <div class="admin-pnl-table-wrap">
+                <table class="admin-pnl-table">
                     <thead>
                         <tr>
-                            <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Strategy</th>
-                            <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Selections</th>
-                            <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Staked (pts)</th>
-                            <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Returns (pts)</th>
-                            <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Hits</th>
-                            <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Win/Place Hits</th>
-                            <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Strike %</th>
-                            <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Profit (pts)</th>
-                            <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Profit (£)</th>
-                            <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">ROI %</th>
+                            <th>Strategy</th>
+                            <th>Selections</th>
+                            <th>Staked (pts)</th>
+                            <th>Returns (pts)</th>
+                            <th>Hits</th>
+                            <th>Win/Place Hits</th>
+                            <th>Strike %</th>
+                            <th>Profit (pts)</th>
+                            <th>Profit (£)</th>
+                            <th>ROI %</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -343,27 +381,41 @@ if (!function_exists('bricks_admin_pnl_dashboard_shortcode')) {
                                 $label .= ' (0.5w/0.5p)';
                             }
                             $r = $summary[$k] ?? bricks_admin_pnl_empty_strategy();
-                            $roi_class = floatval($r['roi_pct']) >= 0 ? '#065f46' : '#991b1b';
                             $profit_pts = floatval($r['profit_pts']);
-                            $profit_gbp = $profit_pts; // 1pt = £1
+                            $profit_gbp = $profit_pts;
+                            $roi_positive = floatval($r['roi_pct']) >= 0;
+                            $profit_class = $roi_positive ? 'pnl-profit--pos' : 'pnl-profit--neg';
                         ?>
-                        <tr>
-                            <td style="padding:10px;border-bottom:1px solid #f3f4f6;font-weight:700;"><?php echo esc_html($label); ?></td>
-                            <td style="padding:10px;border-bottom:1px solid #f3f4f6;"><?php echo esc_html($r['selections']); ?></td>
-                            <td style="padding:10px;border-bottom:1px solid #f3f4f6;"><?php echo esc_html(number_format(floatval($r['staked_pts']), 2)); ?></td>
-                            <td style="padding:10px;border-bottom:1px solid #f3f4f6;"><?php echo esc_html(number_format(floatval($r['returns_pts']), 2)); ?></td>
-                            <td style="padding:10px;border-bottom:1px solid #f3f4f6;"><?php echo esc_html($r['hits']); ?></td>
-                            <td style="padding:10px;border-bottom:1px solid #f3f4f6;"><?php echo esc_html(intval($r['win_hits']) . '/' . intval($r['place_hits'])); ?></td>
-                            <td style="padding:10px;border-bottom:1px solid #f3f4f6;"><?php echo esc_html(number_format(floatval($r['strike_rate']), 2)); ?>%</td>
-                            <td style="padding:10px;border-bottom:1px solid #f3f4f6;color:<?php echo esc_attr($roi_class); ?>;"><?php echo esc_html(number_format($profit_pts, 2)); ?></td>
-                            <td style="padding:10px;border-bottom:1px solid #f3f4f6;color:<?php echo esc_attr($roi_class); ?>;">£<?php echo esc_html(number_format($profit_gbp, 2)); ?></td>
-                            <td style="padding:10px;border-bottom:1px solid #f3f4f6;color:<?php echo esc_attr($roi_class); ?>;font-weight:700;"><?php echo esc_html(number_format(floatval($r['roi_pct']), 2)); ?>%</td>
+                        <tr class="pnl-row">
+                            <td class="pnl-cell pnl-cell--strategy" data-label="Strategy"><?php echo esc_html($label); ?></td>
+                            <td class="pnl-cell" data-label="Selections"><?php echo esc_html($r['selections']); ?></td>
+                            <td class="pnl-cell" data-label="Staked (pts)"><?php echo esc_html(number_format(floatval($r['staked_pts']), 2)); ?></td>
+                            <td class="pnl-cell" data-label="Returns (pts)"><?php echo esc_html(number_format(floatval($r['returns_pts']), 2)); ?></td>
+                            <td class="pnl-cell" data-label="Hits"><?php echo esc_html($r['hits']); ?></td>
+                            <td class="pnl-cell" data-label="Win/Place Hits"><?php echo esc_html(intval($r['win_hits']) . '/' . intval($r['place_hits'])); ?></td>
+                            <td class="pnl-cell" data-label="Strike %"><?php echo esc_html(number_format(floatval($r['strike_rate']), 2)); ?>%</td>
+                            <td class="pnl-cell pnl-cell--profit <?php echo esc_attr($profit_class); ?>" data-label="Profit (pts)"><?php echo esc_html(number_format($profit_pts, 2)); ?></td>
+                            <td class="pnl-cell pnl-cell--profit <?php echo esc_attr($profit_class); ?>" data-label="Profit (£)">£<?php echo esc_html(number_format($profit_gbp, 2)); ?></td>
+                            <td class="pnl-cell pnl-cell--roi <?php echo esc_attr($profit_class); ?>" data-label="ROI %"><?php echo esc_html(number_format(floatval($r['roi_pct']), 2)); ?>%</td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
         </div>
+        <script>
+        (function() {
+            var btn = document.getElementById('pnlFiltersToggle');
+            var panel = document.getElementById('pnlFiltersPanel');
+            if (!btn || !panel) return;
+            btn.addEventListener('click', function() {
+                var open = panel.classList.toggle('is-open');
+                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+                var state = btn.querySelector('.race-filters-toggle__state');
+                if (state) state.textContent = open ? 'Hide' : 'Show';
+            });
+        })();
+        </script>
         <?php
         return ob_get_clean();
     }

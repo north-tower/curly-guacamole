@@ -650,7 +650,7 @@ function bricks_my_tracker_dashboard_shortcode($atts = []) {
     ob_start();
     ?>
     <div class="my-tracker-dashboard">
-        <div class="my-tracker-header">
+        <div class="my-tracker-header fhor-page-header">
             <h1>📝 My Tracker</h1>
             <p>Tracked horses grouped with expandable comments.</p>
         </div>
@@ -680,11 +680,11 @@ function bricks_my_tracker_dashboard_shortcode($atts = []) {
                                 $row['latest_course']
                             ])));
                             ?>
-                            <tr>
-                                <td style="font-weight:700;"><?php echo esc_html($row['horse_name']); ?></td>
-                                <td><?php echo esc_html($display_date); ?></td>
-                                <td><?php echo esc_html($meta_course ?: '-'); ?></td>
-                                <td>
+                            <tr class="tracker-row">
+                                <td class="tracker-cell tracker-cell--horse" data-label="Horse"><?php echo esc_html($row['horse_name']); ?></td>
+                                <td class="tracker-cell tracker-cell--date" data-label="Latest Date"><?php echo esc_html($display_date); ?></td>
+                                <td class="tracker-cell tracker-cell--course" data-label="Latest Course"><?php echo esc_html($meta_course ?: '-'); ?></td>
+                                <td class="tracker-cell tracker-cell--comments" data-label="Comments">
                                     <details class="my-tracker-details">
                                         <summary>
                                             View Comments (<?php echo esc_html($row['notes_count']); ?>)
@@ -726,23 +726,6 @@ function bricks_my_tracker_dashboard_shortcode($atts = []) {
             </div>
         <?php endif; ?>
     </div>
-    <style>
-    .my-tracker-dashboard { max-width: 1200px; margin: 24px auto; padding: 0 16px 30px; }
-    .my-tracker-header h1 { margin: 0 0 6px; color: #111827; font-size: 30px; font-weight: 800; }
-    .my-tracker-header p { margin: 0 0 16px; color: #6b7280; }
-    .my-tracker-empty { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; color: #6b7280; }
-    .my-tracker-table-wrap { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: auto; }
-    .my-tracker-table { width: 100%; border-collapse: collapse; min-width: 900px; }
-    .my-tracker-table th, .my-tracker-table td { padding: 12px; border-bottom: 1px solid #f3f4f6; text-align: left; }
-    .my-tracker-table th { background: #f9fafb; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; color: #374151; }
-    .my-tracker-details summary { cursor: pointer; font-weight: 600; color: #2563eb; }
-    .my-tracker-notes-dropdown { margin-top: 8px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; padding: 10px; }
-    .my-tracker-note-item { border-bottom: 1px solid #f3f4f6; padding: 10px 0; }
-    .my-tracker-note-item:last-child { border-bottom: none; }
-    .my-tracker-note-meta { font-size: 11px; color: #6b7280; margin-bottom: 6px; }
-    .my-tracker-note-text { font-size: 13px; color: #111827; margin-bottom: 8px; white-space: normal; }
-    .my-tracker-delete-btn { white-space: nowrap; }
-    </style>
     <?php
     return ob_get_clean();
 }

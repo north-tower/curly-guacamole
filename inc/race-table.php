@@ -514,7 +514,7 @@ if (!empty($having_conditions)) {
         // </div>';
         
         echo $tracker_summary_html;
-        echo '<div style="overflow-x:auto;">
+        echo '<div class="race-table-scroll">
         <table class="race-table sticky-header">
            <thead>
             <tr>
@@ -538,11 +538,12 @@ if (!empty($having_conditions)) {
             if (strtolower($row->track_type) === 'allweather') {
                 $course_name .= ' AW';
             }
+            $course_label = str_replace('_', ' ', $course_name);
 
             if ($course_name !== $current_course) {
                 $current_course = $course_name;
-                echo '<tr data-course-header="true">
-                    <td colspan="11">' . esc_html($current_course) . '</td>
+                echo '<tr class="race-course-header" data-course-header="true">
+                    <td class="race-cell race-cell--course" colspan="11">' . esc_html($course_label) . '</td>
                 </tr>';
             }
 
@@ -570,12 +571,13 @@ if (!empty($having_conditions)) {
             }
 
             $formatted_prize = $currency_symbol . number_format(floatval($row->prize_pos_1));
+            $furlongs = round($row->distance_yards / 220, 1);
             
             // Add badge styling for handicap
             $handicap_badge = '';
             if ($row->handicap !== null) {
                 $badge_color = ($row->handicap == 1) ? '#10b981' : '#6b7280';
-                $handicap_badge = '<span style="display:inline-block;padding:4px 8px;border-radius:6px;background:' . $badge_color . ';color:white;font-size:10px;font-weight:700;text-transform:uppercase;">' . $handicap_display . '</span>';
+                $handicap_badge = '<span class="race-handicap-badge" style="display:inline-block;padding:4px 8px;border-radius:6px;background:' . $badge_color . ';color:white;font-size:10px;font-weight:700;text-transform:uppercase;">' . $handicap_display . '</span>';
             } else {
                 $handicap_badge = '<span style="color:#9ca3af;">N/A</span>';
             }
@@ -592,18 +594,20 @@ if (!empty($having_conditions)) {
                 </div>';
             }
 
-            echo '<tr>
-                <td style="color:#3b82f6;font-weight:600;">' . date('H:i', strtotime($row->scheduled_time)) . '</td>
-                <td>' . esc_html($row->country) . '</td>
-                <td><a href="' . esc_url(bricks_race_url($row->race_id)) . '" class="race-link">🏁 ' . esc_html($row->race_title) . '</a>' . $tracker_alert_html . '</td>
-                <td style="color:#374151;font-weight:500;">' . esc_html($formatted_race_type) . '</td>
-                <td><span style="display:inline-block;padding:4px 10px;border-radius:6px;background:#dbeafe;color:#1e40af;font-weight:600;font-size:11px;">' . esc_html($row->class) . '</span></td>
-                <td>' . $handicap_badge . '</td>
-                <td style="color:#6b7280;">' . esc_html($row->age_range) . '</td>
-                <td style="font-family:monospace;color:#374151;">' . esc_html($row->distance_yards) . 'y</td>
-                <td style="font-family:monospace;color:#374151;">' . round($row->distance_yards / 220, 1) . 'f</td>
-                <td style="color:#059669;font-weight:700;">' . esc_html($formatted_prize) . '</td>
-                <td><span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:#eff6ff;color:#2563eb;font-weight:700;font-size:12px;">' . esc_html($row->runner_count) . '</span></td>
+            $time_str = date('H:i', strtotime($row->scheduled_time));
+
+            echo '<tr class="race-row">
+                <td class="race-cell race-cell--time" data-label="Time">' . esc_html($time_str) . '</td>
+                <td class="race-cell" data-label="Country">' . esc_html($row->country) . '</td>
+                <td class="race-cell race-cell--title" data-label="Title"><a href="' . esc_url(bricks_race_url($row->race_id)) . '" class="race-link">🏁 ' . esc_html($row->race_title) . '</a>' . $tracker_alert_html . '</td>
+                <td class="race-cell" data-label="Type">' . esc_html($formatted_race_type) . '</td>
+                <td class="race-cell" data-label="Class"><span class="race-class-badge">' . esc_html($row->class) . '</span></td>
+                <td class="race-cell" data-label="Handicap">' . $handicap_badge . '</td>
+                <td class="race-cell" data-label="Age">' . esc_html($row->age_range) . '</td>
+                <td class="race-cell race-cell--dist" data-label="Dist">' . esc_html($row->distance_yards) . 'y</td>
+                <td class="race-cell race-cell--furlongs" data-label="Furlongs">' . esc_html($furlongs) . 'f</td>
+                <td class="race-cell race-cell--prize" data-label="Prize">' . esc_html($formatted_prize) . '</td>
+                <td class="race-cell race-cell--runners" data-label="Runners"><span class="race-runners-badge">' . esc_html($row->runner_count) . '</span></td>
             </tr>';
         }
 
@@ -869,16 +873,61 @@ $dates[] = [
         }
 
         /* Course Header Rows */
-        .race-table tbody tr[data-course-header] {
+        .race-table tbody tr[data-course-header],
+        .race-table tbody tr.race-course-header {
             background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
         }
         
-        .race-table tbody tr[data-course-header] td {
+        .race-table tbody tr[data-course-header] td,
+        .race-table tbody tr.race-course-header td {
             color: white;
             font-weight: 700;
             font-size: 14px;
             padding: 12px;
             border: none;
+        }
+
+        .race-class-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            background: #dbeafe;
+            color: #1e40af;
+            font-weight: 600;
+            font-size: 11px;
+        }
+
+        .race-runners-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #eff6ff;
+            color: #2563eb;
+            font-weight: 700;
+            font-size: 12px;
+        }
+
+        .race-cell--time {
+            color: #3b82f6;
+            font-weight: 600;
+        }
+
+        .race-cell--prize {
+            color: #059669;
+            font-weight: 700;
+        }
+
+        .race-filters-toggle,
+        .race-mobile-toolbar {
+            display: none;
+        }
+
+        .race-table-scroll {
+            width: 100%;
+            max-width: 100%;
         }
 
         /* Links */
@@ -978,9 +1027,69 @@ $dates[] = [
             }
             
             .race-filters {
+                display: none;
                 grid-template-columns: 1fr 1fr;
                 gap: 10px;
                 padding: 12px;
+            }
+
+            .race-filters.is-open {
+                display: grid;
+            }
+
+            .race-filters-toggle {
+                display: flex;
+                width: 100%;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 10px;
+                padding: 12px 14px;
+                border: 1px solid #e2e8f0;
+                border-radius: 10px;
+                background: #f8fafc;
+                color: #0f172a;
+                font-weight: 700;
+                font-size: 14px;
+                cursor: pointer;
+            }
+
+            .race-filters-toggle__state {
+                color: #2563eb;
+                font-size: 12px;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+            }
+
+            .race-mobile-toolbar {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin: 0 0 12px;
+                padding: 10px 12px;
+                background: #f8fafc;
+                border: 1px solid #e2e8f0;
+                border-radius: 10px;
+            }
+
+            .race-mobile-toolbar__label {
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                color: #64748b;
+                flex-shrink: 0;
+            }
+
+            .race-mobile-toolbar__select {
+                flex: 1;
+                min-width: 0;
+                padding: 10px 12px;
+                border: 2px solid #e2e8f0;
+                border-radius: 8px;
+                background: #fff;
+                font-size: 16px;
+                font-weight: 600;
+                color: #0f172a;
             }
             
             .filter-group label {
@@ -1015,24 +1124,137 @@ $dates[] = [
             }
             
             #race-table-container {
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
+                overflow: visible;
                 border-radius: 10px;
+                border: none;
+                background: transparent;
             }
             
-            .race-table {
-                font-size: 11px;
-                min-width: 720px;
-            }
-            
+            .race-table,
+            .race-table thead,
+            .race-table tbody,
+            .race-table tr,
             .race-table th,
             .race-table td {
-                padding: 8px 6px;
+                display: block;
+                width: 100%;
+                max-width: 100%;
             }
-            
-            .race-table thead th {
+
+            .race-table {
+                font-size: 13px;
+                min-width: 0 !important;
+                border: none;
+            }
+
+            .race-table thead {
+                display: none !important;
+            }
+
+            .race-table tbody {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .race-table tbody tr.race-course-header,
+            .race-table tbody tr[data-course-header] {
+                display: block;
+                border-radius: 10px;
+                overflow: hidden;
+            }
+
+            .race-table tbody tr.race-row {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px 12px;
+                padding: 12px;
+                background: #fff;
+                border: 1px solid #e2e8f0;
+                border-radius: 12px;
+                box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+            }
+
+            .race-table tbody tr.race-row:hover {
+                background: #fff;
+            }
+
+            .race-table tbody tr.race-row td.race-cell {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 8px;
+                padding: 0 !important;
+                border: none !important;
+                min-width: 0;
+            }
+
+            .race-table tbody tr.race-row td.race-cell::before {
+                content: attr(data-label);
                 font-size: 10px;
-                padding: 10px 6px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                color: #64748b;
+                flex-shrink: 0;
+            }
+
+            .race-table tbody tr.race-row td.race-cell > * {
+                margin-left: auto;
+                text-align: right;
+            }
+
+            .race-table tbody tr.race-row td.race-cell--time {
+                order: -20;
+                grid-column: 1;
+                justify-content: flex-start;
+                font-size: 18px;
+            }
+
+            .race-table tbody tr.race-row td.race-cell--time::before {
+                display: none;
+            }
+
+            .race-table tbody tr.race-row td.race-cell--runners {
+                order: -19;
+                grid-column: 2;
+                justify-content: flex-end;
+            }
+
+            .race-table tbody tr.race-row td.race-cell--runners::before {
+                display: none;
+            }
+
+            .race-table tbody tr.race-row td.race-cell--title {
+                order: -18;
+                grid-column: 1 / -1;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+                padding-bottom: 8px !important;
+                border-bottom: 1px solid #e2e8f0 !important;
+            }
+
+            .race-table tbody tr.race-row td.race-cell--title::before {
+                display: none;
+            }
+
+            .race-table tbody tr.race-row td.race-cell--title > * {
+                margin-left: 0;
+                text-align: left;
+                width: 100%;
+            }
+
+            .race-table tbody tr.race-row td.race-cell--title .race-link {
+                font-size: 15px;
+                line-height: 1.3;
+            }
+
+            .race-table tbody tr.race-row td.race-cell--prize {
+                grid-column: 1 / -1;
+                background: #f0fdf4;
+                border-radius: 8px;
+                padding: 8px 10px !important;
             }
             
             .race-pagination-wrapper {
@@ -1056,13 +1278,9 @@ $dates[] = [
                 padding: 10px;
             }
             
-            .race-table {
-                font-size: 10px;
-            }
-            
-            .race-table th,
-            .race-table td {
-                padding: 6px 4px;
+            .race-table tbody tr.race-row {
+                padding: 10px;
+                gap: 7px 10px;
             }
             
             .race-pagination-btn {
@@ -1084,7 +1302,12 @@ $dates[] = [
         }
     ?>>
 
-    <div class="race-filters">
+    <button type="button" class="race-filters-toggle" id="raceFiltersToggle" aria-expanded="false" aria-controls="raceFiltersPanel">
+        <span>Filters</span>
+        <span class="race-filters-toggle__state">Show</span>
+    </button>
+
+    <div class="race-filters" id="raceFiltersPanel">
         <div class="filter-group">
             <label for="race-country-filter">Country:</label>
             <select id="race-country-filter" class="race-filter">
@@ -1174,7 +1397,20 @@ $dates[] = [
     <?php endforeach; ?>
 </div>
 
-
+    <div class="race-mobile-toolbar">
+        <label class="race-mobile-toolbar__label" for="raceMobileSort">Sort by</label>
+        <select id="raceMobileSort" class="race-mobile-toolbar__select" aria-label="Sort races">
+            <option value="scheduled_time" selected>Time</option>
+            <option value="country">Country</option>
+            <option value="race_type">Type</option>
+            <option value="class">Class</option>
+            <option value="handicap">Handicap</option>
+            <option value="age_range">Age</option>
+            <option value="distance_yards">Distance</option>
+            <option value="prize_pos_1">Prize</option>
+            <option value="runner_count">Runners</option>
+        </select>
+    </div>
 
     <div id="race-table-container">
         <div style="text-align:center;padding:60px 20px;color:#6b7280;">

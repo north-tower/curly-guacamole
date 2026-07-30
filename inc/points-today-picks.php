@@ -180,109 +180,84 @@ if (!function_exists('bricks_points_today_picks_shortcode')) {
 
         ob_start();
         ?>
-        <style>
-            @media print {
-                .tp-no-print { display: none !important; }
-                .tp-print-root {
-                    max-width: none !important;
-                    margin: 0 !important;
-                    padding: 0 !important;
-                }
-                .tp-card, .tp-course-block {
-                    break-inside: avoid;
-                    page-break-inside: avoid;
-                }
-                body { background: #fff !important; }
-            }
-        </style>
-        <div class="tp-print-root" style="max-width:1100px;margin:24px auto;padding:0 16px 40px;">
-            <div class="tp-no-print" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px;">
-                <form method="get" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+        <div class="tp-print-root points-today-picks">
+            <div class="tp-toolbar tp-no-print">
+                <form method="get" class="tp-date-form">
                     <input type="hidden" name="my_today_picks" value="1" />
-                    <label style="font-size:12px;color:#374151;">Meeting date<br>
-                        <input type="date" name="tp_date" value="<?php echo esc_attr($meeting_date); ?>" style="padding:8px;border:1px solid #d1d5db;border-radius:8px;">
+                    <label class="admin-pnl-field">
+                        <span class="admin-pnl-label">Meeting date</span>
+                        <input type="date" name="tp_date" value="<?php echo esc_attr($meeting_date); ?>">
                     </label>
-                    <button type="submit" style="padding:9px 14px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;">Show picks</button>
+                    <button type="submit" class="fhor-btn fhor-btn--primary">Show picks</button>
                 </form>
-                <button type="button" onclick="window.print();" style="padding:9px 14px;border:none;border-radius:8px;background:#0f766e;color:#fff;font-weight:700;cursor:pointer;">Print / screenshot</button>
-                <a href="<?php echo esc_url($backtest_url); ?>" style="padding:9px 14px;border-radius:8px;background:#ecfdf5;color:#065f46;font-weight:700;text-decoration:none;border:1px solid #6ee7b7;">Open backtest for this date</a>
+                <div class="tp-toolbar-actions">
+                    <button type="button" class="fhor-btn fhor-btn--secondary" onclick="window.print();">Print / screenshot</button>
+                    <a href="<?php echo esc_url($backtest_url); ?>" class="fhor-btn fhor-btn--accent">Open backtest for this date</a>
+                </div>
             </div>
 
-            <div class="tp-card" style="background:#fff;border:2px solid #111827;border-radius:12px;padding:18px 20px;margin-bottom:16px;">
-                <h1 style="margin:0 0 4px;font-size:28px;font-weight:800;color:#111827;">Points Engine — Published Picks</h1>
-                <p style="margin:0 0 10px;font-size:16px;color:#374151;">
+            <div class="tp-card">
+                <h1>Points Engine — Published Picks</h1>
+                <p class="tp-card-date">
                     <strong><?php echo esc_html(wp_date('l j F Y', strtotime($meeting_date))); ?></strong>
-                    <span style="color:#6b7280;">(<?php echo esc_html($meeting_date); ?>)</span>
+                    <span>(<?php echo esc_html($meeting_date); ?>)</span>
                 </p>
-                <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:13px;color:#374151;">
-                    <span style="background:#f3f4f6;border-radius:8px;padding:6px 10px;">Saved picks: <strong><?php echo esc_html($saved); ?></strong><?php echo $expected > 0 ? ' / ' . esc_html($expected) . ' races' : ''; ?></span>
-                    <span style="background:#f3f4f6;border-radius:8px;padding:6px 10px;">Generated: <strong><?php echo esc_html($generated_at); ?></strong></span>
+                <div class="tp-card-meta">
+                    <span class="fhor-stat-chip">Saved picks: <strong><?php echo esc_html($saved); ?></strong><?php echo $expected > 0 ? ' / ' . esc_html($expected) . ' races' : ''; ?></span>
+                    <span class="fhor-stat-chip">Generated: <strong><?php echo esc_html($generated_at); ?></strong></span>
                     <?php if ($meeting_date === $today): ?>
-                    <span style="background:#eff6ff;border-radius:8px;padding:6px 10px;color:#1e40af;">Tomorrow: backtest this card with <strong>Yesterday = <?php echo esc_html($today); ?></strong> (Published picks)</span>
+                    <span class="fhor-stat-chip fhor-stat-chip--info">Tomorrow: backtest this card with <strong>Yesterday = <?php echo esc_html($today); ?></strong> (Published picks)</span>
                     <?php elseif ($meeting_date === $yesterday): ?>
-                    <span style="background:#ecfdf5;border-radius:8px;padding:6px 10px;color:#065f46;">Ready to compare with backtest for <?php echo esc_html($meeting_date); ?></span>
+                    <span class="fhor-stat-chip fhor-stat-chip--success">Ready to compare with backtest for <?php echo esc_html($meeting_date); ?></span>
                     <?php endif; ?>
                 </div>
             </div>
 
             <?php if ($saved === 0): ?>
-            <div class="tp-no-print" style="margin-bottom:14px;padding:12px 14px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:13px;">
+            <div class="fhor-alert fhor-alert--warn tp-no-print">
                 No published picks saved for this date yet. Run <code>CALL points_published_picks_daily_UPDATE();</code> after the speed table rebuild, or open race pages while logged in.
             </div>
             <?php endif; ?>
 
             <?php if (!empty($missing)): ?>
-            <div class="tp-no-print" style="margin-bottom:14px;padding:12px 14px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:13px;">
+            <div class="fhor-alert fhor-alert--error tp-no-print">
                 <strong><?php echo esc_html(count($missing)); ?></strong> race(s) on the card have no saved pick yet (not included below).
             </div>
             <?php endif; ?>
 
             <?php foreach ($by_course as $course => $course_picks): ?>
-            <div class="tp-course-block" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:14px;overflow:hidden;">
-                <div style="background:#111827;color:#fff;padding:10px 14px;font-size:15px;font-weight:800;">
+            <div class="tp-course-block">
+                <div class="tp-course-header">
                     <?php echo esc_html(bricks_points_today_picks_format_course($course)); ?>
-                    <span style="font-weight:600;opacity:0.85;">(<?php echo esc_html(count($course_picks)); ?> races)</span>
+                    <span class="tp-course-count">(<?php echo esc_html(count($course_picks)); ?> races)</span>
                 </div>
-                <div style="overflow:auto;">
-                    <table style="width:100%;border-collapse:collapse;min-width:760px;font-size:14px;">
+                <div class="tp-picks-table-wrap">
+                    <table class="tp-picks-table">
                         <thead>
                             <tr>
-                                <th style="text-align:left;padding:10px 12px;border-bottom:1px solid #e5e7eb;background:#f9fafb;width:70px;">Time</th>
-                                <th style="text-align:left;padding:10px 12px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Race</th>
-                                <th style="text-align:left;padding:10px 12px;border-bottom:1px solid #e5e7eb;background:#f9fafb;width:140px;">Win</th>
-                                <th style="text-align:left;padding:10px 12px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Place (top 3)</th>
-                                <th style="text-align:left;padding:10px 12px;border-bottom:1px solid #e5e7eb;background:#f9fafb;width:120px;">EW Simple</th>
-                                <th style="text-align:left;padding:10px 12px;border-bottom:1px solid #e5e7eb;background:#f9fafb;width:120px;">EW Edge</th>
-                                <th style="text-align:left;padding:10px 12px;border-bottom:1px solid #e5e7eb;background:#f9fafb;width:80px;">Source</th>
+                                <th>Time</th>
+                                <th>Race</th>
+                                <th>Win</th>
+                                <th>Place (top 3)</th>
+                                <th>EW Simple</th>
+                                <th>EW Edge</th>
+                                <th>Source</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($course_picks as $pick): ?>
-                            <tr>
-                                <td style="padding:10px 12px;border-bottom:1px solid #f3f4f6;font-weight:700;white-space:nowrap;">
-                                    <?php echo esc_html(bricks_points_today_picks_format_time($pick->scheduled_time ?? '')); ?>
-                                </td>
-                                <td style="padding:10px 12px;border-bottom:1px solid #f3f4f6;color:#475569;font-size:13px;">
-                                    <?php echo esc_html(wp_trim_words((string) ($pick->race_title ?? ''), 10, '…')); ?>
-                                </td>
-                                <td style="padding:10px 12px;border-bottom:1px solid #f3f4f6;font-weight:800;color:#111827;">
-                                    <?php echo esc_html($pick->win_horse ?: '—'); ?>
-                                </td>
-                                <td style="padding:10px 12px;border-bottom:1px solid #f3f4f6;">
-                                    <?php
-                                    $places = is_array($pick->place_list ?? null) ? $pick->place_list : [];
-                                    echo esc_html(!empty($places) ? implode(' · ', $places) : '—');
-                                    ?>
-                                </td>
-                                <td style="padding:10px 12px;border-bottom:1px solid #f3f4f6;">
-                                    <?php echo esc_html($pick->ew_simple_horse ?: '—'); ?>
-                                </td>
-                                <td style="padding:10px 12px;border-bottom:1px solid #f3f4f6;">
-                                    <?php echo esc_html($pick->ew_edge_horse ?: '—'); ?>
-                                </td>
-                                <td style="padding:10px 12px;border-bottom:1px solid #f3f4f6;font-size:11px;color:#6b7280;">
-                                    <?php echo esc_html($pick->source ?? ''); ?>
-                                </td>
+                            <?php
+                            $places = is_array($pick->place_list ?? null) ? $pick->place_list : [];
+                            $places_display = !empty($places) ? implode(' · ', $places) : '—';
+                            ?>
+                            <tr class="tp-pick-row">
+                                <td class="tp-pick-cell tp-pick-cell--time" data-label="Time"><?php echo esc_html(bricks_points_today_picks_format_time($pick->scheduled_time ?? '')); ?></td>
+                                <td class="tp-pick-cell tp-pick-cell--race" data-label="Race"><?php echo esc_html(wp_trim_words((string) ($pick->race_title ?? ''), 10, '…')); ?></td>
+                                <td class="tp-pick-cell tp-pick-cell--win" data-label="Win"><?php echo esc_html($pick->win_horse ?: '—'); ?></td>
+                                <td class="tp-pick-cell" data-label="Place (top 3)"><?php echo esc_html($places_display); ?></td>
+                                <td class="tp-pick-cell" data-label="EW Simple"><?php echo esc_html($pick->ew_simple_horse ?: '—'); ?></td>
+                                <td class="tp-pick-cell" data-label="EW Edge"><?php echo esc_html($pick->ew_edge_horse ?: '—'); ?></td>
+                                <td class="tp-pick-cell tp-pick-cell--source" data-label="Source"><?php echo esc_html($pick->source ?? ''); ?></td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -292,11 +267,11 @@ if (!function_exists('bricks_points_today_picks_shortcode')) {
             <?php endforeach; ?>
 
             <?php if (!empty($missing)): ?>
-            <div class="tp-course-block tp-no-print" style="background:#fff;border:1px solid #fecaca;border-radius:12px;margin-bottom:14px;overflow:hidden;">
-                <div style="background:#991b1b;color:#fff;padding:10px 14px;font-size:15px;font-weight:800;">
+            <div class="tp-course-block tp-course-block--missing tp-no-print">
+                <div class="tp-course-header tp-course-header--missing">
                     Missing picks (<?php echo esc_html(count($missing)); ?>)
                 </div>
-                <ul style="margin:0;padding:12px 18px 12px 32px;font-size:13px;color:#7f1d1d;">
+                <ul class="tp-missing-list">
                     <?php foreach ($missing as $race): ?>
                     <li>
                         <?php echo esc_html(bricks_points_today_picks_format_time($race->scheduled_time ?? '')); ?>

@@ -65,9 +65,35 @@ jQuery(document).ready(function($) {
 
         $('.race-table th.sortable').removeClass('sorted-asc sorted-desc active-column');
         $(this).addClass('sorted-' + currentSort.direction + ' active-column');
+        syncMobileSortSelect(column);
 
         currentPage = 1;
         loadRaceTable();
+    });
+
+    $('#raceMobileSort').on('change', function() {
+        const column = $(this).val();
+        if (!column) {
+            return;
+        }
+        currentSort.column = column;
+        currentSort.direction = (column === 'scheduled_time' || column === 'country' || column === 'race_type' || column === 'age_range') ? 'asc' : 'desc';
+        currentPage = 1;
+        loadRaceTable();
+    });
+
+    function syncMobileSortSelect(column) {
+        const $select = $('#raceMobileSort');
+        if ($select.length && $select.find('option[value="' + column + '"]').length) {
+            $select.val(column);
+        }
+    }
+
+    $('#raceFiltersToggle').on('click', function() {
+        const $filters = $('.race-filters');
+        const open = $filters.toggleClass('is-open').hasClass('is-open');
+        $(this).attr('aria-expanded', open ? 'true' : 'false');
+        $(this).find('.race-filters-toggle__state').text(open ? 'Hide' : 'Show');
     });
 
     function loadFilterOptions(date) {
@@ -149,6 +175,7 @@ jQuery(document).ready(function($) {
                 if (currentSort.column) {
                     $('.race-table th[data-sort="' + currentSort.column + '"]')
                         .addClass('sorted-' + currentSort.direction + ' active-column');
+                    syncMobileSortSelect(currentSort.column);
                 }
             },
             error: function(xhr, status, error) {
@@ -189,6 +216,7 @@ jQuery(document).ready(function($) {
                 if (currentSort.column) {
                     $('.race-table th[data-sort="' + currentSort.column + '"]')
                         .addClass('sorted-' + currentSort.direction + ' active-column');
+                    syncMobileSortSelect(currentSort.column);
                 }
             },
             error: function() {

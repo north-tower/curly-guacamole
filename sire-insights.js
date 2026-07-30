@@ -54,6 +54,7 @@ jQuery(document).ready(function($) {
                 }
                 if (response && response.effective_date) {
                     $('#sire-date-filter').val(response.effective_date);
+                    $('#sire-display-date').text(response.effective_date);
                 }
                 updateSelect('#sire-course-filter', response.courses, 'All Courses');
                 updateSelect('#sire-type-filter', response.race_types, 'All Types');
@@ -80,6 +81,7 @@ jQuery(document).ready(function($) {
                     $active.addClass('sorted-' + currentSort.direction);
                     $active.find('.sort-indicator').text(currentSort.direction === 'asc' ? '▲' : '▼');
                 }
+                syncMobileSort();
             },
             error: function() {
                 $container.html('<div style="padding:14px;color:#991b1b;background:#fee2e2;border-radius:8px;">Failed to load sire insights.</div>');
@@ -87,7 +89,40 @@ jQuery(document).ready(function($) {
         });
     }
 
+    function syncMobileSort() {
+        const $sort = $('#sireMobileSort');
+        if (!$sort.length) {
+            return;
+        }
+        $sort.val(currentSort.column);
+    }
+
+    $('#sireFiltersToggle').on('click', function() {
+        const $panel = $('#sireFiltersPanel');
+        const $state = $(this).find('.race-filters-toggle__state');
+        $panel.toggleClass('is-open');
+        const isOpen = $panel.hasClass('is-open');
+        $(this).attr('aria-expanded', isOpen);
+        $state.text(isOpen ? 'Hide' : 'Show');
+    });
+
+    $('#sireMobileSort').on('change', function() {
+        const nextColumn = $(this).val();
+        if (!nextColumn) {
+            return;
+        }
+        if (currentSort.column === nextColumn) {
+            currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+            currentSort.column = nextColumn;
+            currentSort.direction = 'desc';
+        }
+        currentPage = 1;
+        loadTable();
+    });
+
     $('#sire-apply-btn').on('click', function() {
+        $('#sire-display-date').text($('#sire-date-filter').val() || sire_insights_ajax_obj.default_date);
         currentPage = 1;
         loadTable();
     });

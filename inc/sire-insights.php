@@ -359,7 +359,7 @@ if (!function_exists('bricks_sire_insights_render_table_html')) {
                 </thead>
                 <tbody>
                     <?php if (empty($rows)): ?>
-                        <tr>
+                        <tr class="sire-row sire-row--empty">
                             <td colspan="15" class="sire-empty-cell">No sire insights found for current filters.</td>
                         </tr>
                     <?php else: ?>
@@ -377,27 +377,27 @@ if (!function_exists('bricks_sire_insights_render_table_html')) {
                                 }
                             }
                             ?>
-                            <tr>
-                                <td><?php echo esc_html($row->race_id ?? '-'); ?></td>
-                                <td class="horse-name"><?php echo esc_html($row->runner_id ?? '-'); ?></td>
-                                <td class="sire-name"><?php echo esc_html($row->sire_name ?? '-'); ?></td>
-                                <td><?php echo bricks_sire_insights_badge($row->course ?? '', 'blue'); ?></td>
-                                <td><?php echo bricks_sire_insights_badge($row->race_code ?? '', 'slate'); ?></td>
-                                <td><?php echo bricks_sire_insights_badge($row->race_type ?? '', 'violet'); ?></td>
-                                <td><?php echo esc_html($row->distance_band ?? '-'); ?></td>
-                                <td><?php echo esc_html($row->age ?? '-'); ?></td>
-                                <td><?php echo esc_html(isset($row->handicap) ? intval($row->handicap) : '-'); ?></td>
-                                <td class="ta-right">
+                            <tr class="sire-row">
+                                <td class="sire-cell" data-label="Race ID"><?php echo esc_html($row->race_id ?? '-'); ?></td>
+                                <td class="sire-cell horse-name" data-label="Runner ID"><?php echo esc_html($row->runner_id ?? '-'); ?></td>
+                                <td class="sire-cell sire-cell--sire sire-name" data-label="Sire"><?php echo esc_html($row->sire_name ?? '-'); ?></td>
+                                <td class="sire-cell" data-label="Course"><?php echo bricks_sire_insights_badge($row->course ?? '', 'blue'); ?></td>
+                                <td class="sire-cell" data-label="Code"><?php echo bricks_sire_insights_badge($row->race_code ?? '', 'slate'); ?></td>
+                                <td class="sire-cell" data-label="Type"><?php echo bricks_sire_insights_badge($row->race_type ?? '', 'violet'); ?></td>
+                                <td class="sire-cell" data-label="Dist (f)"><?php echo esc_html($row->distance_band ?? '-'); ?></td>
+                                <td class="sire-cell" data-label="Age"><?php echo esc_html($row->age ?? '-'); ?></td>
+                                <td class="sire-cell" data-label="Hcap"><?php echo esc_html(isset($row->handicap) ? intval($row->handicap) : '-'); ?></td>
+                                <td class="sire-cell sire-cell--prb ta-right" data-label="RT 5Y PRB">
                                     <?php if ($prb === null): ?>
                                         <span class="prb-score prb-neutral">-</span>
                                     <?php else: ?>
                                         <span class="prb-score <?php echo esc_attr($prb_class); ?>"><?php echo esc_html(number_format($prb, 1)); ?></span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="ta-right"><?php echo esc_html($row->rc_21d_prb !== null ? number_format((float) $row->rc_21d_prb, 1) : '-'); ?></td>
-                                <td class="ta-right"><?php echo esc_html($row->course_prb !== null ? number_format((float) $row->course_prb, 1) : '-'); ?></td>
-                                <td class="ta-right"><?php echo esc_html($row->distance_prb !== null ? number_format((float) $row->distance_prb, 1) : '-'); ?></td>
-                                <td class="ta-right"><?php echo esc_html($row->candd_prb !== null ? number_format((float) $row->candd_prb, 1) : '-'); ?></td>
+                                <td class="sire-cell ta-right" data-label="RC 21D PRB"><?php echo esc_html($row->rc_21d_prb !== null ? number_format((float) $row->rc_21d_prb, 1) : '-'); ?></td>
+                                <td class="sire-cell ta-right" data-label="Course PRB"><?php echo esc_html($row->course_prb !== null ? number_format((float) $row->course_prb, 1) : '-'); ?></td>
+                                <td class="sire-cell ta-right" data-label="Dist PRB"><?php echo esc_html($row->distance_prb !== null ? number_format((float) $row->distance_prb, 1) : '-'); ?></td>
+                                <td class="sire-cell ta-right" data-label="C&amp;D PRB"><?php echo esc_html($row->candd_prb !== null ? number_format((float) $row->candd_prb, 1) : '-'); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -578,10 +578,15 @@ if (!function_exists('bricks_daily_sires_insights_shortcode')) {
         <div class="daily-sires-insights-wrapper">
             <div class="sire-header-row">
                 <h3>Daily Sire Insights</h3>
-                <div class="sire-date-label">Date: <?php echo esc_html($default_date); ?></div>
+                <div class="sire-date-label">Date: <span id="sire-display-date"><?php echo esc_html($default_date); ?></span></div>
             </div>
 
-            <div class="sire-insights-filters">
+            <button type="button" class="race-filters-toggle sire-filters-toggle" id="sireFiltersToggle" aria-expanded="false" aria-controls="sireFiltersPanel">
+                <span>Filters</span>
+                <span class="race-filters-toggle__state">Show</span>
+            </button>
+
+            <div class="sire-insights-filters" id="sireFiltersPanel">
                 <div class="filter-group">
                     <label for="sire-date-filter">Date</label>
                     <input type="date" id="sire-date-filter" value="<?php echo esc_attr($default_date); ?>" />
@@ -609,54 +614,31 @@ if (!function_exists('bricks_daily_sires_insights_shortcode')) {
             </div>
 
             <div class="sire-actions-row">
-                <button type="button" id="sire-apply-btn">Apply Filters</button>
-                <button type="button" id="sire-reset-btn">Reset</button>
+                <button type="button" id="sire-apply-btn" class="fhor-btn fhor-btn--primary">Apply Filters</button>
+                <button type="button" id="sire-reset-btn" class="fhor-btn fhor-btn--secondary">Reset</button>
+            </div>
+
+            <div class="race-mobile-toolbar sire-mobile-toolbar">
+                <label class="race-mobile-toolbar__label" for="sireMobileSort">Sort by</label>
+                <select id="sireMobileSort" class="race-mobile-toolbar__select" aria-label="Sort sire insights">
+                    <option value="mean_prb">RT 5Y PRB</option>
+                    <option value="sire_name">Sire</option>
+                    <option value="race_id">Race ID</option>
+                    <option value="runner_id">Runner ID</option>
+                    <option value="course">Course</option>
+                    <option value="race_type">Type</option>
+                    <option value="distance_band">Distance</option>
+                    <option value="rc_21d_prb">RC 21D PRB</option>
+                    <option value="course_prb">Course PRB</option>
+                    <option value="distance_prb">Dist PRB</option>
+                    <option value="candd_prb">C&amp;D PRB</option>
+                </select>
             </div>
 
             <div id="sire-insights-table-container">
                 <div style="text-align:center;padding:28px;color:#6b7280;">Loading sire insights...</div>
             </div>
         </div>
-        <style>
-        .daily-sires-insights-wrapper { background: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 100%); border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px; box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06); }
-        .sire-header-row { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
-        .sire-header-row h3 { margin:0; color:#111827; font-size:24px; font-weight:800; }
-        .sire-date-label { font-size:12px; color:#6b7280; font-weight:600; }
-        .sire-insights-filters { display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:10px; margin-bottom:12px; }
-        .filter-group label { display:block; margin-bottom:6px; color:#374151; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.4px; }
-        .sire-insights-filters select, .sire-insights-filters input[type="date"] { width:100%; border:2px solid #e5e7eb; border-radius:8px; background:#fff; color:#111827; padding:9px 10px; font-size:13px; }
-        .sire-insights-filters select:focus, .sire-insights-filters input[type="date"]:focus { outline:none; border-color:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,0.12); }
-        .sire-actions-row { display:flex; gap:8px; margin-bottom:12px; }
-        #sire-apply-btn, #sire-reset-btn { border:none; border-radius:8px; padding:10px 14px; font-size:13px; font-weight:700; cursor:pointer; }
-        #sire-apply-btn { background:#2563eb; color:#fff; }
-        #sire-reset-btn { background:#f3f4f6; color:#111827; border:1px solid #d1d5db; }
-        .sire-insights-table-wrap { overflow-x:auto; border:1px solid #e5e7eb; border-radius:10px; background:#fff; }
-        .sire-insights-table { width:100%; border-collapse:collapse; min-width:960px; }
-        .sire-insights-table th, .sire-insights-table td { padding:11px 12px; border-bottom:1px solid #f3f4f6; text-align:left; vertical-align:middle; }
-        .sire-insights-table thead th { background:#111827; color:#fff; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.45px; cursor:pointer; user-select:none; white-space:nowrap; }
-        .sire-insights-table tbody tr:hover { background:#f8fafc; }
-        .sire-insights-table .horse-name { font-weight:700; color:#111827; }
-        .sire-insights-table .sire-name { color:#1f2937; font-weight:600; }
-        .ta-right { text-align:right !important; }
-        .sort-indicator { margin-left:6px; opacity:0.7; font-size:10px; }
-        .sire-empty-cell { padding:16px; text-align:center; color:#6b7280; }
-        .sire-pill { display:inline-flex; align-items:center; border-radius:999px; padding:3px 8px; font-size:11px; font-weight:700; border:1px solid transparent; }
-        .sire-pill-blue { background:#eff6ff; border-color:#bfdbfe; color:#1e40af; }
-        .sire-pill-violet { background:#f5f3ff; border-color:#ddd6fe; color:#5b21b6; }
-        .sire-pill-emerald { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
-        .sire-pill-amber { background:#fffbeb; border-color:#fde68a; color:#92400e; }
-        .sire-pill-slate { background:#f8fafc; border-color:#e2e8f0; color:#334155; }
-        .sire-pill-empty { color:#9ca3af; }
-        .prb-score { display:inline-flex; min-width:50px; justify-content:center; border-radius:8px; padding:4px 8px; font-size:12px; font-weight:800; }
-        .prb-strong { background:#dcfce7; color:#166534; }
-        .prb-good { background:#ecfeff; color:#155e75; }
-        .prb-neutral { background:#f3f4f6; color:#374151; }
-        .prb-weak { background:#fee2e2; color:#991b1b; }
-        @media (max-width: 768px) {
-            .daily-sires-insights-wrapper { padding:14px; }
-            .sire-header-row h3 { font-size:20px; }
-        }
-        </style>
         <?php
         return ob_get_clean();
     }
