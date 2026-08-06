@@ -176,6 +176,7 @@ if (!function_exists('bricks_cache_key')) {
 if (!function_exists('bricks_flush_filter_option_caches')) {
     function bricks_flush_filter_option_caches() {
         bricks_bump_cache_namespace_version('race_filters');
+        bricks_bump_cache_namespace_version('race_table');
         bricks_bump_cache_namespace_version('speed_filters');
         bricks_bump_cache_namespace_version('horse_filters');
         bricks_bump_cache_namespace_version('sire_filters');
@@ -187,6 +188,7 @@ if (!function_exists('bricks_get_filter_cache_versions')) {
     function bricks_get_filter_cache_versions() {
         return [
             'race_filters' => bricks_cache_namespace_version('race_filters'),
+            'race_table' => bricks_cache_namespace_version('race_table'),
             'speed_filters' => bricks_cache_namespace_version('speed_filters'),
             'horse_filters' => bricks_cache_namespace_version('horse_filters'),
             'sire_filters' => bricks_cache_namespace_version('sire_filters'),

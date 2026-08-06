@@ -5,14 +5,26 @@ jQuery(document).ready(function($) {
 
     const $wrapper = $('.race-table-wrapper').first();
     const lockedCourse = $wrapper.data('locked-course') || race_ajax_obj.locked_course || '';
+    const isArchive = String($wrapper.data('archive') || race_ajax_obj.is_archive || '0') === '1';
+    const wrapperDefaultDate = $wrapper.data('default-date') || race_ajax_obj.default_date;
+    if (wrapperDefaultDate) {
+        currentFilters.date = wrapperDefaultDate;
+    }
     if (lockedCourse) {
         $('#race-course-filter').val(lockedCourse);
         currentFilters.course = lockedCourse;
     }
 
-    loadRaceTable();
+    const $container = $('#race-table-container');
+    const hasSsr = String($container.data('ssr') || '') === '1' || $container.find('.race-table').length > 0;
+    if (!hasSsr) {
+        loadRaceTable();
+    }
 
     $('.race-date-tab').on('click', function() {
+        if (isArchive) {
+            return;
+        }
         $('.race-date-tab').removeClass('active');
         $(this).addClass('active');
         const selectedDate = $(this).data('date');

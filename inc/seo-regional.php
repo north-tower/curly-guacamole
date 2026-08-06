@@ -122,6 +122,10 @@ if (!function_exists('bricks_seo_is_dashboard_request')) {
         if (!function_exists('bricks_request_uri_contains')) {
             return false;
         }
+        // Archive URLs contain "/daily/" but are not the live hub.
+        if ($slug === 'daily' && function_exists('bricks_daily_archive_is_request') && bricks_daily_archive_is_request()) {
+            return false;
+        }
         return bricks_request_uri_contains(['/' . trim($slug, '/')]);
     }
 }

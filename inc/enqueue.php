@@ -61,10 +61,24 @@ function bricks_race_table_enqueue_scripts() {
     }
 
     $localize_handle = wp_script_is('race-table-ajax', 'enqueued') ? 'race-table-ajax' : 'jquery';
+    $default_date = function_exists('bricks_daily_archive_today')
+        ? bricks_daily_archive_today()
+        : date('Y-m-d');
+    $is_archive = function_exists('bricks_daily_archive_is_request') && bricks_daily_archive_is_request();
+    if ($is_archive && function_exists('bricks_daily_archive_resolve_date_from_request')) {
+        $archive_date = bricks_daily_archive_resolve_date_from_request();
+        if ($archive_date) {
+            $default_date = $archive_date;
+        }
+    }
+
     wp_localize_script($localize_handle, 'race_ajax_obj', [
         'ajax_url' => admin_url('admin-ajax.php'),
-        'default_date' => date('Y-m-d'),
-        'version' => time()
+        'default_date' => $default_date,
+        'is_archive' => $is_archive ? 1 : 0,
+        'version' => function_exists('bricks_cache_namespace_version')
+            ? (string) bricks_cache_namespace_version('race_table')
+            : (string) time(),
     ]);
 }
 add_action('wp_enqueue_scripts', 'bricks_race_table_enqueue_scripts');

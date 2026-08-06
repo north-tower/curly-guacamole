@@ -1163,7 +1163,9 @@ if (!function_exists('bricks_seo_is_ratings_dashboard_request')) {
             return 'track';
         }
         if (function_exists('bricks_request_uri_contains')) {
-            if (bricks_request_uri_contains(['/daily'])) {
+            if (bricks_request_uri_contains(['/daily'])
+                && !(function_exists('bricks_daily_archive_is_request') && bricks_daily_archive_is_request())
+            ) {
                 return 'daily';
             }
             if (bricks_request_uri_contains(['/speed'])) {

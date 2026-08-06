@@ -41,14 +41,15 @@ add_filter( 'bricks/builder/i18n', function( $i18n ) {
   return $i18n;
 } );
 
-require_once __DIR__ . '/inc/helpers-core.php';
-require_once __DIR__ . '/inc/race-detail-perf.php';
-require_once __DIR__ . '/inc/enqueue.php';
-require_once __DIR__ . '/inc/rewrites.php';
-require_once __DIR__ . '/inc/seo.php';
-require_once __DIR__ . '/inc/seo-regional.php';
-require_once __DIR__ . '/inc/tracker.php';
-require_once __DIR__ . '/inc/race-table.php';
+    require_once __DIR__ . '/inc/helpers-core.php';
+    require_once __DIR__ . '/inc/race-detail-perf.php';
+    require_once __DIR__ . '/inc/enqueue.php';
+    require_once __DIR__ . '/inc/rewrites.php';
+    require_once __DIR__ . '/inc/seo.php';
+    require_once __DIR__ . '/inc/seo-regional.php';
+    require_once __DIR__ . '/inc/daily-archive.php';
+    require_once __DIR__ . '/inc/tracker.php';
+    require_once __DIR__ . '/inc/race-table.php';
 require_once __DIR__ . '/inc/speed-performance.php';
 require_once __DIR__ . '/inc/pace-map.php';
 require_once __DIR__ . '/inc/running-style.php';

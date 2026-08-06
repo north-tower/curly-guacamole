@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/race-table-query.php';
 /**
  * Race table feature: shortcode, AJAX, and inline UI script.
  */
@@ -266,17 +267,15 @@ function bricks_get_race_filter_options() {
 
     $date = !empty($_POST['date']) ? sanitize_text_field($_POST['date']) : date('Y-m-d');
 
-    // FIXED: Determine which table to use based on date
-    $today = date('Y-m-d');
-    $tomorrow = date('Y-m-d', strtotime('+1 day'));
-    
-    if ($date === $tomorrow) {
-        $table = 'advance_daily_races';
+    if (function_exists('bricks_race_tables_for_date')) {
+        $tables = bricks_race_tables_for_date($date);
+        $table = $tables['races'];
     } else {
-        $table = 'advance_daily_races_beta';
+        $tomorrow = date('Y-m-d', strtotime('+1 day'));
+        $table = ($date === $tomorrow) ? 'advance_daily_races' : 'advance_daily_races_beta';
     }
 
-    $cache_key = 'race_filter_opts_' . md5($table . '|' . $date);
+    $cache_key = function_exists('bricks_cache_key') ? bricks_cache_key('race_filters', array($table, $date)) : ('race_filter_opts_' . md5($table . '|' . $date));
     $cached = get_transient($cache_key);
     if ($cached !== false && is_array($cached)) {
         wp_send_json($cached);
@@ -320,323 +319,24 @@ add_action('wp_ajax_get_race_filter_options', 'bricks_get_race_filter_options');
 add_action('wp_ajax_nopriv_get_race_filter_options', 'bricks_get_race_filter_options');
 
 function bricks_ajax_load_race_table() {
-    global $wpdb;
-
-    $per_page = 50;
-    $paged = isset($_POST['race_page']) ? intval($_POST['race_page']) : 1;
-    $offset = ($paged - 1) * $per_page;
-
-    $where = '1=1';
-    $having_conditions = []; // Add this array for HAVING conditions
-    
-    if (!empty($_POST['country'])) {
-        $where .= $wpdb->prepare(" AND r.country = %s", $_POST['country']);
-    }
-    if (!empty($_POST['course'])) {
-        $where .= $wpdb->prepare(" AND r.course = %s", $_POST['course']);
-    }
-    if (!empty($_POST['race_type'])) {
-        $where .= $wpdb->prepare(" AND r.race_type = %s", $_POST['race_type']);
-    }
-    if (!empty($_POST['class'])) {
-        $where .= $wpdb->prepare(" AND r.class = %s", $_POST['class']);
-    }
-    if (isset($_POST['handicap']) && $_POST['handicap'] !== '') {
-        $handicap_value = intval($_POST['handicap']);
-        $where .= $wpdb->prepare(" AND r.handicap = %d", $handicap_value);
-    }
-    if (!empty($_POST['age_range'])) {
-        $where .= $wpdb->prepare(" AND r.age_range = %s", $_POST['age_range']);
-    }
-
-    $date = !empty($_POST['date']) ? $_POST['date'] : date('Y-m-d');
-    $where .= $wpdb->prepare(" AND r.meeting_date = %s", $date);
-
-   // CORRECTED: Runner count filtering - works with either "from" or "to" or both
-if (isset($_POST['runners_from']) && $_POST['runners_from'] !== '' && is_numeric($_POST['runners_from'])) {
-    $runners_from = intval($_POST['runners_from']);
-    if ($runners_from >= 0) {  // Allow 0 as minimum
-        $having_conditions[] = "runner_count >= $runners_from";
-    }
+    $html = bricks_race_table_query_html([
+        'date' => !empty($_POST['date']) ? sanitize_text_field(wp_unslash($_POST['date'])) : (function_exists('bricks_daily_archive_today') ? bricks_daily_archive_today() : date('Y-m-d')),
+        'page' => isset($_POST['race_page']) ? intval($_POST['race_page']) : 1,
+        'country' => isset($_POST['country']) ? sanitize_text_field(wp_unslash($_POST['country'])) : '',
+        'course' => isset($_POST['course']) ? sanitize_text_field(wp_unslash($_POST['course'])) : '',
+        'race_type' => isset($_POST['race_type']) ? sanitize_text_field(wp_unslash($_POST['race_type'])) : '',
+        'class' => isset($_POST['class']) ? sanitize_text_field(wp_unslash($_POST['class'])) : '',
+        'handicap' => isset($_POST['handicap']) ? sanitize_text_field(wp_unslash($_POST['handicap'])) : '',
+        'age_range' => isset($_POST['age_range']) ? sanitize_text_field(wp_unslash($_POST['age_range'])) : '',
+        'runners_from' => isset($_POST['runners_from']) ? sanitize_text_field(wp_unslash($_POST['runners_from'])) : '',
+        'runners_to' => isset($_POST['runners_to']) ? sanitize_text_field(wp_unslash($_POST['runners_to'])) : '',
+        'sort_column' => isset($_POST['sort_column']) ? sanitize_text_field(wp_unslash($_POST['sort_column'])) : '',
+        'sort_direction' => isset($_POST['sort_direction']) ? sanitize_text_field(wp_unslash($_POST['sort_direction'])) : 'asc',
+        'include_tracker' => is_user_logged_in(),
+        'use_cache' => !is_user_logged_in(),
+    ]);
+    wp_die($html);
 }
-
-if (isset($_POST['runners_to']) && $_POST['runners_to'] !== '' && is_numeric($_POST['runners_to'])) {
-    $runners_to = intval($_POST['runners_to']);
-    if ($runners_to > 0) {  // Must be greater than 0 for maximum
-        $having_conditions[] = "runner_count <= $runners_to";
-    }
-}
-
-// Build the HAVING clause
-$having_clause = '';
-if (!empty($having_conditions)) {
-    $having_clause = 'HAVING ' . implode(' AND ', $having_conditions);
-}
-
-
-    // Determine which table to use based on date
-    $today = date('Y-m-d');
-    $tomorrow = date('Y-m-d', strtotime('+1 day'));
-    
-    if ($date === $tomorrow) {
-        $table = 'advance_daily_races';
-        $runners_table = 'advance_daily_runners';
-    } else {
-        $table = 'advance_daily_races_beta';
-        $runners_table = 'advance_daily_runners_beta';
-    }
-
-    // CORRECTED: Count query with HAVING clause
-    $count_query = "SELECT COUNT(*) FROM (
-        SELECT r.race_id, COUNT(ru.runner_id) AS runner_count
-        FROM $table r
-        LEFT JOIN $runners_table ru ON r.race_id = ru.race_id
-        WHERE $where
-        GROUP BY r.race_id
-        $having_clause
-    ) AS filtered_races";
-
-    $total_races = $wpdb->get_var($count_query);
-    
-    $order_by = 'r.course, r.scheduled_time';
-    $allowed_sorts = [
-        'scheduled_time', 'country', 'race_type', 'class',
-        'handicap', 'age_range', 'distance_yards', 'prize_pos_1', 'runner_count'
-    ];
-    
-    if (!empty($_POST['sort_column']) && in_array($_POST['sort_column'], $allowed_sorts)) {
-        $direction = (!empty($_POST['sort_direction']) && $_POST['sort_direction'] === 'desc') ? 'DESC' : 'ASC';
-        $order_by = sanitize_sql_orderby($_POST['sort_column'] . ' ' . $direction);
-    }
-
-    // CORRECTED: Main query with HAVING clause
-    $results = $wpdb->get_results("SELECT 
-        r.race_id, r.course, r.country, r.meeting_date, r.scheduled_time,
-        r.race_title, r.race_type, r.class, r.handicap, r.age_range,
-        r.distance_yards, r.prize_pos_1, r.track_type,
-        COUNT(ru.runner_id) AS runner_count
-        FROM $table r
-        LEFT JOIN $runners_table ru ON r.race_id = ru.race_id
-        WHERE $where
-        GROUP BY r.race_id
-        $having_clause
-        ORDER BY $order_by
-        LIMIT $per_page OFFSET $offset");
-
-    // Tracker alerts: flag races that contain horses this user is tracking.
-    $race_tracker_alerts = [];
-    if (is_user_logged_in() && !empty($results) && function_exists('bricks_tracker_get_user_data') && function_exists('bricks_tracker_normalize_horse_key')) {
-        $tracker_data = bricks_tracker_get_user_data(get_current_user_id());
-        $tracked_keys = [];
-        foreach ($tracker_data as $tracker_entry) {
-            if (!is_array($tracker_entry) || empty($tracker_entry['horse_name'])) {
-                continue;
-            }
-            $key = bricks_tracker_normalize_horse_key($tracker_entry['horse_name']);
-            if ($key !== '') {
-                $tracked_keys[$key] = $tracker_entry['horse_name'];
-            }
-        }
-
-        if (!empty($tracked_keys)) {
-            $race_ids = array_values(array_filter(array_map(function($r) {
-                return isset($r->race_id) ? intval($r->race_id) : 0;
-            }, $results)));
-
-            if (!empty($race_ids)) {
-                $race_placeholders = implode(',', array_fill(0, count($race_ids), '%d'));
-                $runner_rows = $wpdb->get_results($wpdb->prepare(
-                    "SELECT race_id, name FROM $runners_table WHERE race_id IN ($race_placeholders) AND name IS NOT NULL AND name != ''",
-                    ...$race_ids
-                ));
-
-                if (!empty($runner_rows)) {
-                    foreach ($runner_rows as $runner_row) {
-                        $runner_name = isset($runner_row->name) ? (string) $runner_row->name : '';
-                        $runner_key = bricks_tracker_normalize_horse_key($runner_name);
-                        $runner_race_id = isset($runner_row->race_id) ? intval($runner_row->race_id) : 0;
-
-                        if ($runner_key === '' || $runner_race_id <= 0 || !isset($tracked_keys[$runner_key])) {
-                            continue;
-                        }
-
-                        if (!isset($race_tracker_alerts[$runner_race_id])) {
-                            $race_tracker_alerts[$runner_race_id] = [];
-                        }
-                        $race_tracker_alerts[$runner_race_id][$runner_key] = $runner_name;
-                    }
-                }
-            }
-        }
-    }
-    
-    $total_pages = ceil($total_races / $per_page);
-
-    // Rest of your function continues as before...
-    ob_start();
-    // ... your existing display code
-
-
-
-    if ($results) {
-        $current_course = '';
-        $tracker_summary_html = '';
-
-        if (!empty($race_tracker_alerts)) {
-            $summary_items = [];
-            foreach ($results as $summary_row) {
-                $summary_race_id = isset($summary_row->race_id) ? intval($summary_row->race_id) : 0;
-                if ($summary_race_id <= 0 || empty($race_tracker_alerts[$summary_race_id])) {
-                    continue;
-                }
-
-                $summary_horses = array_values($race_tracker_alerts[$summary_race_id]);
-                $summary_time = !empty($summary_row->scheduled_time) ? date('H:i', strtotime($summary_row->scheduled_time)) : '--:--';
-                $summary_label = $summary_time . ' ' . (string) ($summary_row->course ?? '') . ' - ' . implode(', ', $summary_horses);
-                $summary_items[] = '<a href="' . esc_url(bricks_race_url($summary_race_id)) . '" class="tracker-summary-link" title="' . esc_attr($summary_label) . '">' . esc_html($summary_label) . '</a>';
-            }
-
-            if (!empty($summary_items)) {
-                $tracker_summary_html = '<div class="tracker-alert-strip" style="margin:0 0 14px 0;padding:12px 14px;border-radius:10px;background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border:1px solid #f59e0b;">
-                    <div style="font-weight:800;color:#92400e;font-size:13px;margin-bottom:8px;">📝 Tracker Alerts Today</div>
-                    <div style="display:flex;flex-direction:column;gap:6px;">' . implode('', $summary_items) . '</div>
-                </div>';
-            }
-        }
-        
-        // Add debug info at the top of the table (remove this after testing)
-        // echo '<div style="background:yellow;padding:10px;margin:10px 0;border:1px solid red;">
-        //     <strong>DEBUG INFO:</strong><br>
-        //     Date requested: ' . esc_html($date) . '<br>
-        //     Table used: ' . esc_html($table) . '<br>
-        //     Total races: ' . esc_html($total_races) . '<br>
-        //     Results count: ' . count($results) . '
-        // </div>';
-        
-        echo $tracker_summary_html;
-        echo '<div class="race-table-scroll">
-        <table class="race-table sticky-header">
-           <thead>
-            <tr>
-                <th data-sort="scheduled_time" class="sortable">Time</th>
-                <th data-sort="country" class="sortable">Country</th>
-                <th>Title</th>
-                <th data-sort="race_type" class="sortable">Type</th>
-                <th data-sort="class" class="sortable">Class</th>
-                <th data-sort="handicap" class="sortable">Handicap</th>
-                <th data-sort="age_range" class="sortable">Age</th>
-                <th data-sort="distance_yards" class="sortable">Dist</th>
-                <th data-sort="distance_yards" class="sortable">Furlongs</th>
-                <th data-sort="prize_pos_1" class="sortable">Prize</th>
-                <th data-sort="runner_count" class="sortable">Runners</th>
-            </tr>
-        </thead>
-        <tbody>';
-
-        foreach ($results as $row) {
-            $course_name = $row->course;
-            if (strtolower($row->track_type) === 'allweather') {
-                $course_name .= ' AW';
-            }
-            $course_label = str_replace('_', ' ', $course_name);
-
-            if ($course_name !== $current_course) {
-                $current_course = $course_name;
-                echo '<tr class="race-course-header" data-course-header="true">
-                    <td class="race-cell race-cell--course" colspan="11">' . esc_html($course_label) . '</td>
-                </tr>';
-            }
-
-            $handicap_display = 'N/A';
-            if ($row->handicap !== null) {
-                $handicap_display = ($row->handicap == 1) ? 'Handicap' : 'Non-Handicap';
-            }
-
-            $formatted_race_type = $row->race_type;
-            if (str_contains(strtolower($row->race_type), 'flat')) {
-                $surface = '';
-                if (strtolower($row->track_type) === 'allweather') {
-                    $surface = 'AW';
-                } elseif (strtolower($row->track_type) === 'turf') {
-                    $surface = 'Turf';
-                }
-                if ($surface) {
-                   $formatted_race_type = trim($row->race_type . ' ' . $surface);
-                }
-            }
-
-            $currency_symbol = '£';
-            if (in_array(strtolower($row->country), ['ireland', 'eire'])) {
-                $currency_symbol = '€';
-            }
-
-            $formatted_prize = $currency_symbol . number_format(floatval($row->prize_pos_1));
-            $furlongs = round($row->distance_yards / 220, 1);
-            
-            // Add badge styling for handicap
-            $handicap_badge = '';
-            if ($row->handicap !== null) {
-                $badge_color = ($row->handicap == 1) ? '#10b981' : '#6b7280';
-                $handicap_badge = '<span class="race-handicap-badge" style="display:inline-block;padding:4px 8px;border-radius:6px;background:' . $badge_color . ';color:white;font-size:10px;font-weight:700;text-transform:uppercase;">' . $handicap_display . '</span>';
-            } else {
-                $handicap_badge = '<span style="color:#9ca3af;">N/A</span>';
-            }
-
-            $race_alert = isset($race_tracker_alerts[intval($row->race_id)]) ? array_values($race_tracker_alerts[intval($row->race_id)]) : [];
-            $tracker_alert_html = '';
-            if (!empty($race_alert)) {
-                $alert_count = count($race_alert);
-                $alert_title = 'Tracked horse running: ' . implode(', ', $race_alert);
-                $tracker_alert_html = '<div style="margin-top:4px;">
-                    <span title="' . esc_attr($alert_title) . '" style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">
-                        📝 Tracker Alert' . ($alert_count > 1 ? ' (' . $alert_count . ')' : '') . '
-                    </span>
-                </div>';
-            }
-
-            $time_str = date('H:i', strtotime($row->scheduled_time));
-
-            echo '<tr class="race-row">
-                <td class="race-cell race-cell--time" data-label="Time">' . esc_html($time_str) . '</td>
-                <td class="race-cell" data-label="Country">' . esc_html($row->country) . '</td>
-                <td class="race-cell race-cell--title" data-label="Title"><a href="' . esc_url(bricks_race_url($row->race_id)) . '" class="race-link">🏁 ' . esc_html($row->race_title) . '</a>' . $tracker_alert_html . '</td>
-                <td class="race-cell" data-label="Type">' . esc_html($formatted_race_type) . '</td>
-                <td class="race-cell" data-label="Class"><span class="race-class-badge">' . esc_html($row->class) . '</span></td>
-                <td class="race-cell" data-label="Handicap">' . $handicap_badge . '</td>
-                <td class="race-cell" data-label="Age">' . esc_html($row->age_range) . '</td>
-                <td class="race-cell race-cell--dist" data-label="Dist">' . esc_html($row->distance_yards) . 'y</td>
-                <td class="race-cell race-cell--furlongs" data-label="Furlongs">' . esc_html($furlongs) . 'f</td>
-                <td class="race-cell race-cell--prize" data-label="Prize">' . esc_html($formatted_prize) . '</td>
-                <td class="race-cell race-cell--runners" data-label="Runners"><span class="race-runners-badge">' . esc_html($row->runner_count) . '</span></td>
-            </tr>';
-        }
-
-        echo '</tbody></table></div>';
-
-        echo '<div class="race-pagination-wrapper" style="margin-top:15px;text-align:center">';
-
-        if ($paged > 1) {
-            echo '<a class="race-pagination-btn" href="#" data-page="' . ($paged - 1) . '">&laquo; Prev</a>';
-        }
-
-        for ($i = 1; $i <= $total_pages; $i++) {
-            $active = $i == $paged ? ' race-pagination-btn-active' : '';
-            echo '<a class="race-pagination-btn' . $active . '" href="#" data-page="' . $i . '">' . $i . '</a>';
-        }
-
-        if ($paged < $total_pages) {
-            echo '<a class="race-pagination-btn" href="#" data-page="' . ($paged + 1) . '">Next &raquo;</a>';
-        }
-
-        echo '</div>';
-    } else {
-        
-        echo '<p>No results found.</p>';
-    }
-
-    wp_die(ob_get_clean());
-}
-
 
 add_action('wp_ajax_load_race_table', 'bricks_ajax_load_race_table');
 add_action('wp_ajax_nopriv_load_race_table', 'bricks_ajax_load_race_table');
@@ -652,56 +352,107 @@ function bricks_race_table_shortcode($atts = []) {
         'course' => '',
         'lock_course' => '0',
         'hide_course_filter' => '0',
+        'date' => '',
+        'archive' => '0',
     ], $atts, 'race_table');
 
     $locked_course = trim((string) $atts['course']);
     $lock_course = ($atts['lock_course'] === '1' || $atts['lock_course'] === 'true') && $locked_course !== '';
     $hide_course_filter = $atts['hide_course_filter'] === '1' || $atts['hide_course_filter'] === 'true' || $lock_course;
+    $is_archive = ($atts['archive'] === '1' || $atts['archive'] === 'true')
+        || (function_exists('bricks_daily_archive_is_request') && bricks_daily_archive_is_request());
 
-    $today = new DateTimeImmutable();
-    $today_date = $today->format('Y-m-d');
+    $today_date = function_exists('bricks_daily_archive_today')
+        ? bricks_daily_archive_today()
+        : wp_date('Y-m-d', current_time('timestamp'));
+    $tomorrow_str = function_exists('bricks_daily_archive_tomorrow')
+        ? bricks_daily_archive_tomorrow()
+        : wp_date('Y-m-d', strtotime('+1 day', current_time('timestamp')));
+
+    $active_date = $today_date;
+    if ($atts['date'] !== '' && function_exists('bricks_daily_archive_normalize_date')) {
+        $normalized = bricks_daily_archive_normalize_date($atts['date']);
+        if ($normalized) {
+            $active_date = $normalized;
+        }
+    } elseif ($is_archive && function_exists('bricks_daily_archive_resolve_date_from_request')) {
+        $resolved = bricks_daily_archive_resolve_date_from_request();
+        if ($resolved) {
+            $active_date = $resolved;
+            $is_archive = true;
+        }
+    }
 
     $navigation_header = bricks_get_navigation_header();
 
-    // Use beta table for today's initial load
-    $table = 'advance_daily_races_beta';
-    
-    $countries = $wpdb->get_col(
-        $wpdb->prepare("SELECT DISTINCT country FROM $table WHERE meeting_date = %s ORDER BY country", $today_date)
-    );
-    $courses = $wpdb->get_col(
-        $wpdb->prepare("SELECT DISTINCT course FROM $table WHERE meeting_date = %s ORDER BY course", $today_date)
-    );
-    $types = $wpdb->get_col(
-        $wpdb->prepare("SELECT DISTINCT race_type FROM $table WHERE meeting_date = %s ORDER BY race_type", $today_date)
-    );
-    $classes = $wpdb->get_col(
-        $wpdb->prepare("SELECT DISTINCT class FROM $table WHERE meeting_date = %s ORDER BY class", $today_date)
-    );
-    $ages = $wpdb->get_col(
-        $wpdb->prepare("SELECT DISTINCT age_range FROM $table WHERE meeting_date = %s ORDER BY age_range", $today_date)
-    );
+    if (function_exists('bricks_race_tables_for_date')) {
+        $tables = bricks_race_tables_for_date($active_date);
+        $table = $tables['races'];
+    } else {
+        $table = 'advance_daily_races_beta';
+    }
 
-$dates = [];
-$today_str = $today->format('Y-m-d');
-$tomorrow_str = date('Y-m-d', strtotime('+1 day'));
+    $filter_cache_key = function_exists('bricks_cache_key')
+        ? bricks_cache_key('race_filters', [$table, $active_date, 'shortcode'])
+        : null;
+    $filter_cached = $filter_cache_key ? get_transient($filter_cache_key) : false;
+    if (is_array($filter_cached)) {
+        $countries = $filter_cached['countries'] ?? [];
+        $courses = $filter_cached['courses'] ?? [];
+        $types = $filter_cached['types'] ?? [];
+        $classes = $filter_cached['classes'] ?? [];
+        $ages = $filter_cached['ages'] ?? [];
+    } else {
+        $countries = $wpdb->get_col(
+            $wpdb->prepare("SELECT DISTINCT country FROM `$table` WHERE meeting_date = %s ORDER BY country", $active_date)
+        );
+        $courses = $wpdb->get_col(
+            $wpdb->prepare("SELECT DISTINCT course FROM `$table` WHERE meeting_date = %s ORDER BY course", $active_date)
+        );
+        $types = $wpdb->get_col(
+            $wpdb->prepare("SELECT DISTINCT race_type FROM `$table` WHERE meeting_date = %s ORDER BY race_type", $active_date)
+        );
+        $classes = $wpdb->get_col(
+            $wpdb->prepare("SELECT DISTINCT class FROM `$table` WHERE meeting_date = %s ORDER BY class", $active_date)
+        );
+        $ages = $wpdb->get_col(
+            $wpdb->prepare("SELECT DISTINCT age_range FROM `$table` WHERE meeting_date = %s ORDER BY age_range", $active_date)
+        );
+        if ($filter_cache_key) {
+            set_transient($filter_cache_key, compact('countries', 'courses', 'types', 'classes', 'ages'), 10 * MINUTE_IN_SECONDS);
+        }
+    }
 
-// Today
-$dates[] = [
-    'label' => 'Today',
-    'value' => $today_str,
-    'is_today' => true
-];
-// Tomorrow
-$dates[] = [
-    'label' => 'Tomorrow',
-    'value' => $tomorrow_str,
-    'is_today' => false
-];
+    $dates = [];
+    if ($is_archive) {
+        $dates[] = [
+            'label' => wp_date('D j M', strtotime($active_date . ' 12:00:00')),
+            'value' => $active_date,
+            'is_today' => true,
+        ];
+    } else {
+        $dates[] = [
+            'label' => 'Today',
+            'value' => $today_date,
+            'is_today' => true,
+        ];
+        $dates[] = [
+            'label' => 'Tomorrow',
+            'value' => $tomorrow_str,
+            'is_today' => false,
+        ];
+    }
 
-
-
-
+    $ssr_html = '';
+    if (function_exists('bricks_race_table_query_html')) {
+        $ssr_html = bricks_race_table_query_html([
+            'date' => $active_date,
+            'page' => 1,
+            'course' => $lock_course ? $locked_course : '',
+            'include_tracker' => false,
+            'use_cache' => true,
+        ]);
+    }
 
     ob_start();
     ?>
@@ -1311,21 +1062,46 @@ $dates[] = [
             }
         }
 
-        /* Loading State */
+        /* Loading State / CLS reservation for SSR + AJAX swaps */
         #race-table-container {
-            min-height: 200px;
+            min-height: 420px;
             position: relative;
+        }
+        .race-table-scroll {
+            min-height: 280px;
+            content-visibility: auto;
+            contain-intrinsic-size: 280px;
         }
     </style>
 
     <?php
-    // Dated H1 on /daily/ hub only (not racecourse-embedded race tables).
-    if (!$lock_course && function_exists('bricks_seo_render_daily_page_header_html')) {
+    // Dated H1 on /daily/ hub; archive pages get their own dated H1.
+    if ($is_archive) {
+        $archive_h1 = function_exists('bricks_seo_build_daily_archive_h1')
+            ? bricks_seo_build_daily_archive_h1($active_date)
+            : ('Horse Racing Ratings Archive: ' . $active_date);
+        $archive_intro = function_exists('bricks_seo_build_daily_archive_meta_description')
+            ? bricks_seo_build_daily_archive_meta_description($active_date)
+            : '';
+        echo '<header class="daily-hub-header page-header daily-archive-header">';
+        echo '<div class="page-header-container daily-hub-header__inner">';
+        echo '<h1 class="page-title daily-hub-header__title"><span aria-hidden="true">🏁</span> ' . esc_html($archive_h1) . '</h1>';
+        if ($archive_intro !== '') {
+            echo '<p class="page-description daily-hub-header__intro">' . esc_html($archive_intro) . '</p>';
+        }
+        echo '</div></header>';
+        if (function_exists('bricks_daily_archive_nav_html')) {
+            echo bricks_daily_archive_nav_html($active_date);
+        }
+    } elseif (!$lock_course && function_exists('bricks_seo_render_daily_page_header_html')) {
         echo bricks_seo_render_daily_page_header_html();
+        if (function_exists('bricks_daily_live_yesterday_archive_link_html')) {
+            echo bricks_daily_live_yesterday_archive_link_html();
+        }
     }
     ?>
 
-    <div class="race-table-wrapper"<?php
+    <div class="race-table-wrapper" data-default-date="<?php echo esc_attr($active_date); ?>" data-archive="<?php echo $is_archive ? '1' : '0'; ?>"<?php
         if ($lock_course && $locked_course !== '') {
             echo ' data-locked-course="' . esc_attr($locked_course) . '"';
         }
@@ -1441,11 +1217,15 @@ $dates[] = [
         </select>
     </div>
 
-    <div id="race-table-container">
+    <div id="race-table-container" data-ssr="<?php echo $ssr_html !== '' ? '1' : '0'; ?>">
+        <?php if ($ssr_html !== ''): ?>
+            <?php echo $ssr_html; ?>
+        <?php else: ?>
         <div style="text-align:center;padding:60px 20px;color:#6b7280;">
             <div style="font-size:48px;margin-bottom:16px;">🏇</div>
             <div style="font-size:16px;font-weight:600;">Loading races...</div>
         </div>
+        <?php endif; ?>
     </div>
   
     </div>
