@@ -2374,6 +2374,73 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
             margin: 0 auto 20px auto;
             padding: 0 20px;
         }
+
+        .race-upward-links {
+            max-width: 1400px;
+            margin: 0 auto 16px auto;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+
+        .race-upward-breadcrumb__list {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px 8px;
+            list-style: none;
+            margin: 0 0 10px;
+            padding: 0;
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .race-upward-breadcrumb__item:not(:last-child)::after {
+            content: "/";
+            margin-left: 8px;
+            color: #94a3b8;
+        }
+
+        .race-upward-breadcrumb__item a {
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .race-upward-breadcrumb__item a:hover {
+            color: #1d4ed8;
+            text-decoration: underline;
+        }
+
+        .race-upward-breadcrumb__item--current span {
+            color: #475569;
+            font-weight: 600;
+        }
+
+        .race-hub-cta {
+            margin: 0 0 4px;
+            padding: 12px 14px;
+            background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
+            border: 1px solid #bfdbfe;
+            border-radius: 10px;
+        }
+
+        .race-hub-cta__text {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #334155;
+        }
+
+        .race-hub-cta__link {
+            color: #1d4ed8;
+            font-weight: 700;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .race-hub-cta__link:hover {
+            color: #1e3a8a;
+        }
         
         .back-button {
             display: inline-flex;
@@ -2603,6 +2670,10 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
         
         @media (max-width: 768px) {
             .back-button-container {
+                padding: 0 16px;
+            }
+
+            .race-upward-links {
                 padding: 0 16px;
             }
             
@@ -3496,6 +3567,21 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
     <!-- Your existing styling and HTML continues here... -->
 
     <div class="race-detail-container">
+    <?php
+    $race_upward_course = function_exists('bricks_seo_race_upward_context')
+        ? bricks_seo_race_upward_context($race)
+        : null;
+    ?>
+    <div class="race-upward-links">
+        <?php
+        if (function_exists('bricks_seo_render_race_breadcrumb_html')) {
+            echo bricks_seo_render_race_breadcrumb_html($race);
+        }
+        if (function_exists('bricks_seo_render_race_hub_cta_html')) {
+            echo bricks_seo_render_race_hub_cta_html($race);
+        }
+        ?>
+    </div>
     <div class="back-button-container">
             <a href="<?php echo home_url('/daily/'); ?>" class="back-button">
                 <span class="back-button-icon">←</span>
@@ -3508,9 +3594,13 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
         <div class="race-quick-nav">
             <div class="race-quick-nav-top">
                 <div class="race-quick-nav-breadcrumb">
-                    <a href="<?php echo home_url('/daily/'); ?>">Horse Racing</a>
+                    <a href="<?php echo esc_url(home_url('/daily/')); ?>">Horse Racing</a>
                     <span>/</span>
+                    <?php if (!empty($race_upward_course['course_url'])): ?>
+                    <a href="<?php echo esc_url($race_upward_course['course_url']); ?>"><?php echo esc_html($race_upward_course['course_display'] !== '' ? $race_upward_course['course_display'] : $race->course); ?></a>
+                    <?php else: ?>
                     <span><?php echo esc_html($race->course); ?></span>
+                    <?php endif; ?>
                 </div>
                 
                 <div class="course-selector-wrapper">

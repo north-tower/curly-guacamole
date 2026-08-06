@@ -272,6 +272,194 @@ if (!function_exists('bricks_seo_output_paywall_json_ld')) {
 }
 add_action('wp_head', 'bricks_seo_output_paywall_json_ld', 5);
 
+if (!function_exists('bricks_seo_race_upward_context')) {
+    /**
+     * Resolve daily + parent racecourse URLs for upward internal linking from /race/ pages.
+     *
+     * @param object|null $race
+     * @return array{course_raw:string,course_display:string,course_url:string,daily_url:string,race_url:string,race_title:string}
+     */
+    function bricks_seo_race_upward_context($race = null) {
+        if (!$race) {
+            $race = bricks_seo_get_race_row();
+        }
+
+        $course_raw = $race ? trim((string) ($race->course ?? '')) : '';
+        $course_display = $course_raw !== ''
+            ? (function_exists('bricks_seo_format_course_name')
+                ? bricks_seo_format_course_name($course_raw)
+                : (function_exists('bricks_track_format_display_name')
+                    ? bricks_track_format_display_name($course_raw)
+                    : $course_raw))
+            : '';
+
+        $course_url = '';
+        if ($course_raw !== '') {
+            if (function_exists('bricks_track_url')) {
+                $course_url = bricks_track_url($course_raw);
+            } elseif (function_exists('bricks_track_course_to_slug')) {
+                $course_url = home_url('/racecourses/' . bricks_track_course_to_slug($course_raw) . '/');
+            } else {
+                $course_url = home_url('/racecourses/' . sanitize_title($course_display !== '' ? $course_display : $course_raw) . '/');
+            }
+        }
+
+        $race_id = $race ? intval($race->race_id ?? 0) : bricks_seo_resolve_race_id_from_request();
+        $race_url = $race_id > 0 && function_exists('bricks_race_url')
+            ? bricks_race_url($race_id)
+            : home_url(isset($_SERVER['REQUEST_URI']) ? esc_url_raw(wp_unslash($_SERVER['REQUEST_URI'])) : '/');
+        $race_title = $race ? trim((string) ($race->race_title ?? 'Race')) : 'Race';
+
+        return [
+            'course_raw' => $course_raw,
+            'course_display' => $course_display,
+            'course_url' => $course_url,
+            'daily_url' => home_url('/daily/'),
+            'race_url' => $race_url,
+            'race_title' => $race_title !== '' ? $race_title : 'Race',
+        ];
+    }
+}
+
+if (!function_exists('bricks_seo_race_upward_links_styles')) {
+    /**
+     * Shared CSS for race upward breadcrumbs + hub CTA (printed once per request).
+     */
+    function bricks_seo_race_upward_links_styles() {
+        static $printed = false;
+        if ($printed) {
+            return '';
+        }
+        $printed = true;
+        return '<style id="race-upward-links-styles">'
+            . '.race-upward-breadcrumb__list{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;list-style:none;margin:0 0 10px;padding:0;font-size:13px;color:#64748b;}'
+            . '.race-upward-breadcrumb__item:not(:last-child)::after{content:"/";margin-left:8px;color:#94a3b8;}'
+            . '.race-upward-breadcrumb__item a{color:#2563eb;text-decoration:none;font-weight:600;}'
+            . '.race-upward-breadcrumb__item a:hover{color:#1d4ed8;text-decoration:underline;}'
+            . '.race-upward-breadcrumb__item--current span{color:#475569;font-weight:600;}'
+            . '.race-hub-cta{margin:0 0 4px;padding:12px 14px;background:linear-gradient(135deg,#eff6ff 0%,#f8fafc 100%);border:1px solid #bfdbfe;border-radius:10px;text-align:left;}'
+            . '.race-hub-cta__text{margin:0;font-size:14px;line-height:1.5;color:#334155;}'
+            . '.race-hub-cta__link{color:#1d4ed8;font-weight:700;text-decoration:underline;text-underline-offset:2px;}'
+            . '.race-hub-cta__link:hover{color:#1e3a8a;}'
+            . '</style>';
+    }
+}
+
+if (!function_exists('bricks_seo_render_race_breadcrumb_html')) {
+    /**
+     * Crawlable HTML breadcrumb: Daily → Racecourse → Race.
+     *
+     * @param object|null $race
+     */
+    function bricks_seo_render_race_breadcrumb_html($race = null) {
+        $ctx = bricks_seo_race_upward_context($race);
+        ob_start();
+        echo bricks_seo_race_upward_links_styles();
+        ?>
+        <nav class="race-upward-breadcrumb" aria-label="Breadcrumb">
+            <ol class="race-upward-breadcrumb__list">
+                <li class="race-upward-breadcrumb__item">
+                    <a href="<?php echo esc_url($ctx['daily_url']); ?>">Daily Race Cards</a>
+                </li>
+                <?php if ($ctx['course_url'] !== '' && $ctx['course_display'] !== ''): ?>
+                <li class="race-upward-breadcrumb__item">
+                    <a href="<?php echo esc_url($ctx['course_url']); ?>"><?php echo esc_html($ctx['course_display']); ?></a>
+                </li>
+                <?php elseif ($ctx['course_display'] !== ''): ?>
+                <li class="race-upward-breadcrumb__item">
+                    <span><?php echo esc_html($ctx['course_display']); ?></span>
+                </li>
+                <?php endif; ?>
+                <li class="race-upward-breadcrumb__item race-upward-breadcrumb__item--current" aria-current="page">
+                    <span><?php echo esc_html($ctx['race_title']); ?></span>
+                </li>
+            </ol>
+        </nav>
+        <?php
+        return ob_get_clean();
+    }
+}
+
+if (!function_exists('bricks_seo_render_race_hub_cta_html')) {
+    /**
+     * Permanent upward CTA linking to live Daily cards + parent racecourse guide.
+     *
+     * @param object|null $race
+     */
+    function bricks_seo_render_race_hub_cta_html($race = null) {
+        $ctx = bricks_seo_race_upward_context($race);
+        $course_label = $ctx['course_display'] !== '' ? $ctx['course_display'] : 'this racecourse';
+        ob_start();
+        ?>
+        <aside class="race-hub-cta" aria-label="Live race cards and racecourse guide">
+            <p class="race-hub-cta__text">
+                Looking for the next running or today's ratings? View our live
+                <a class="race-hub-cta__link" href="<?php echo esc_url($ctx['daily_url']); ?>">Daily Race Cards</a><?php
+                if ($ctx['course_url'] !== ''): ?>
+                    or check the upcoming schedule for
+                    <a class="race-hub-cta__link" href="<?php echo esc_url($ctx['course_url']); ?>"><?php echo esc_html($course_label); ?></a><?php
+                endif; ?>.
+            </p>
+        </aside>
+        <?php
+        return ob_get_clean();
+    }
+}
+
+if (!function_exists('bricks_seo_output_race_breadcrumb_json_ld')) {
+    function bricks_seo_output_race_breadcrumb_json_ld() {
+        static $done = false;
+        if ($done || !bricks_seo_is_race_detail_request()) {
+            return;
+        }
+
+        $race = bricks_seo_get_race_row();
+        if (!$race) {
+            return;
+        }
+
+        $done = true;
+        $ctx = bricks_seo_race_upward_context($race);
+        $dir_url = function_exists('bricks_track_directory_url')
+            ? bricks_track_directory_url()
+            : home_url('/racecourses/');
+
+        $items = [
+            [
+                '@type' => 'ListItem',
+                'position' => 1,
+                'name' => 'Racecourses',
+                'item' => $dir_url,
+            ],
+        ];
+        $position = 2;
+
+        if ($ctx['course_url'] !== '' && $ctx['course_display'] !== '') {
+            $items[] = [
+                '@type' => 'ListItem',
+                'position' => $position,
+                'name' => $ctx['course_display'],
+                'item' => $ctx['course_url'],
+            ];
+            $position++;
+        }
+
+        $items[] = [
+            '@type' => 'ListItem',
+            'position' => $position,
+            'name' => $ctx['race_title'],
+            'item' => $ctx['race_url'],
+        ];
+
+        bricks_seo_print_json_ld([
+            '@context' => 'https://schema.org',
+            '@type' => 'BreadcrumbList',
+            'itemListElement' => $items,
+        ]);
+    }
+}
+add_action('wp_head', 'bricks_seo_output_race_breadcrumb_json_ld', 6);
+
 if (!function_exists('bricks_seo_filter_meta_title')) {
     function bricks_seo_filter_meta_title($title) {
         if (!bricks_seo_is_race_detail_request()) {

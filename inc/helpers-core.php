@@ -445,12 +445,29 @@ if (!function_exists('fhor_race_detail_access_gate_html')) {
         ob_start();
         ?>
         <div style="max-width:640px;margin:48px auto 32px;padding:0 20px;font-family:inherit;">
+            <?php
+            if (function_exists('bricks_seo_render_race_breadcrumb_html')) {
+                echo bricks_seo_render_race_breadcrumb_html($race);
+            }
+            if (function_exists('bricks_seo_render_race_hub_cta_html')) {
+                echo '<div style="margin:12px 0 20px;">' . bricks_seo_render_race_hub_cta_html($race) . '</div>';
+            }
+            ?>
             <div style="text-align:center;padding:32px 24px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,0.06);">
                 <div style="font-size:40px;margin-bottom:12px;">🔒</div>
                 <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#111827;">Members-only race page</h1>
                 <?php if ($course !== ''): ?>
                 <p style="margin:0 0 6px;font-size:15px;color:#374151;font-weight:600;"><?php echo esc_html($title); ?></p>
-                <p style="margin:0 0 16px;font-size:13px;color:#64748b;"><?php echo esc_html($course); ?></p>
+                <p style="margin:0 0 16px;font-size:13px;color:#64748b;">
+                    <?php
+                    $gate_ctx = function_exists('bricks_seo_race_upward_context') ? bricks_seo_race_upward_context($race) : null;
+                    if ($gate_ctx && $gate_ctx['course_url'] !== ''):
+                    ?>
+                    <a href="<?php echo esc_url($gate_ctx['course_url']); ?>" style="color:#2563eb;font-weight:600;text-decoration:none;"><?php echo esc_html($gate_ctx['course_display'] !== '' ? $gate_ctx['course_display'] : $course); ?></a>
+                    <?php else: ?>
+                    <?php echo esc_html($course); ?>
+                    <?php endif; ?>
+                </p>
                 <?php endif; ?>
                 <p style="margin:0 0 20px;color:#6b7280;font-size:14px;line-height:1.5;">
                     <?php if (!is_user_logged_in()): ?>
@@ -475,6 +492,12 @@ if (!function_exists('fhor_race_detail_access_gate_html')) {
                     <a href="<?php echo esc_url($signup_url); ?>" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;text-decoration:none;">Become a Fhorsite Member</a>
                     <?php endif; ?>
                     <a href="<?php echo esc_url(home_url('/daily/')); ?>" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#f3f4f6;color:#374151;font-weight:600;text-decoration:none;">← Daily races</a>
+                    <?php
+                    $gate_track = function_exists('bricks_seo_race_upward_context') ? bricks_seo_race_upward_context($race) : null;
+                    if ($gate_track && $gate_track['course_url'] !== ''):
+                    ?>
+                    <a href="<?php echo esc_url($gate_track['course_url']); ?>" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#ecfdf5;color:#047857;font-weight:600;text-decoration:none;"><?php echo esc_html(($gate_track['course_display'] !== '' ? $gate_track['course_display'] : 'Racecourse') . ' guide'); ?></a>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>

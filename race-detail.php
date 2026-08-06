@@ -17,6 +17,7 @@ get_header();
         background: var(--fhor-bg, #f1f5f9);
     }
     .race-detail-page-shell .back-button-container,
+    .race-detail-page-shell .race-upward-links,
     .race-detail-page-shell .race-quick-nav,
     .race-detail-page-shell .race-detail-container,
     .race-detail-page-shell .cpc,
@@ -30,6 +31,7 @@ get_header();
         box-sizing: border-box;
     }
     .race-detail-page-shell .back-button-container,
+    .race-detail-page-shell .race-upward-links,
     .race-detail-page-shell .race-quick-nav {
         padding-left: 0;
         padding-right: 0;
