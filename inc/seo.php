@@ -1185,18 +1185,21 @@ if (!function_exists('bricks_seo_build_dashboard_dataset_schema')) {
         switch ($dashboard_type) {
             case 'daily':
                 $url = home_url('/daily/');
+                $today = wp_date('Y-m-d', current_time('timestamp'));
+                $title_date = wp_date('d/m/Y', current_time('timestamp'));
                 return [
                     '@context' => 'https://schema.org',
                     '@type' => 'Dataset',
                     '@id' => $url . '#dataset',
-                    'name' => 'UK & Irish race cards — turf & All-Weather ratings dashboard',
+                    'name' => sprintf('Daily horse racing speed ratings & form – %s', $title_date),
                     'description' => function_exists('bricks_seo_build_daily_meta_description')
                         ? bricks_seo_build_daily_meta_description()
                         : 'Live UK and Irish race card table with course, class, runners, and Fhorsite race ratings for today and tomorrow.',
                     'url' => $url,
                     'creator' => $org,
                     'publisher' => $org,
-                    'temporalCoverage' => wp_date('Y-m-d', current_time('timestamp')) . '/' . wp_date('Y-m-d', strtotime('+1 day', current_time('timestamp'))),
+                    'dateModified' => wp_date('c', current_time('timestamp')),
+                    'temporalCoverage' => $today . '/' . wp_date('Y-m-d', strtotime('+1 day', current_time('timestamp'))),
                     'variableMeasured' => $variables,
                     'distribution' => [
                         '@type' => 'DataDownload',

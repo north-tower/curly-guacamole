@@ -706,6 +706,28 @@ $dates[] = [
     ob_start();
     ?>
     <style>
+        /* Dated daily hub H1 */
+        .daily-hub-header {
+            max-width: 1400px;
+            margin: 0 auto 20px;
+            padding: 8px 4px 4px;
+            box-sizing: border-box;
+        }
+        .daily-hub-header__title {
+            margin: 0 0 8px;
+            font-size: clamp(1.35rem, 3.2vw, 1.85rem);
+            font-weight: 800;
+            line-height: 1.25;
+            color: #0f172a;
+            letter-spacing: -0.02em;
+        }
+        .daily-hub-header__intro {
+            margin: 0 0 4px;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #64748b;
+        }
+
         /* Container */
         .race-table-wrapper {
             background: #ffffff;
@@ -1296,6 +1318,13 @@ $dates[] = [
         }
     </style>
 
+    <?php
+    // Dated H1 on /daily/ hub only (not racecourse-embedded race tables).
+    if (!$lock_course && function_exists('bricks_seo_render_daily_page_header_html')) {
+        echo bricks_seo_render_daily_page_header_html();
+    }
+    ?>
+
     <div class="race-table-wrapper"<?php
         if ($lock_course && $locked_course !== '') {
             echo ' data-locked-course="' . esc_attr($locked_course) . '"';
@@ -1436,15 +1465,26 @@ function bricks_race_table_shortcode_with_header() {
         get_header();
         $content .= ob_get_clean();
         
-        // Add page header
+        $h1 = function_exists('bricks_seo_build_daily_h1')
+            ? bricks_seo_build_daily_h1()
+            : "Today's Horse Racing Ratings: " . wp_date('l, d F Y', current_time('timestamp'));
+        $intro = function_exists('bricks_seo_build_daily_intro')
+            ? bricks_seo_build_daily_intro()
+            : "Today's UK and Irish meetings — turf speed ratings, All-Weather AW speed figures, and full racecard data";
+
+        // Mark daily header as rendered so race_table does not duplicate the H1.
+        if (function_exists('bricks_seo_render_daily_page_header_html')) {
+            bricks_seo_render_daily_page_header_html();
+        }
+
         $content .= '
-        <div class="page-header">
-            <div class="page-header-container">
-                <h1 class="page-title">
-                    <span>🏁</span>
-                    UK &amp; Irish Race Cards Today
+        <div class="page-header daily-hub-header">
+            <div class="page-header-container daily-hub-header__inner">
+                <h1 class="page-title daily-hub-header__title">
+                    <span aria-hidden="true">🏁</span>
+                    ' . esc_html($h1) . '
                 </h1>
-                <p class="page-description">Today\'s UK and Irish meetings — turf speed ratings, All-Weather AW speed figures, and full racecard data</p>
+                <p class="page-description daily-hub-header__intro">' . esc_html($intro) . '</p>
             </div>
         </div>
         <main class="main-content">

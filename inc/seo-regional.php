@@ -127,14 +127,78 @@ if (!function_exists('bricks_seo_is_dashboard_request')) {
 }
 
 if (!function_exists('bricks_seo_build_daily_meta_title')) {
+    /**
+     * Chronological meta title so Google sees /daily/ as today's live card hub.
+     * Format: Daily Horse Racing Speed Ratings & Form – DD/MM/YYYY
+     */
     function bricks_seo_build_daily_meta_title() {
-        return 'UK & Irish Race Cards Today | Turf & All-Weather Ratings | Fhorsite';
+        $date = wp_date('d/m/Y', current_time('timestamp'));
+        return sprintf('Daily Horse Racing Speed Ratings & Form – %s', $date);
     }
 }
 
 if (!function_exists('bricks_seo_build_daily_meta_description')) {
+    /**
+     * Meta description with today's calendar date for index stability.
+     */
     function bricks_seo_build_daily_meta_description() {
-        return 'Today\'s UK and Irish race cards with course, class, runners, and links to turf speed ratings and All-Weather (AW) speed figures for every race.';
+        $date = wp_date('l, j F Y', current_time('timestamp'));
+        return sprintf(
+            'Today\'s UK and Irish race cards for %s — turf speed ratings, All-Weather (AW) speed figures, runners, and Fhorsite form for every meeting.',
+            $date
+        );
+    }
+}
+
+if (!function_exists('bricks_seo_build_daily_h1')) {
+    /**
+     * Main H1 for /daily/.
+     * Format: Today's Horse Racing Ratings: Day of Week, DD Month YYYY
+     */
+    function bricks_seo_build_daily_h1() {
+        $date = wp_date('l, d F Y', current_time('timestamp'));
+        return sprintf("Today's Horse Racing Ratings: %s", $date);
+    }
+}
+
+if (!function_exists('bricks_seo_build_daily_intro')) {
+    function bricks_seo_build_daily_intro() {
+        $date = wp_date('l, j F Y', current_time('timestamp'));
+        return sprintf(
+            "Today's UK and Irish meetings for %s — turf speed ratings, All-Weather AW speed figures, and full racecard data",
+            $date
+        );
+    }
+}
+
+if (!function_exists('bricks_seo_render_daily_page_header_html')) {
+    /**
+     * Dated H1 + intro for the /daily/ hub (printed at most once per request).
+     *
+     * @return string
+     */
+    function bricks_seo_render_daily_page_header_html() {
+        static $done = false;
+        if ($done) {
+            return '';
+        }
+        if (!function_exists('bricks_seo_is_dashboard_request') || !bricks_seo_is_dashboard_request('daily')) {
+            return '';
+        }
+        $done = true;
+
+        $h1 = bricks_seo_build_daily_h1();
+        $intro = bricks_seo_build_daily_intro();
+
+        return '<header class="daily-hub-header page-header">'
+            . '<div class="page-header-container daily-hub-header__inner">'
+            . '<h1 class="page-title daily-hub-header__title">'
+            . '<span aria-hidden="true">🏁</span> '
+            . esc_html($h1)
+            . '</h1>'
+            . '<p class="page-description daily-hub-header__intro">' . esc_html($intro) . '</p>'
+            . '</div>'
+            . '</header>';
     }
 }
 
