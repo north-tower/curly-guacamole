@@ -229,28 +229,39 @@ if (!function_exists('bricks_seo_output_paywall_json_ld')) {
         $race_title = trim((string) ($race->race_title ?? 'Horse race'));
         $course = bricks_seo_format_course_name($race->course ?? '');
         $event_name = $course !== '' ? $course . ' — ' . $race_title : $race_title;
+        $description = bricks_seo_build_meta_description();
 
         $url = function_exists('bricks_race_url') ? bricks_race_url($race_id) : home_url('/race/' . $race_id . '/');
 
+        // CreativeWork/Article + isAccessibleForFree:false per Google paywalled content guidelines.
+        // cssSelector must be a .class that wraps the gated DOM (see .paywall on race detail).
         $schema = [
             '@context' => 'https://schema.org',
-            '@type' => 'SportsEvent',
-            'name' => $event_name,
+            '@type' => 'Article',
+            'headline' => $event_name,
+            'mainEntityOfPage' => [
+                '@type' => 'WebPage',
+                '@id' => $url,
+            ],
             'url' => $url,
-            'isAccessibleForFree' => true,
+            'isAccessibleForFree' => false,
             'hasPart' => [
                 '@type' => 'WebPageElement',
                 'isAccessibleForFree' => false,
-                'cssSelector' => '.premium-ratings-container',
+                'cssSelector' => '.paywall',
             ],
         ];
 
+        if ($description !== '') {
+            $schema['description'] = $description;
+        }
+
         $start = bricks_seo_race_start_date_iso($race);
         if ($start !== '') {
-            $schema['startDate'] = $start;
+            $schema['datePublished'] = $start;
         }
         if ($course !== '') {
-            $schema['location'] = [
+            $schema['about'] = [
                 '@type' => 'Place',
                 'name' => $course,
             ];
@@ -907,7 +918,12 @@ if (!function_exists('bricks_seo_build_race_dataset_schema')) {
             'url' => $url,
             'creator' => bricks_seo_get_organization_schema(),
             'publisher' => bricks_seo_get_organization_schema(),
-            'isAccessibleForFree' => true,
+            'isAccessibleForFree' => false,
+            'hasPart' => [
+                '@type' => 'WebPageElement',
+                'isAccessibleForFree' => false,
+                'cssSelector' => '.paywall',
+            ],
             'keywords' => array_values(array_filter([
                 'UK horse racing',
                 'Irish horse racing',

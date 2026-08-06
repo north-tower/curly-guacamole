@@ -3808,7 +3808,7 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
         
         <?php if ($runners && count($runners) > 0): ?>
 
-        <div class="premium-ratings-container">
+        <div class="premium-ratings-container paywall">
         
         <!-- Runners Table -->
         <div class="runners-card">
@@ -6352,7 +6352,7 @@ jQuery(document).on('click', '.toggle-details-btn', function() {
     });
     </script>
 
-        </div><!-- .premium-ratings-container -->
+        </div><!-- .premium-ratings-container.paywall -->
         
         <?php else: ?>
         <div class="runners-card">
