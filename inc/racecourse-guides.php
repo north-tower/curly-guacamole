@@ -891,6 +891,11 @@ if (!function_exists('bricks_track_render_static_section')) {
                 <h1 class="racecourse-guide-title">
                     <?php echo esc_html($display); ?> Racecourse Statistics &amp; Speed Ratings
                 </h1>
+                <?php
+                if (function_exists('fhor_lead_capture_render_banner_html')) {
+                    echo fhor_lead_capture_render_banner_html($context); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in renderer
+                }
+                ?>
                 <p class="racecourse-guide-lead">
                     <?php if ($is_aw): ?>
                         All-Weather speed figures, AW ratings, draw bias, and Fhorsite Points Engine history
@@ -1006,6 +1011,7 @@ if (!function_exists('bricks_track_enqueue_styles')) {
         .racecourse-guide-hero{margin-bottom:1.5rem}
         .racecourse-guide-title{margin:0 0 .5rem;font-size:clamp(1.75rem,3vw,2.25rem);line-height:1.2}
         .racecourse-guide-lead{margin:0;color:#475569;font-size:1.05rem;line-height:1.6}
+        ' . (function_exists('fhor_lead_capture_styles') ? fhor_lead_capture_styles() : '') . '
         .racecourse-guide-section{margin:2rem 0}
         .racecourse-guide-section h2{margin:0 0 .75rem;font-size:1.35rem}
         .racecourse-guide-note{margin:0 0 1rem;color:#64748b;font-size:.95rem}
