@@ -115,6 +115,7 @@ WHERE hracb.meeting_date BETWEEN '", SEASON_FROM, "' AND '", SEASON_TO, "'
   AND COALESCE(hrunb.weight_pounds, 0) > 0
 ")
 print(paste("Mordin rematch: fetching flat handicaps", SEASON_FROM, "->", SEASON_TO, "from", DB_SCHEMA))
+print("Mordin rematch: script build = surface_v2_vectorized")
 raw <- dbGetQuery(con, sql)
 print(paste("Mordin rematch: rows loaded =", nrow(raw)))
 
