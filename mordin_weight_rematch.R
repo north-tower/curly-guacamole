@@ -67,6 +67,8 @@ con <- smartformDB
 # -----------------------------------------------------------------------------
 # 2. Extract flat handicap results (Turf + AW)
 # -----------------------------------------------------------------------------
+# track_type lives on historic_races_beta (same as load.R / clean.R).
+# course_features has profile / features only — join matches my_daily_races_UPDATE.
 sql <- paste0("
 SELECT
   hrunb.race_id,
@@ -75,6 +77,7 @@ SELECT
   hracb.meeting_date,
   hracb.course,
   hracb.race_type,
+  hracb.track_type,
   hracb.handicap,
   hracb.distance_yards,
   hracb.direction,
@@ -84,7 +87,6 @@ SELECT
   COALESCE(hrunb.distance_beaten, 0) AS distance_beaten,
   COALESCE(hrunb.weight_pounds, 0) AS weight_pounds,
   COALESCE(hrunb.jockey_claim, 0) AS jockey_claim,
-  COALESCE(cf.track_type, '') AS track_type_cf,
   COALESCE(cf.profile, '') AS course_profile,
   COALESCE(cf.general_features, '') AS general_features,
   COALESCE(cf.straight_track_up_to, '') AS straight_track_up_to
@@ -93,10 +95,10 @@ INNER JOIN ", tbl("historic_races_beta"), " hracb
   ON hracb.race_id = hrunb.race_id
 LEFT JOIN ", tbl("course_features"), " cf
   ON cf.course = hracb.course
- AND (
-      cf.race_type = hracb.race_type
-      OR (LOWER(hracb.race_type) LIKE '%flat%'
-          AND LOWER(cf.race_type) LIKE '%flat%')
+ AND cf.race_type = IF(
+       hracb.race_type = 'Flat' AND hracb.track_type != 'Turf',
+       'All Weather Flat',
+       hracb.race_type
      )
 WHERE hracb.meeting_date BETWEEN '", SEASON_FROM, "' AND '", SEASON_TO, "'
   AND hracb.handicap = 1
@@ -108,7 +110,6 @@ WHERE hracb.meeting_date BETWEEN '", SEASON_FROM, "' AND '", SEASON_TO, "'
   AND CAST(hrunb.finish_position AS UNSIGNED) BETWEEN 1 AND 40
   AND COALESCE(hrunb.weight_pounds, 0) > 0
 ")
-
 print(paste("Mordin rematch: fetching flat handicaps", SEASON_FROM, "->", SEASON_TO, "from", DB_SCHEMA))
 raw <- dbGetQuery(con, sql)
 print(paste("Mordin rematch: rows loaded =", nrow(raw)))
@@ -122,8 +123,11 @@ if (nrow(raw) == 0) {
 # 3. Surface + track configuration labels
 # -----------------------------------------------------------------------------
 is_aw_surface <- function(track_type, course, race_type) {
+  # Pipeline values: Turf vs AllWeather (see clean.R / stdtimes.R)
+  tt <- tolower(trimws(as.character(track_type %||% "")))
+  if (nzchar(tt) && tt != "turf") return(TRUE)
   blob <- tolower(paste(track_type, course, race_type, sep = " "))
-  grepl("all\\s*weather|\\baw\\b|polytrack|tapeta|fibresand|synthetic|equitrack|wolverhampton|kempton|lingfield|southwell|newcastle|dundalk", blob)
+  grepl("all\\s*weather|\\baw\\b|polytrack|tapeta|fibresand|synthetic|equitrack", blob)
 }
 
 classify_track_config <- function(course, profile, general_features, straight_up_to) {
@@ -147,7 +151,7 @@ raw <- raw %>%
     meeting_date = as.Date(meeting_date),
     effective_weight = pmax(0, as.numeric(weight_pounds) - as.numeric(jockey_claim)),
     surface = if_else(
-      is_aw_surface(track_type_cf, course, race_type),
+      is_aw_surface(track_type, course, race_type),
       "All-Weather",
       "Turf"
     ),

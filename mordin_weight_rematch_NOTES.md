@@ -43,3 +43,5 @@
 # ---------------------------------------------------------------------------
 # horse_id → runner_id | weight_lbs → weight_pounds - jockey_claim
 # lengths_behind → distance_beaten | tables → historic_*_beta
+# track_type → historic_races_beta.track_type (not course_features)
+# course_features join → same IF(... All Weather Flat ...) as my_daily_races_UPDATE
