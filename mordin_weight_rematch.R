@@ -115,7 +115,7 @@ WHERE hracb.meeting_date BETWEEN '", SEASON_FROM, "' AND '", SEASON_TO, "'
   AND COALESCE(hrunb.weight_pounds, 0) > 0
 ")
 print(paste("Mordin rematch: fetching flat handicaps", SEASON_FROM, "->", SEASON_TO, "from", DB_SCHEMA))
-print("Mordin rematch: script build = surface_v2_vectorized")
+print("Mordin rematch: script build = geometry_v3_case_when")
 raw <- dbGetQuery(con, sql)
 print(paste("Mordin rematch: rows loaded =", nrow(raw)))
 
@@ -125,68 +125,64 @@ if (nrow(raw) == 0) {
 }
 
 # -----------------------------------------------------------------------------
-# 3. Surface + track configuration labels
+# 3. Surface + track geometry labels (fully vectorized — no scalar if())
 # -----------------------------------------------------------------------------
+# Brief primary buckets: Turning Synthetic | Turning Turf | Straight Galloping Turf
 AW_COURSES <- c(
   "Wolverhampton", "Kempton", "Lingfield", "Southwell", "Newcastle",
   "Chelmsford City", "Chelmsford", "Dundalk", "Laytown"
 )
 AW_GOINGS <- c("Slow", "Standard to Slow", "Standard", "Standard to Fast", "Fast")
 
-# Vectorized (dplyr mutate passes whole columns)
-is_aw_surface <- function(track_type, course, race_type, going = "") {
-  tt <- tolower(trimws(as.character(track_type)))
-  c_norm <- gsub("_", " ", as.character(course), fixed = TRUE)
-  g <- trimws(as.character(going))
-  blob <- tolower(paste(course, race_type, sep = " "))
-
-  has_tt <- !is.na(tt) & nzchar(tt)
-  from_tt <- has_tt & tt != "turf"
-  from_going <- !has_tt & !is.na(g) & g %in% AW_GOINGS
-  from_course <- !has_tt & !from_going & !is.na(c_norm) & c_norm %in% AW_COURSES
-  from_blob <- !has_tt & !from_going & !from_course &
-    grepl("all\\s*weather|\\baw\\b|polytrack|tapeta|fibresand|synthetic", blob)
-
-  from_tt | from_going | from_course | from_blob
-}
-
-classify_track_config <- function(course, profile, general_features, straight_up_to) {
-  c_norm <- gsub("_", " ", course %||% "", fixed = TRUE)
-  text <- tolower(paste(c_norm, profile %||% "", general_features %||% "", straight_up_to %||% ""))
-  if (grepl("gallop|straight|stiff|testing|undulat", text) || c_norm %in% GALLOPING_COURSES) {
-    return("Straight / Galloping")
-  }
-  if (grepl("tight|sharp|turn|bend|switchback", text) || c_norm %in% TURNING_COURSES) {
-    return("Turning / Tight")
-  }
-  if (!is.null(straight_up_to) && nzchar(as.character(straight_up_to)) &&
-      !grepl("^\\s*$", as.character(straight_up_to))) {
-    return("Straight / Galloping")
-  }
-  "Unclassified"
-}
-
 raw <- raw %>%
   mutate(
     meeting_date = as.Date(meeting_date),
     effective_weight = pmax(0, as.numeric(weight_pounds) - as.numeric(jockey_claim)),
-    surface = if_else(
-      is_aw_surface(track_type, course, race_type, going),
-      "All-Weather",
-      "Turf"
+    course_norm = gsub("_", " ", as.character(course), fixed = TRUE),
+    tt = tolower(trimws(as.character(track_type))),
+    going_chr = trimws(as.character(going)),
+    profile_blob = tolower(paste(
+      course_norm,
+      coalesce(as.character(course_profile), ""),
+      coalesce(as.character(general_features), ""),
+      coalesce(as.character(straight_track_up_to), "")
+    )),
+    surface = case_when(
+      !is.na(tt) & nzchar(tt) & tt != "turf" ~ "All-Weather",
+      !is.na(tt) & tt == "turf" ~ "Turf",
+      going_chr %in% AW_GOINGS ~ "All-Weather",
+      course_norm %in% AW_COURSES ~ "All-Weather",
+      grepl("all\\s*weather|\\baw\\b|polytrack|tapeta|fibresand|synthetic",
+            tolower(paste(course, race_type))) ~ "All-Weather",
+      TRUE ~ "Turf"
     ),
-    track_config = pmap_chr(
-      list(course, course_profile, general_features, straight_track_up_to),
-      ~ classify_track_config(..1, ..2, ..3, ..4)
+    track_config = case_when(
+      grepl("gallop|straight|stiff|testing|undulat", profile_blob) ~ "Straight / Galloping",
+      course_norm %in% GALLOPING_COURSES ~ "Straight / Galloping",
+      grepl("tight|sharp|turn|bend|switchback", profile_blob) ~ "Turning / Tight",
+      course_norm %in% TURNING_COURSES ~ "Turning / Tight",
+      !is.na(straight_track_up_to) & nzchar(trimws(as.character(straight_track_up_to))) ~
+        "Straight / Galloping",
+      TRUE ~ "Unclassified"
+    ),
+    # Primary DL-task label: Track Type / Geometry
+    track_geometry = case_when(
+      surface == "All-Weather" & track_config == "Turning / Tight" ~ "Turning Synthetic",
+      surface == "All-Weather" & track_config == "Straight / Galloping" ~ "Straight / Galloping Synthetic",
+      surface == "All-Weather" ~ "Synthetic (Other)",
+      surface == "Turf" & track_config == "Turning / Tight" ~ "Turning Turf",
+      surface == "Turf" & track_config == "Straight / Galloping" ~ "Straight Galloping Turf",
+      TRUE ~ "Unclassified"
     ),
     furlongs = as.numeric(distance_yards) / 220
   ) %>%
+  select(-tt, -going_chr, -profile_blob) %>%
   distinct(race_id, runner_id, .keep_all = TRUE)
 
 print("Mordin rematch: surface split")
 print(count(raw, surface))
-print("Mordin rematch: track config split")
-print(count(raw, track_config))
+print("Mordin rematch: track geometry split")
+print(count(raw, track_geometry))
 
 # -----------------------------------------------------------------------------
 # 4-5. Previous run + rematch pairs
@@ -228,6 +224,7 @@ pairs <- by_horse %>%
     loser_beats_winner = as.integer(loser_pos_rematch < winner_pos_rematch),
     rematch_surface = surface_a,
     rematch_track_config = track_config_a,
+    rematch_track_geometry = track_geometry_a,
     rematch_course = course_a,
     rematch_furlongs = furlongs_a,
     rematch_date = meeting_date_a
@@ -263,6 +260,20 @@ by_surface <- mordin_core %>%
     avg_weight_pull_lb = mean(loser_weight_pull, na.rm = TRUE),
     .groups = "drop"
   ) %>%
+  mutate(run_at = run_ts)
+
+# Primary DL-task output: Track Type / Geometry
+by_geometry <- mordin_core %>%
+  group_by(rematch_track_geometry) %>%
+  summarise(
+    total_rematches = n(),
+    loser_won_rematch = sum(loser_beats_winner, na.rm = TRUE),
+    reversal_rate_pct = mean(loser_beats_winner, na.rm = TRUE) * 100,
+    avg_weight_pull_lb = mean(loser_weight_pull, na.rm = TRUE),
+    avg_rematch_furlongs = mean(rematch_furlongs, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(total_rematches)) %>%
   mutate(run_at = run_ts)
 
 by_config <- mordin_core %>%
@@ -316,6 +327,9 @@ cat("Rematch = both horses' immediate next race | pull >=", MIN_WEIGHT_PULL_LB, 
 cat("--- Overall (loser got >=2lb relative pull) ---\n")
 print(overall)
 
+cat("\n--- PRIMARY: By Track Type / Geometry ---\n")
+print(by_geometry)
+
 cat("\n--- By surface (Turf vs All-Weather) ---\n")
 print(by_surface)
 
@@ -336,6 +350,7 @@ tryCatch({
   dbExecute(con, paste0("USE `", DB_SCHEMA, "`"))
   for (pair in list(
     list("mordin_rematch_overall", overall),
+    list("mordin_rematch_by_geometry", by_geometry),
     list("mordin_rematch_by_surface", by_surface),
     list("mordin_rematch_by_config", by_config),
     list("mordin_rematch_by_surface_config", by_surface_config),
@@ -355,6 +370,7 @@ tryCatch({
 out_dir <- "mordin_weight_rematch_out"
 dir.create(out_dir, showWarnings = FALSE)
 write_csv(overall, file.path(out_dir, "overall.csv"))
+write_csv(by_geometry, file.path(out_dir, "by_geometry.csv"))
 write_csv(by_surface, file.path(out_dir, "by_surface.csv"))
 write_csv(by_config, file.path(out_dir, "by_config.csv"))
 write_csv(by_surface_config, file.path(out_dir, "by_surface_config.csv"))
