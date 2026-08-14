@@ -132,18 +132,21 @@ AW_COURSES <- c(
 )
 AW_GOINGS <- c("Slow", "Standard to Slow", "Standard", "Standard to Fast", "Fast")
 
+# Vectorized (dplyr mutate passes whole columns)
 is_aw_surface <- function(track_type, course, race_type, going = "") {
-  # Primary: daily_races_beta.track_type (Turf vs AllWeather / etc.)
-  tt <- tolower(trimws(as.character(track_type %||% "")))
-  if (nzchar(tt)) return(tt != "turf")
-
-  # Fallbacks when daily row missing
-  g <- trimws(as.character(going %||% ""))
-  if (g %in% AW_GOINGS) return(TRUE)
-  c_norm <- gsub("_", " ", course %||% "", fixed = TRUE)
-  if (c_norm %in% AW_COURSES) return(TRUE)
+  tt <- tolower(trimws(as.character(track_type)))
+  c_norm <- gsub("_", " ", as.character(course), fixed = TRUE)
+  g <- trimws(as.character(going))
   blob <- tolower(paste(course, race_type, sep = " "))
-  grepl("all\\s*weather|\\baw\\b|polytrack|tapeta|fibresand|synthetic", blob)
+
+  has_tt <- !is.na(tt) & nzchar(tt)
+  from_tt <- has_tt & tt != "turf"
+  from_going <- !has_tt & !is.na(g) & g %in% AW_GOINGS
+  from_course <- !has_tt & !from_going & !is.na(c_norm) & c_norm %in% AW_COURSES
+  from_blob <- !has_tt & !from_going & !from_course &
+    grepl("all\\s*weather|\\baw\\b|polytrack|tapeta|fibresand|synthetic", blob)
+
+  from_tt | from_going | from_course | from_blob
 }
 
 classify_track_config <- function(course, profile, general_features, straight_up_to) {
