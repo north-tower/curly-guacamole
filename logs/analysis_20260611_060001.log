@@ -1,0 +1,63 @@
+Starting R analysis at Thu Jun 11 06:00:01 AM UTC 2026
+Working directory: /root/curly-guacamole
+Loading required package: nlme
+This is mgcv 1.9-4. For overview type '?mgcv'.
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ dplyr     1.2.1     ✔ readr     2.2.0
+✔ forcats   1.0.1     ✔ stringr   1.6.0
+✔ ggplot2   4.0.3     ✔ tibble    3.3.1
+✔ lubridate 1.9.5     ✔ tidyr     1.3.2
+✔ purrr     1.2.2     
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::arrange()   masks plyr::arrange()
+✖ dplyr::collapse()  masks nlme::collapse()
+✖ purrr::compact()   masks plyr::compact()
+✖ dplyr::count()     masks plyr::count()
+✖ dplyr::desc()      masks plyr::desc()
+✖ dplyr::filter()    masks stats::filter()
+✖ dplyr::lag()       masks stats::lag()
+✖ dplyr::mutate()    masks plyr::mutate()
+✖ dplyr::rename()    masks plyr::rename()
+✖ dplyr::summarise() masks plyr::summarise()
+✖ dplyr::summarize() masks plyr::summarize()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+[1] "Available tables:"
+  Tables_in_coolwed1_wp364 (sr_%)
+1                   sr_daily_data
+2                         sr_data
+3                      sr_results
+4                 sr_sample_races
+[1] "Columns in races data:"
+ [1] "race_id"           "course"            "meeting_date"     
+ [4] "class"             "race_type"         "track_type"       
+ [7] "going"             "adv_going"         "handicap"         
+[10] "distance_yards"    "winning_time_secs" "min_age"          
+[1] "Number of rows in races:"
+[1] 139893
+`summarise()` has regrouped the output.
+ℹ Summaries were computed grouped by course, distance_yards, race_type,
+  track_type, going_value_coef, class_coef, distance_yards_coef, and
+  track_value_coef.
+ℹ Output is grouped by course, distance_yards, race_type, track_type,
+  going_value_coef, class_coef, and distance_yards_coef.
+ℹ Use `summarise(.groups = "drop_last")` to silence this message.
+ℹ Use `summarise(.by = c(course, distance_yards, race_type, track_type,
+  going_value_coef, class_coef, distance_yards_coef, track_value_coef))` for
+  per-operation grouping (`?dplyr::dplyr_by`) instead.
+`summarise()` has regrouped the output.
+ℹ Summaries were computed grouped by race_type, track_type, course,
+  stall_number, distance_yards_min, and distance_yards_max.
+ℹ Output is grouped by race_type, track_type, course, stall_number, and
+  distance_yards_min.
+ℹ Use `summarise(.groups = "drop_last")` to silence this message.
+ℹ Use `summarise(.by = c(race_type, track_type, course, stall_number,
+  distance_yards_min, distance_yards_max))` for per-operation grouping
+  (`?dplyr::dplyr_by`) instead.
+[1] "Writing 1397980 rows to sr_results"
+[1] "Writing 5334 rows to draw_bias"
+[1] "Calling adv_speed_analysis_UPDATE and speed_analysis_UPDATE procedures"
+[1] "Calling speed&performance_table_UPDATE procedure"
+[1] "Calling adv_speed&performance_table_UPDATE procedure"
+[1] "Calling points_published_picks_daily_UPDATE procedure"
+[1] "daily_sires_insights_UPDATE not found in coolwed1_wp364, skipped"
+Analysis completed successfully at Thu Jun 11 06:05:09 AM UTC 2026
