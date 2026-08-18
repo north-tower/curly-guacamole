@@ -1,13 +1,20 @@
 <?php
 /**
- * Racecourse lead-capture banner → Brevo list (FREE #3).
+ * Racecourse lead-capture banner → Brevo list FREE (ID 3).
  *
- * Configure via wp-config.php:
- *   define('FHOR_BREVO_API_KEY', 'xkeysib-...');
- *   define('FHOR_BREVO_LIST_ID', 123); // numeric ID of list "FREE #3"
+ * Load order for credentials:
+ *   1. wp-config.php: define('FHOR_BREVO_API_KEY', '...'); define('FHOR_BREVO_LIST_ID', 3);
+ *   2. inc/brevo-secrets.php (gitignored — copy onto the server once)
+ *   3. Settings → Fhorsite Lead Capture
  *
- * Or Settings → Fhorsite Lead Capture in wp-admin.
+ * List ID defaults to 3 (FREE) if nothing else is set.
  */
+
+$fhor_brevo_secrets = __DIR__ . '/brevo-secrets.php';
+if (is_readable($fhor_brevo_secrets)) {
+    require_once $fhor_brevo_secrets;
+}
+unset($fhor_brevo_secrets);
 
 if (!function_exists('fhor_brevo_api_key')) {
     function fhor_brevo_api_key() {
@@ -28,6 +35,9 @@ if (!function_exists('fhor_brevo_list_id')) {
             return intval(FHOR_BREVO_LIST_ID);
         }
         $opt = intval(get_option('fhor_brevo_list_id', 0));
+        if ($opt <= 0) {
+            $opt = 3; // FREE list
+        }
         return intval(apply_filters('fhor_brevo_list_id', $opt));
     }
 }
@@ -48,7 +58,7 @@ if (!function_exists('fhor_lead_capture_register_settings')) {
         register_setting('fhor_lead_capture', 'fhor_brevo_list_id', [
             'type' => 'integer',
             'sanitize_callback' => 'absint',
-            'default' => 0,
+            'default' => 3,
         ]);
     }
 }
@@ -98,8 +108,8 @@ if (!function_exists('fhor_lead_capture_render_settings_page')) {
                             <?php if ($has_const_list): ?>
                                 <p><em>Using <code>FHOR_BREVO_LIST_ID</code> = <?php echo esc_html((string) intval(FHOR_BREVO_LIST_ID)); ?> from wp-config.</em></p>
                             <?php else: ?>
-                                <input type="number" min="1" class="small-text" id="fhor_brevo_list_id" name="fhor_brevo_list_id" value="<?php echo esc_attr((string) intval(get_option('fhor_brevo_list_id', 0))); ?>" />
-                                <p class="description">Numeric ID only (not the list name). Example: <code>42</code>.</p>
+                                <input type="number" min="1" class="small-text" id="fhor_brevo_list_id" name="fhor_brevo_list_id" value="<?php echo esc_attr((string) intval(get_option('fhor_brevo_list_id', 3) ?: 3)); ?>" />
+                                <p class="description">Numeric ID of the FREE list. Default is <code>3</code>.</p>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -148,13 +158,19 @@ if (!function_exists('fhor_lead_capture_render_banner_html')) {
         <aside class="fhor-lead-capture" aria-label="Free database signup">
             <div class="fhor-lead-capture__inner">
                 <p class="fhor-lead-capture__headline"><?php echo esc_html($headline); ?></p>
-                <form class="fhor-lead-capture__form" id="<?php echo esc_attr($form_id); ?>" data-fhor-lead-form method="post" novalidate>
+                <form class="fhor-lead-capture__form" id="<?php echo esc_attr($form_id); ?>" data-fhor-lead-form method="post" autocomplete="off" novalidate>
                     <?php wp_nonce_field('fhor_lead_capture', 'fhor_lead_nonce'); ?>
                     <input type="hidden" name="action" value="fhor_lead_capture_subscribe" />
                     <input type="hidden" name="course" value="<?php echo esc_attr($course); ?>" />
                     <input type="hidden" name="course_display" value="<?php echo esc_attr($display); ?>" />
                     <input type="hidden" name="course_slug" value="<?php echo esc_attr($slug); ?>" />
-                    <input type="text" name="fhor_website" value="" tabindex="-1" autocomplete="off" class="fhor-lead-capture__hp" aria-hidden="true" />
+                    <input type="hidden" name="fhor_lead_ts" value="<?php echo esc_attr((string) time()); ?>" />
+                    <div class="fhor-lead-capture__hp-wrap" aria-hidden="true">
+                        <label>
+                            <span>Website</span>
+                            <input type="text" name="fhor_website" value="" tabindex="-1" autocomplete="off" />
+                        </label>
+                    </div>
 
                     <div class="fhor-lead-capture__fields">
                         <label class="fhor-lead-capture__field">
@@ -180,7 +196,7 @@ if (!function_exists('fhor_lead_capture_render_banner_html')) {
 if (!function_exists('fhor_lead_capture_styles')) {
     function fhor_lead_capture_styles() {
         return '
-        .fhor-lead-capture{margin:.75rem 0 1rem;padding:1rem 1.1rem;border:1px solid #bbf7d0;border-radius:12px;background:linear-gradient(135deg,#f0fdf4 0%,#fff 70%);box-shadow:0 2px 10px rgba(15,23,42,.04)}
+        .fhor-lead-capture{position:relative;margin:.75rem 0 1rem;padding:1rem 1.1rem;border:1px solid #bbf7d0;border-radius:12px;background:linear-gradient(135deg,#f0fdf4 0%,#fff 70%);box-shadow:0 2px 10px rgba(15,23,42,.04)}
         .fhor-lead-capture__headline{margin:0 0 .85rem;font-size:clamp(.98rem,2.6vw,1.12rem);font-weight:700;line-height:1.4;color:#14532d}
         .fhor-lead-capture__fields{display:flex;flex-wrap:wrap;gap:.55rem;align-items:stretch}
         .fhor-lead-capture__field{flex:1 1 140px;min-width:0}
@@ -193,7 +209,7 @@ if (!function_exists('fhor_lead_capture_styles')) {
         .fhor-lead-capture__status.is-ok{color:#15803d}
         .fhor-lead-capture__status.is-err{color:#b91c1c}
         .fhor-lead-capture__fineprint{margin:.55rem 0 0;font-size:.75rem;color:#64748b;line-height:1.4}
-        .fhor-lead-capture__hp{position:absolute!important;left:-9999px!important;width:1px!important;height:1px!important;opacity:0!important}
+        .fhor-lead-capture__hp-wrap{position:absolute!important;left:-10000px!important;top:auto!important;width:1px!important;height:1px!important;overflow:hidden!important}
         @media (max-width:560px){
             .fhor-lead-capture__submit{width:100%}
         }
@@ -381,10 +397,19 @@ if (!function_exists('fhor_lead_capture_ajax_subscribe')) {
             wp_send_json_error(['message' => 'Session expired. Please refresh and try again.'], 403);
         }
 
-        // Honeypot
+        // Honeypot (Bricks-style hidden Website field). Fake success so bots stop retrying.
         $hp = isset($_POST['fhor_website']) ? trim((string) wp_unslash($_POST['fhor_website'])) : '';
         if ($hp !== '') {
             wp_send_json_success(['message' => "Thanks — you're on the free list."]);
+        }
+
+        // Time trap: reject instant bot posts (allow clock skew).
+        $ts = isset($_POST['fhor_lead_ts']) ? intval($_POST['fhor_lead_ts']) : 0;
+        if ($ts > 0) {
+            $elapsed = time() - $ts;
+            if ($elapsed < 2 || $elapsed > DAY_IN_SECONDS) {
+                wp_send_json_success(['message' => "Thanks — you're on the free list."]);
+            }
         }
 
         $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : 'unknown';
