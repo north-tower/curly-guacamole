@@ -17,8 +17,14 @@ jQuery(document).ready(function($) {
 
     const $container = $('#race-table-container');
     const hasSsr = String($container.data('ssr') || '') === '1' || $container.find('.race-table').length > 0;
+    const isLoggedIn = String((typeof race_ajax_obj !== 'undefined' && race_ajax_obj.is_logged_in) || '') === '1'
+        || (typeof race_ajax_obj !== 'undefined' && race_ajax_obj.is_logged_in === true)
+        || (typeof bricks_tracker_obj !== 'undefined' && !!bricks_tracker_obj.is_logged_in);
     if (!hasSsr) {
         loadRaceTable();
+    } else if (isLoggedIn) {
+        // Cached SSR is guest HTML (no tracker banner). Refresh silently for logged-in users.
+        loadRaceTable({ silent: true });
     }
 
     $('.race-date-tab').on('click', function() {
@@ -150,7 +156,8 @@ jQuery(document).ready(function($) {
         }
     }
 
-    function loadRaceTable() {
+    function loadRaceTable(opts) {
+        const silent = !!(opts && opts.silent);
         let activeDate = currentFilters.date;
         if (!activeDate) {
             activeDate = $('.race-date-tab.active').data('date');
@@ -175,7 +182,9 @@ jQuery(document).ready(function($) {
             sort_direction: currentSort.direction
         };
 
-        $('#race-table-container').html('<div style="text-align:center;padding:40px;">Loading...</div>');
+        if (!silent) {
+            $('#race-table-container').html('<div style="text-align:center;padding:40px;">Loading...</div>');
+        }
 
         $.ajax({
             url: race_ajax_obj.ajax_url,
@@ -191,10 +200,13 @@ jQuery(document).ready(function($) {
                 }
             },
             error: function(xhr, status, error) {
-                $('#race-table-container').html('<div style="text-align:center;padding:40px;color:red;">Error loading races. Please try again.</div>');
                 if (window.console) {
                     console.error('Race table AJAX error:', status, error);
                 }
+                if (silent) {
+                    return;
+                }
+                $('#race-table-container').html('<div style="text-align:center;padding:40px;color:red;">Error loading races. Please try again.</div>');
             }
         });
     }

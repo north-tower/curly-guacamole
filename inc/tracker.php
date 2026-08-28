@@ -521,6 +521,9 @@ function bricks_tracker_inline_styles() {
         background: #fff;
         color: #9a3412;
     }
+    .tracker-alert-strip {
+        display: block;
+    }
     </style>
     <?php
 }

@@ -76,6 +76,7 @@ function bricks_race_table_enqueue_scripts() {
         'ajax_url' => admin_url('admin-ajax.php'),
         'default_date' => $default_date,
         'is_archive' => $is_archive ? 1 : 0,
+        'is_logged_in' => is_user_logged_in() ? 1 : 0,
         'version' => function_exists('bricks_cache_namespace_version')
             ? (string) bricks_cache_namespace_version('race_table')
             : (string) time(),
@@ -168,7 +169,7 @@ function bricks_tracker_enqueue_scripts() {
         get_query_var('racecourses_region') ||
         get_query_var('festivals_index') ||
         get_query_var('festival_slug') ||
-        bricks_request_uri_contains(['/my-tracker', '/points-backtest', '/today-picks', '/race/', '/horse-history/', '/race-comments/', '/tracks', '/racecourses', '/festivals']) ||
+        bricks_request_uri_contains(['/my-tracker', '/points-backtest', '/today-picks', '/race/', '/horse-history/', '/race-comments/', '/daily', '/tracks', '/racecourses', '/festivals']) ||
         bricks_current_post_has_shortcode([
             'my_tracker_dashboard',
             'race_table',

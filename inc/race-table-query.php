@@ -44,12 +44,137 @@ if (!function_exists('bricks_race_table_render_pagination')) {
     }
 }
 
+if (!function_exists('bricks_race_table_render_tracker_banner')) {
+    /**
+     * @param array<int, array<string, mixed>> $banner_rows
+     */
+    function bricks_race_table_render_tracker_banner($banner_rows) {
+        if (empty($banner_rows) || !is_array($banner_rows)) {
+            return '';
+        }
+
+        $summary_items = [];
+        foreach ($banner_rows as $banner_row) {
+            if (!is_array($banner_row)) {
+                continue;
+            }
+            $race_id = isset($banner_row['race_id']) ? intval($banner_row['race_id']) : 0;
+            $horses = isset($banner_row['horses']) ? array_values(array_filter((array) $banner_row['horses'])) : [];
+            if ($race_id <= 0 || empty($horses)) {
+                continue;
+            }
+            $time = !empty($banner_row['scheduled_time']) ? date('H:i', strtotime((string) $banner_row['scheduled_time'])) : '--:--';
+            $label = $time . ' ' . (string) ($banner_row['course'] ?? '') . ' - ' . implode(', ', $horses);
+            $url = function_exists('bricks_race_url') ? bricks_race_url($race_id) : '#';
+            $summary_items[] = '<a href="' . esc_url($url) . '" class="tracker-summary-link" title="' . esc_attr($label) . '">' . esc_html($label) . '</a>';
+        }
+
+        if (empty($summary_items)) {
+            return '';
+        }
+
+        return '<div class="tracker-alert-strip" style="margin:0 0 14px 0;padding:12px 14px;border-radius:10px;background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border:1px solid #f59e0b;">
+                    <div class="tracker-alert-strip__title" style="font-weight:800;color:#92400e;font-size:13px;margin-bottom:8px;">📝 Tracker Alerts Today</div>
+                    <div class="tracker-alert-strip__list" style="display:flex;flex-direction:column;gap:6px;">' . implode('', $summary_items) . '</div>
+                </div>';
+    }
+}
+
+if (!function_exists('bricks_race_table_collect_tracker_alerts')) {
+    /**
+     * Match tracked horses against every runner on a meeting date (not just the current table page).
+     *
+     * @return array{by_race: array<int, array<string, string>>, banner: array<int, array<string, mixed>>}
+     */
+    function bricks_race_table_collect_tracker_alerts($date, $races_table, $runners_table, $course = '') {
+        global $wpdb;
+
+        $empty = ['by_race' => [], 'banner' => []];
+        if (!is_user_logged_in()
+            || !function_exists('bricks_tracker_get_user_data')
+            || !function_exists('bricks_tracker_normalize_horse_key')) {
+            return $empty;
+        }
+
+        $tracker_data = bricks_tracker_get_user_data(get_current_user_id());
+        $tracked_keys = [];
+        foreach ($tracker_data as $tracker_entry) {
+            if (!is_array($tracker_entry) || empty($tracker_entry['horse_name'])) {
+                continue;
+            }
+            $key = bricks_tracker_normalize_horse_key($tracker_entry['horse_name']);
+            if ($key !== '') {
+                $tracked_keys[$key] = $tracker_entry['horse_name'];
+            }
+        }
+        if (empty($tracked_keys)) {
+            return $empty;
+        }
+
+        $races_table = preg_replace('/[^a-zA-Z0-9_]/', '', (string) $races_table);
+        $runners_table = preg_replace('/[^a-zA-Z0-9_]/', '', (string) $runners_table);
+        if ($races_table === '' || $runners_table === '') {
+            return $empty;
+        }
+
+        $sql = "SELECT ru.race_id, ru.name, r.scheduled_time, r.course
+            FROM `$runners_table` ru
+            INNER JOIN `$races_table` r ON r.race_id = ru.race_id
+            WHERE r.meeting_date = %s AND ru.name IS NOT NULL AND ru.name != ''";
+        $params = [$date];
+        if ($course !== '') {
+            $sql .= ' AND r.course = %s';
+            $params[] = $course;
+        }
+
+        $runner_rows = $wpdb->get_results($wpdb->prepare($sql, ...$params));
+        $by_race = [];
+        $meta = [];
+        foreach ((array) $runner_rows as $runner_row) {
+            $runner_key = bricks_tracker_normalize_horse_key((string) ($runner_row->name ?? ''));
+            $runner_race_id = intval($runner_row->race_id ?? 0);
+            if ($runner_key === '' || $runner_race_id <= 0 || !isset($tracked_keys[$runner_key])) {
+                continue;
+            }
+            if (!isset($by_race[$runner_race_id])) {
+                $by_race[$runner_race_id] = [];
+                $meta[$runner_race_id] = [
+                    'scheduled_time' => (string) ($runner_row->scheduled_time ?? ''),
+                    'course' => (string) ($runner_row->course ?? ''),
+                ];
+            }
+            $by_race[$runner_race_id][$runner_key] = $tracked_keys[$runner_key];
+        }
+
+        $banner = [];
+        foreach ($by_race as $race_id => $horses) {
+            $banner[] = [
+                'race_id' => (int) $race_id,
+                'scheduled_time' => $meta[$race_id]['scheduled_time'] ?? '',
+                'course' => $meta[$race_id]['course'] ?? '',
+                'horses' => array_values($horses),
+            ];
+        }
+        usort($banner, static function ($a, $b) {
+            $a_ts = !empty($a['scheduled_time']) ? strtotime((string) $a['scheduled_time']) : 0;
+            $b_ts = !empty($b['scheduled_time']) ? strtotime((string) $b['scheduled_time']) : 0;
+            if ($a_ts !== $b_ts) {
+                return $a_ts <=> $b_ts;
+            }
+            return strcasecmp((string) ($a['course'] ?? ''), (string) ($b['course'] ?? ''));
+        });
+
+        return ['by_race' => $by_race, 'banner' => $banner];
+    }
+}
+
 if (!function_exists('bricks_race_table_build_html')) {
     /**
      * @param array<int, object> $results
      * @param array<int, array<string, string>> $race_tracker_alerts
+     * @param array<int, array<string, mixed>> $tracker_banner_rows
      */
-    function bricks_race_table_build_html($results, $total_races, $paged, $per_page, $race_tracker_alerts = []) {
+    function bricks_race_table_build_html($results, $total_races, $paged, $per_page, $race_tracker_alerts = [], $tracker_banner_rows = []) {
         $total_pages = max(1, (int) ceil(intval($total_races) / max(1, intval($per_page))));
         $paged = max(1, intval($paged));
 
@@ -61,24 +186,23 @@ if (!function_exists('bricks_race_table_build_html')) {
         $current_course = '';
         $tracker_summary_html = '';
 
-        if (!empty($race_tracker_alerts)) {
-            $summary_items = [];
+        if (!empty($tracker_banner_rows) && function_exists('bricks_race_table_render_tracker_banner')) {
+            $tracker_summary_html = bricks_race_table_render_tracker_banner($tracker_banner_rows);
+        } elseif (!empty($race_tracker_alerts) && function_exists('bricks_race_table_render_tracker_banner')) {
+            $fallback_banner = [];
             foreach ($results as $summary_row) {
                 $summary_race_id = isset($summary_row->race_id) ? intval($summary_row->race_id) : 0;
                 if ($summary_race_id <= 0 || empty($race_tracker_alerts[$summary_race_id])) {
                     continue;
                 }
-                $summary_horses = array_values($race_tracker_alerts[$summary_race_id]);
-                $summary_time = !empty($summary_row->scheduled_time) ? date('H:i', strtotime($summary_row->scheduled_time)) : '--:--';
-                $summary_label = $summary_time . ' ' . (string) ($summary_row->course ?? '') . ' - ' . implode(', ', $summary_horses);
-                $summary_items[] = '<a href="' . esc_url(bricks_race_url($summary_race_id)) . '" class="tracker-summary-link" title="' . esc_attr($summary_label) . '">' . esc_html($summary_label) . '</a>';
+                $fallback_banner[] = [
+                    'race_id' => $summary_race_id,
+                    'scheduled_time' => (string) ($summary_row->scheduled_time ?? ''),
+                    'course' => (string) ($summary_row->course ?? ''),
+                    'horses' => array_values($race_tracker_alerts[$summary_race_id]),
+                ];
             }
-            if (!empty($summary_items)) {
-                $tracker_summary_html = '<div class="tracker-alert-strip" style="margin:0 0 14px 0;padding:12px 14px;border-radius:10px;background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border:1px solid #f59e0b;">
-                    <div style="font-weight:800;color:#92400e;font-size:13px;margin-bottom:8px;">📝 Tracker Alerts Today</div>
-                    <div style="display:flex;flex-direction:column;gap:6px;">' . implode('', $summary_items) . '</div>
-                </div>';
-            }
+            $tracker_summary_html = bricks_race_table_render_tracker_banner($fallback_banner);
         }
 
         echo $tracker_summary_html;
@@ -294,47 +418,32 @@ if (!function_exists('bricks_race_table_query_html')) {
         );
 
         $race_tracker_alerts = [];
-        if (!empty($args['include_tracker']) && is_user_logged_in() && !empty($results)
-            && function_exists('bricks_tracker_get_user_data') && function_exists('bricks_tracker_normalize_horse_key')) {
-            $tracker_data = bricks_tracker_get_user_data(get_current_user_id());
-            $tracked_keys = [];
-            foreach ($tracker_data as $tracker_entry) {
-                if (!is_array($tracker_entry) || empty($tracker_entry['horse_name'])) {
-                    continue;
-                }
-                $key = bricks_tracker_normalize_horse_key($tracker_entry['horse_name']);
-                if ($key !== '') {
-                    $tracked_keys[$key] = $tracker_entry['horse_name'];
+        $tracker_banner_rows = [];
+        if (!empty($args['include_tracker']) && is_user_logged_in() && function_exists('bricks_race_table_collect_tracker_alerts')) {
+            $collected = bricks_race_table_collect_tracker_alerts(
+                $date,
+                $table,
+                $runners_table,
+                (string) $args['course']
+            );
+            $tracker_banner_rows = $collected['banner'];
+            $page_race_ids = [];
+            foreach ((array) $results as $result_row) {
+                $page_race_id = isset($result_row->race_id) ? intval($result_row->race_id) : 0;
+                if ($page_race_id > 0) {
+                    $page_race_ids[$page_race_id] = true;
                 }
             }
-            if (!empty($tracked_keys)) {
-                $race_ids = array_values(array_filter(array_map(static function ($r) {
-                    return isset($r->race_id) ? intval($r->race_id) : 0;
-                }, $results)));
-                if (!empty($race_ids)) {
-                    $placeholders = implode(',', array_fill(0, count($race_ids), '%d'));
-                    $runner_rows = $wpdb->get_results($wpdb->prepare(
-                        "SELECT race_id, name FROM `$runners_table` WHERE race_id IN ($placeholders) AND name IS NOT NULL AND name != ''",
-                        ...$race_ids
-                    ));
-                    foreach ((array) $runner_rows as $runner_row) {
-                        $runner_key = bricks_tracker_normalize_horse_key((string) ($runner_row->name ?? ''));
-                        $runner_race_id = intval($runner_row->race_id ?? 0);
-                        if ($runner_key === '' || $runner_race_id <= 0 || !isset($tracked_keys[$runner_key])) {
-                            continue;
-                        }
-                        if (!isset($race_tracker_alerts[$runner_race_id])) {
-                            $race_tracker_alerts[$runner_race_id] = [];
-                        }
-                        $race_tracker_alerts[$runner_race_id][$runner_key] = $tracked_keys[$runner_key];
-                    }
+            foreach ($collected['by_race'] as $alert_race_id => $horses) {
+                if (isset($page_race_ids[intval($alert_race_id)])) {
+                    $race_tracker_alerts[intval($alert_race_id)] = $horses;
                 }
             }
         }
 
-        $html = bricks_race_table_build_html($results ?: [], $total_races, $paged, $per_page, $race_tracker_alerts);
+        $html = bricks_race_table_build_html($results ?: [], $total_races, $paged, $per_page, $race_tracker_alerts, $tracker_banner_rows);
 
-        if (!empty($args['use_cache']) && empty($race_tracker_alerts) && function_exists('bricks_cache_key')) {
+        if (!empty($args['use_cache']) && empty($race_tracker_alerts) && empty($tracker_banner_rows) && function_exists('bricks_cache_key')) {
             $today = function_exists('bricks_daily_archive_today') ? bricks_daily_archive_today() : wp_date('Y-m-d');
             $ttl = ($date < $today) ? 6 * HOUR_IN_SECONDS : 5 * MINUTE_IN_SECONDS;
             set_transient(bricks_cache_key('race_table', $filter_signature), $html, $ttl);

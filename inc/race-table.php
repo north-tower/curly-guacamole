@@ -449,8 +449,8 @@ function bricks_race_table_shortcode($atts = []) {
             'date' => $active_date,
             'page' => 1,
             'course' => $lock_course ? $locked_course : '',
-            'include_tracker' => false,
-            'use_cache' => true,
+            'include_tracker' => is_user_logged_in(),
+            'use_cache' => !is_user_logged_in(),
         ]);
     }
 
