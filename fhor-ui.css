@@ -44,7 +44,9 @@
 }
 
 #brx-content.proven-winners-page-shell,
-.proven-winners-page-shell {
+.proven-winners-page-shell,
+#brx-content.sb-page-shell,
+.sb-page-shell {
   box-sizing: border-box;
   overflow-x: clip;
   width: 100%;
@@ -512,7 +514,8 @@
   gap: 8px;
   padding: 10px 14px;
   border-radius: 999px;
-  color: #fff;
+  background: #0f172a;
+  color: #fff !important;
   font-weight: 700;
   font-size: 13px;
   text-decoration: none;
@@ -523,10 +526,12 @@
 
 .fhor-fab__link:hover {
   transform: translateY(-1px);
-  color: #fff;
+  color: #fff !important;
 }
 
 .fhor-fab__link--tracker { background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); }
+.fhor-fab__link--builder { background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%); }
+.fhor-fab__link--qualifiers { background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%); }
 .fhor-fab__link--picks { background: linear-gradient(135deg, #0f766e 0%, #115e59 100%); }
 .fhor-fab__link--backtest { background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%); }
 .fhor-fab__link--sires { background: linear-gradient(135deg, #059669 0%, #047857 100%); }
@@ -581,7 +586,9 @@
   }
 
   #brx-content.proven-winners-page-shell,
-  .proven-winners-page-shell {
+  .proven-winners-page-shell,
+  #brx-content.sb-page-shell,
+  .sb-page-shell {
     padding: 16px 16px calc(24px + var(--fhor-fab-clearance)) !important;
   }
 
@@ -753,7 +760,7 @@
   }
 
   .fhor-fab.is-open .fhor-fab__links {
-    max-height: 420px;
+    max-height: 520px;
     opacity: 1;
     pointer-events: auto;
     transform: translateY(0);

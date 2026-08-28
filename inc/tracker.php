@@ -182,6 +182,8 @@ if (!function_exists('bricks_tracker_should_load_frontend_assets')) {
             $has_route_match = bricks_request_uri_contains([
                 '/my-tracker',
                 '/points-backtest',
+                '/system-builder',
+                '/my-qualifiers',
                 '/today-picks',
                 '/daily_sires_insights',
                 '/admin-pnl',
@@ -535,7 +537,11 @@ function bricks_tracker_floating_quick_link() {
         is_admin() ||
         !bricks_tracker_should_load_frontend_assets() ||
         get_query_var('my_tracker_page') ||
-        get_query_var('my_points_backtest')
+        get_query_var('my_points_backtest') ||
+        get_query_var('fhor_system_builder') ||
+        get_query_var('fhor_my_qualifiers') ||
+        (function_exists('fhor_sb_is_request') && fhor_sb_is_request()) ||
+        (function_exists('fhor_sb_is_qualifiers_request') && fhor_sb_is_qualifiers_request())
     ) {
         return;
     }
@@ -543,6 +549,10 @@ function bricks_tracker_floating_quick_link() {
     <div class="fhor-fab" id="fhorFabMenu">
         <div class="fhor-fab__links" id="fhorFabLinks">
             <a class="fhor-fab__link fhor-fab__link--tracker" href="<?php echo esc_url(home_url('/my-tracker/')); ?>" title="Open My Tracker">📝 My Tracker</a>
+            <?php if (function_exists('fhor_sb_user_can_access') && fhor_sb_user_can_access()): ?>
+            <a class="fhor-fab__link fhor-fab__link--builder" href="<?php echo esc_url(home_url('/system-builder/')); ?>" title="Open System Builder">📐 System Builder</a>
+            <a class="fhor-fab__link fhor-fab__link--qualifiers" href="<?php echo esc_url(home_url('/my-qualifiers/')); ?>" title="Open My Daily Qualifiers">🔔 My Qualifiers</a>
+            <?php endif; ?>
             <?php if (function_exists('bricks_user_can_access_points_backtest') && bricks_user_can_access_points_backtest()): ?>
             <a class="fhor-fab__link fhor-fab__link--picks" href="<?php echo esc_url(home_url('/today-picks/')); ?>" title="Open Today's Picks (audit sheet)">📋 Today's Picks</a>
             <a class="fhor-fab__link fhor-fab__link--backtest" href="<?php echo esc_url(home_url('/points-backtest/')); ?>" title="Open Points Backtest">📊 Points Backtest</a>

@@ -163,13 +163,14 @@ function bricks_tracker_enqueue_scripts() {
         get_query_var('my_tracker_page') ||
         get_query_var('my_points_backtest') ||
         get_query_var('my_today_picks_page') ||
+        get_query_var('fhor_system_builder') ||
         get_query_var('track_slug') ||
         get_query_var('tracks_index') ||
         get_query_var('racecourses_index') ||
         get_query_var('racecourses_region') ||
         get_query_var('festivals_index') ||
         get_query_var('festival_slug') ||
-        bricks_request_uri_contains(['/my-tracker', '/points-backtest', '/today-picks', '/race/', '/horse-history/', '/race-comments/', '/daily', '/tracks', '/racecourses', '/festivals']) ||
+        bricks_request_uri_contains(['/my-tracker', '/points-backtest', '/today-picks', '/system-builder', '/my-qualifiers', '/race/', '/horse-history/', '/race-comments/', '/daily', '/tracks', '/racecourses', '/festivals']) ||
         bricks_current_post_has_shortcode([
             'my_tracker_dashboard',
             'race_table',
@@ -185,6 +186,7 @@ function bricks_tracker_enqueue_scripts() {
             'race_comment_history',
             'race_detail',
             'points_backtest',
+            'system_builder',
         ]);
 
     if (!$needs_tracker_assets) {
