@@ -624,26 +624,32 @@ if (!function_exists('bricks_proven_winners_collect_courses')) {
 if (!function_exists('bricks_proven_winners_enqueue_styles')) {
     function bricks_proven_winners_enqueue_styles() {
         $css = '
-        .proven-winners-page{--pw-green:#16a34a;--pw-green-soft:#ecfdf5}
-        .pw-hero{margin-bottom:1.5rem}
+        .proven-winners-page{--pw-green:#16a34a;--pw-green-soft:#ecfdf5;box-sizing:border-box;width:100%;max-width:1180px;margin:0 auto;color:#0f172a}
+        .proven-winners-page *,.proven-winners-page *::before,.proven-winners-page *::after{box-sizing:border-box}
+        .pw-hero{margin-bottom:1.25rem}
         .pw-title{margin:0 0 .5rem;font-size:clamp(1.75rem,3vw,2.25rem);line-height:1.2}
-        .pw-lead{margin:0;color:#475569;font-size:1.05rem;line-height:1.6;max-width:720px}
-        .pw-explainer{margin:.75rem 0 0;padding:.75rem .9rem;max-width:720px;font-size:.88rem;line-height:1.55;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px}
-        .pw-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem;margin:1.25rem 0 1.75rem}
-        .pw-stat{padding:.85rem 1rem;border:1px solid #e2e8f0;border-radius:10px;background:#fff}
+        .pw-lead{margin:0;color:#475569;font-size:1.05rem;line-height:1.6;max-width:46rem}
+        .pw-explainer{margin:.75rem 0 0;padding:.85rem 1rem;max-width:46rem;font-size:.88rem;line-height:1.55;color:#475569;background:#fff;border:1px solid #e2e8f0;border-radius:12px}
+        .pw-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;margin:1.25rem 0 1.5rem}
+        .pw-stat{padding:.9rem 1rem;border:1px solid #e2e8f0;border-radius:12px;background:#fff;box-shadow:0 1px 4px rgba(15,23,42,.04)}
         .pw-stat-label{display:block;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b}
         .pw-stat-value{display:block;margin-top:.25rem;font-size:1.25rem;font-weight:800;color:#111827}
         .pw-stat-value.is-pos{color:#15803d}
         .pw-stat-value.is-neg{color:#b91c1c}
         .pw-stat-meta{display:block;margin-top:.35rem;font-size:.72rem;line-height:1.4;color:#94a3b8}
-        .pw-toolbar{display:flex;flex-direction:column;gap:.75rem;margin:0 0 1.25rem}
-        .pw-search{width:100%;max-width:360px;padding:.55rem .75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem}
-        .pw-toolbar-row{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
-        .pw-filters{display:flex;flex-wrap:wrap;gap:.5rem}
-        .pw-chip{padding:.4rem .8rem;border:1px solid #e2e8f0;border-radius:999px;background:#fff;font-size:.85rem;font-weight:600;cursor:pointer}
+        .pw-toolbar{display:flex;flex-direction:column;gap:1rem;margin:0 0 1.25rem;padding:1rem 1.1rem;background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 1px 4px rgba(15,23,42,.04)}
+        .pw-search-wrap{display:flex;flex-direction:column;gap:.35rem;max-width:420px;width:100%}
+        .pw-search-wrap label,.pw-filter-group label{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#475569}
+        .pw-search{width:100%;max-width:none;padding:.6rem .8rem;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;background:#fff}
+        .pw-search:focus,.pw-select:focus{outline:none;border-color:#86efac;box-shadow:0 0 0 3px rgba(22,163,74,.15)}
+        .pw-toolbar-controls{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.85rem 1rem}
+        .pw-filters{display:flex;flex-wrap:wrap;gap:.45rem;margin-right:auto}
+        .pw-chip{padding:.45rem .85rem;border:1px solid #e2e8f0;border-radius:999px;background:#fff;font-size:.85rem;font-weight:600;cursor:pointer;color:#334155}
         .pw-chip.is-active{background:var(--pw-green);border-color:var(--pw-green);color:#fff}
-        .pw-select{padding:.4rem .65rem;border:1px solid #e2e8f0;border-radius:8px;background:#fff;font-size:.85rem;font-weight:600;color:#334155;cursor:pointer}
-        .pw-results-meta{font-size:.8rem;color:#64748b;margin:0 0 .75rem}
+        .pw-select-groups{display:grid;grid-template-columns:repeat(3,minmax(160px,220px));gap:.75rem;flex:0 1 auto}
+        .pw-filter-group{display:flex;flex-direction:column;gap:.35rem;min-width:0}
+        .proven-winners-page select.pw-select,.pw-select{display:block;width:100%;max-width:100%;min-width:0;padding:.55rem .7rem;border:1px solid #e2e8f0;border-radius:8px;background:#fff;font-size:.85rem;font-weight:600;color:#334155;cursor:pointer;appearance:auto}
+        .pw-results-meta{font-size:.8rem;color:#64748b;margin:0 0 .85rem}
         .pw-masonry{column-count:3;column-gap:1.25rem}
         .pw-card{break-inside:avoid;display:block;margin:0 0 1.25rem;padding:1rem 1.1rem;border:1px solid #e2e8f0;border-radius:12px;background:#fff;text-decoration:none;color:inherit;transition:border-color .2s,box-shadow .2s,transform .2s}
         .pw-card:hover,.pw-card:focus-visible{border-color:var(--pw-green);box-shadow:0 6px 20px rgba(15,23,42,.08);transform:translateY(-2px);outline:none}
@@ -669,13 +675,19 @@ if (!function_exists('bricks_proven_winners_enqueue_styles')) {
         .pw-roi span{font-weight:700;font-size:.72rem}
         .pw-roi.is-win span{color:#15803d}
         .pw-roi.is-loss span{color:#b91c1c}
-        .pw-empty{padding:2rem;text-align:center;color:#64748b;border:1px dashed #e2e8f0;border-radius:12px}
-        .pw-load-more-wrap{text-align:center;margin:1rem 0 2rem}
-        .pw-load-more{padding:.55rem 1.1rem;border:1px solid #e2e8f0;border-radius:8px;background:#fff;font-size:.9rem;font-weight:700;cursor:pointer}
-        .pw-load-more:hover{border-color:var(--pw-green);color:#15803d}
-        .pw-load-more:disabled{opacity:.5;cursor:not-allowed}
-        @media (max-width:1024px){.pw-masonry{column-count:2}}
-        @media (max-width:640px){.pw-masonry{column-count:1}.pw-search{max-width:none}}
+        .pw-empty{padding:2rem;text-align:center;color:#64748b;border:1px dashed #e2e8f0;border-radius:12px;background:#fff}
+        .pw-pagination{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.4rem;margin:1.25rem 0 2rem}
+        .pw-pagination[hidden]{display:none!important}
+        .pw-page-btn{min-width:2.4rem;height:2.4rem;padding:0 .7rem;border:1px solid #e2e8f0;border-radius:10px;background:#fff;font-size:.85rem;font-weight:700;color:#334155;cursor:pointer;line-height:1}
+        .pw-page-btn:hover:not(:disabled):not(.is-active){border-color:var(--pw-green);color:#15803d}
+        .pw-page-btn.is-active{background:var(--pw-green);border-color:var(--pw-green);color:#fff}
+        .pw-page-btn:disabled{opacity:.4;cursor:not-allowed}
+        .pw-page-btn.is-nav{min-width:4.5rem}
+        .pw-page-ellipsis{padding:0 .25rem;color:#94a3b8;font-weight:700;user-select:none}
+        .pw-page-status{width:100%;text-align:center;font-size:.78rem;color:#64748b;margin-bottom:.15rem}
+        @media (max-width:1024px){.pw-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.pw-masonry{column-count:2}.pw-select-groups{grid-template-columns:repeat(3,minmax(0,1fr))}}
+        @media (max-width:720px){.pw-select-groups{grid-template-columns:1fr;width:100%}.pw-search-wrap{max-width:none}}
+        @media (max-width:640px){.pw-masonry{column-count:1}.pw-stats{grid-template-columns:1fr}.pw-toolbar{padding:.85rem}.proven-winners-page-shell{padding-left:16px;padding-right:16px}}
         ';
         wp_register_style('bricks-proven-winners', false);
         wp_enqueue_style('bricks-proven-winners');
@@ -822,44 +834,80 @@ if (!function_exists('bricks_proven_winners_archive_shortcode')) {
             <?php endif; ?>
 
             <div class="pw-toolbar">
-                <input
-                    type="search"
-                    class="pw-search"
-                    id="pw-search"
-                    placeholder="Search horse, track, or race…"
-                    aria-label="Search horse, track, or race"
-                    autocomplete="off"
-                />
-                <div class="pw-toolbar-row">
+                <div class="pw-search-wrap">
+                    <label for="pw-search">Search</label>
+                    <input
+                        type="search"
+                        class="pw-search"
+                        id="pw-search"
+                        placeholder="Horse, track, or race…"
+                        aria-label="Search horse, track, or race"
+                        autocomplete="off"
+                    />
+                </div>
+                <div class="pw-toolbar-controls">
                     <div class="pw-filters" role="tablist" aria-label="Filter winners">
                         <button type="button" class="pw-chip is-active" data-pw-filter="all">All winners</button>
                         <button type="button" class="pw-chip" data-pw-filter="featured">Big prices (10/1+)</button>
                         <button type="button" class="pw-chip" data-pw-filter="ew-big">Big EW (10/1+)</button>
                     </div>
-                    <select class="pw-select" id="pw-sort" aria-label="Sort results">
-                        <option value="recent">Most recent</option>
-                        <option value="roi-desc">ROI high–low</option>
-                        <option value="price-desc">Price high–low</option>
-                        <option value="ew-desc">EW profit high–low</option>
-                    </select>
-                    <select class="pw-select" id="pw-track" aria-label="Filter by track">
-                        <option value="">All tracks</option>
-                        <?php foreach ($courses as $course): ?>
-                            <option value="<?php echo esc_attr($course); ?>"><?php echo esc_html($course); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <select class="pw-select" id="pw-date" aria-label="Filter by date">
-                        <option value="">All dates</option>
-                        <option value="90">Last 90 days</option>
-                        <option value="180">Last 180 days</option>
-                        <option value="365">Last 365 days</option>
-                        <?php foreach ($years as $year): ?>
-                            <option value="year-<?php echo esc_attr($year); ?>"><?php echo esc_html($year); ?></option>
-                        <?php endforeach; ?>
-                        <?php foreach ($months as $month_key): ?>
-                            <option value="month-<?php echo esc_attr($month_key); ?>"><?php echo esc_html(wp_date('F Y', strtotime($month_key . '-01'))); ?></option>
-                        <?php endforeach; ?>
-                    </select>
+                    <div class="pw-select-groups">
+                        <div class="pw-filter-group">
+                            <label for="pw-sort">Sort</label>
+                            <select class="pw-select" id="pw-sort">
+                                <optgroup label="Order">
+                                    <option value="recent">Most recent</option>
+                                    <option value="roi-desc">Highest ROI</option>
+                                    <option value="price-desc">Biggest price</option>
+                                    <option value="ew-desc">Best EW profit</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="pw-filter-group">
+                            <label for="pw-track">Track</label>
+                            <select class="pw-select" id="pw-track">
+                                <option value="">All tracks</option>
+                                <optgroup label="Racecourse">
+                                    <?php foreach ($courses as $course): ?>
+                                        <option value="<?php echo esc_attr($course); ?>"><?php echo esc_html($course); ?></option>
+                                    <?php endforeach; ?>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="pw-filter-group">
+                            <label for="pw-date">Date</label>
+                            <select class="pw-select" id="pw-date">
+                                <option value="">All dates</option>
+                                <optgroup label="Recent">
+                                    <option value="7">Last 7 days</option>
+                                    <option value="14">Last 14 days</option>
+                                    <option value="30">Last 30 days</option>
+                                    <option value="60">Last 60 days</option>
+                                    <option value="90">Last 90 days</option>
+                                    <option value="180">Last 6 months</option>
+                                    <option value="365">Last 12 months</option>
+                                </optgroup>
+                                <optgroup label="This period">
+                                    <option value="this-month">This month</option>
+                                    <option value="last-month">Last month</option>
+                                </optgroup>
+                                <?php if (!empty($years)): ?>
+                                <optgroup label="Calendar year">
+                                    <?php foreach ($years as $year): ?>
+                                        <option value="year-<?php echo esc_attr($year); ?>"><?php echo esc_html($year); ?></option>
+                                    <?php endforeach; ?>
+                                </optgroup>
+                                <?php endif; ?>
+                                <?php if (!empty($months)): ?>
+                                <optgroup label="By month">
+                                    <?php foreach ($months as $month_key): ?>
+                                        <option value="month-<?php echo esc_attr($month_key); ?>"><?php echo esc_html(wp_date('F Y', strtotime($month_key . '-01'))); ?></option>
+                                    <?php endforeach; ?>
+                                </optgroup>
+                                <?php endif; ?>
+                            </select>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -948,9 +996,7 @@ if (!function_exists('bricks_proven_winners_archive_shortcode')) {
                     <?php endforeach; ?>
                 </div>
                 <div class="pw-card-hold" id="pw-card-hold" hidden aria-hidden="true"></div>
-                <div class="pw-load-more-wrap" id="pw-load-more-wrap"<?php echo (count($cases) <= $per_page) ? ' hidden' : ''; ?>>
-                    <button type="button" class="pw-load-more" id="pw-load-more">Load more</button>
-                </div>
+                <nav class="pw-pagination" id="pw-pagination" aria-label="Proven winners pages"<?php echo (count($cases) <= $per_page) ? ' hidden' : ''; ?>></nav>
                 <div class="pw-empty" id="pw-no-results" hidden>No winners match your filters.</div>
             <?php endif; ?>
         </div>

@@ -43,6 +43,23 @@
   padding: 12px 12px calc(24px + var(--fhor-fab-clearance));
 }
 
+#brx-content.proven-winners-page-shell,
+.proven-winners-page-shell {
+  box-sizing: border-box;
+  overflow-x: clip;
+  width: 100%;
+  max-width: 100%;
+  background: var(--fhor-bg);
+  padding: 24px 24px calc(32px + var(--fhor-fab-clearance)) !important;
+}
+
+.proven-winners-page-shell .proven-winners-page {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
 .race-detail-page-shell .race-detail-container {
   padding: 0;
   margin: 0 auto;
@@ -561,6 +578,11 @@
 
   .race-detail-page-shell {
     padding: 8px 8px calc(20px + var(--fhor-fab-clearance));
+  }
+
+  #brx-content.proven-winners-page-shell,
+  .proven-winners-page-shell {
+    padding: 16px 16px calc(24px + var(--fhor-fab-clearance)) !important;
   }
 
   .race-table-wrapper {
