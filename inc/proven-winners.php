@@ -265,6 +265,19 @@ if (!function_exists('bricks_proven_winners_compute_single_race_roi')) {
     }
 }
 
+if (!function_exists('bricks_proven_winners_max_cases')) {
+    function bricks_proven_winners_max_cases() {
+        return 1500;
+    }
+}
+
+if (!function_exists('bricks_proven_winners_names_match')) {
+    function bricks_proven_winners_names_match($a, $b) {
+        return bricks_proven_winners_normalize_horse($a) === bricks_proven_winners_normalize_horse($b)
+            && bricks_proven_winners_normalize_horse($a) !== '';
+    }
+}
+
 if (!function_exists('bricks_proven_winners_fetch_db_cases')) {
     /**
      * Published Points Engine win picks that actually won.
@@ -274,7 +287,8 @@ if (!function_exists('bricks_proven_winners_fetch_db_cases')) {
     function bricks_proven_winners_fetch_db_cases($limit = 60, $min_sp_decimal = 0.0) {
         global $wpdb;
 
-        $limit = max(1, min(120, intval($limit)));
+        $max = function_exists('bricks_proven_winners_max_cases') ? bricks_proven_winners_max_cases() : 1500;
+        $limit = max(1, min($max, intval($limit)));
         $min_sp_decimal = floatval($min_sp_decimal);
 
         if (!function_exists('bricks_points_published_picks_table_name')) {
@@ -305,6 +319,7 @@ if (!function_exists('bricks_proven_winners_fetch_db_cases')) {
 
         $winner_sql = "(
             ru.finish_position = 1 OR ru.finish_position = '1'
+            OR ru.finish_position = '1.0' OR ru.finish_position = '01'
             OR CAST(ru.finish_position AS UNSIGNED) = 1
             OR LOWER(TRIM(ru.finish_position)) IN ('1st', 'first')
         )";
@@ -313,8 +328,13 @@ if (!function_exists('bricks_proven_winners_fetch_db_cases')) {
         $title_select = $title_col !== '' ? ", r.`" . esc_sql($title_col) . "` AS race_title" : ", '' AS race_title";
         $time_select = $time_col !== '' ? ", r.`" . esc_sql($time_col) . "` AS scheduled_time" : ", '' AS scheduled_time";
 
+        $name_sql = 'ru.`' . esc_sql($name_col) . '`';
+        $name_norm_sql = "LOWER(TRIM(REPLACE(REPLACE(REPLACE(REPLACE($name_sql, CHAR(160), ' '), CHAR(9), ' '), '  ', ' '), '  ', ' ')))";
+        $pick_norm_sql = "LOWER(TRIM(REPLACE(REPLACE(REPLACE(REPLACE(pp.win_horse, CHAR(160), ' '), CHAR(9), ' '), '  ', ' '), '  ', ' ')))";
+        $sql_limit = $min_sp_decimal > 0 ? min($max, $limit * 2) : $limit;
+
         $sql = "SELECT pp.meeting_date, pp.win_horse, pp.place_horses, pp.ew_simple_horse, pp.ew_edge_horse,
-                       r.race_id, r.course
+                       r.race_id, r.course, $name_sql AS runner_horse
                        $title_select
                        $time_select
                        $sp_select
@@ -322,12 +342,12 @@ if (!function_exists('bricks_proven_winners_fetch_db_cases')) {
                 INNER JOIN `$races_table` r ON r.race_id = pp.race_id AND r.meeting_date = pp.meeting_date
                 INNER JOIN `$runners_table` ru ON ru.race_id = pp.race_id
                 WHERE $winner_sql
-                  AND LOWER(TRIM(ru.`" . esc_sql($name_col) . "`)) = LOWER(TRIM(pp.win_horse))
+                  AND $name_norm_sql = $pick_norm_sql
                 ORDER BY pp.meeting_date DESC, r.race_id DESC
                 LIMIT %d";
 
         $wpdb->suppress_errors(true);
-        $rows = (array) $wpdb->get_results($wpdb->prepare($sql, $limit * 3));
+        $rows = (array) $wpdb->get_results($wpdb->prepare($sql, $sql_limit));
         $wpdb->suppress_errors(false);
 
         if (empty($rows)) {
@@ -337,6 +357,9 @@ if (!function_exists('bricks_proven_winners_fetch_db_cases')) {
         $candidate_rows = [];
         $race_ids = [];
         foreach ($rows as $row) {
+            if (!bricks_proven_winners_names_match($row->win_horse ?? '', $row->runner_horse ?? $row->win_horse ?? '')) {
+                continue;
+            }
             $sp_decimal = bricks_proven_winners_parse_sp_decimal($row->starting_price ?? '');
             if ($min_sp_decimal > 0 && ($sp_decimal === null || $sp_decimal < $min_sp_decimal)) {
                 continue;
@@ -444,8 +467,9 @@ if (!function_exists('bricks_proven_winners_manual_cases')) {
 
 if (!function_exists('bricks_proven_winners_get_cases')) {
     function bricks_proven_winners_get_cases($limit = 48, $min_sp_decimal = 0.0) {
-        $limit = max(1, min(120, intval($limit)));
-        $cache_key = 'bricks_proven_winners_v2_' . $limit . '_' . floatval($min_sp_decimal);
+        $max = function_exists('bricks_proven_winners_max_cases') ? bricks_proven_winners_max_cases() : 1500;
+        $limit = max(1, min($max, intval($limit)));
+        $cache_key = 'bricks_proven_winners_v3_' . $limit . '_' . floatval($min_sp_decimal);
         $cached = get_transient($cache_key);
         if (is_array($cached)) {
             return $cached;
@@ -625,6 +649,7 @@ if (!function_exists('bricks_proven_winners_enqueue_styles')) {
         .pw-card:hover,.pw-card:focus-visible{border-color:var(--pw-green);box-shadow:0 6px 20px rgba(15,23,42,.08);transform:translateY(-2px);outline:none}
         .pw-card.is-featured{border-color:#86efac;background:linear-gradient(180deg,#f0fdf4 0%,#fff 40%)}
         .pw-card.is-hidden{display:none!important}
+        .pw-card-hold{display:none!important}
         .pw-card-media{display:block;width:100%;border-radius:8px;margin-bottom:.75rem;overflow:hidden;background:#f1f5f9}
         .pw-card-media img{display:block;width:100%;height:auto}
         .pw-card-badge{display:inline-block;margin-bottom:.5rem;padding:.2rem .55rem;border-radius:999px;background:var(--pw-green);color:#fff;font-size:.7rem;font-weight:800;text-transform:uppercase}
@@ -702,7 +727,7 @@ if (!function_exists('bricks_proven_winners_render_strategy_roi')) {
 if (!function_exists('bricks_proven_winners_archive_shortcode')) {
     function bricks_proven_winners_archive_shortcode($atts = []) {
         $atts = shortcode_atts([
-            'limit' => '120',
+            'limit' => '1500',
             'min_sp' => '0',
             'stats_days' => '365',
             'per_page' => '24',
@@ -711,7 +736,8 @@ if (!function_exists('bricks_proven_winners_archive_shortcode')) {
         bricks_proven_winners_enqueue_styles();
         bricks_proven_winners_enqueue_scripts();
 
-        $limit = max(1, min(120, intval($atts['limit'])));
+        $max = function_exists('bricks_proven_winners_max_cases') ? bricks_proven_winners_max_cases() : 1500;
+        $limit = max(1, min($max, intval($atts['limit'])));
         $per_page = max(6, min(48, intval($atts['per_page'])));
         $min_sp = floatval($atts['min_sp']);
         $cases = bricks_proven_winners_get_cases($limit, $min_sp);
@@ -722,13 +748,24 @@ if (!function_exists('bricks_proven_winners_archive_shortcode')) {
         $courses = bricks_proven_winners_collect_courses($cases);
 
         $years = [];
+        $months = [];
+        $archive_from = '';
+        $archive_to = '';
         foreach ($cases as $case) {
             $md = (string) ($case['meeting_date'] ?? '');
-            if (preg_match('/^(\d{4})/', $md, $m)) {
+            if (preg_match('/^(\d{4})-(\d{2})/', $md, $m)) {
                 $years[$m[1]] = $m[1];
+                $months[$m[1] . '-' . $m[2]] = $m[1] . '-' . $m[2];
+            }
+            if ($md !== '') {
+                if ($archive_to === '') {
+                    $archive_to = $md;
+                }
+                $archive_from = $md;
             }
         }
         rsort($years);
+        krsort($months);
 
         ob_start();
         ?>
@@ -744,6 +781,12 @@ if (!function_exists('bricks_proven_winners_archive_shortcode')) {
                 </p>
                 <p class="pw-explainer">
                     Each card below is a published win pick that won. The summary ROI figures above are calculated across <em>every</em> published pick in the period—including races that lost—so a negative percentage does not contradict this archive; it reflects full-period staking, not winner-only results.
+                    <?php if ($archive_from !== '' && $archive_to !== ''): ?>
+                        Settled win-pick hits currently listed:
+                        <?php echo esc_html(wp_date('j M Y', strtotime($archive_from))); ?>
+                        –
+                        <?php echo esc_html(wp_date('j M Y', strtotime($archive_to))); ?>.
+                    <?php endif; ?>
                 </p>
             </header>
 
@@ -783,19 +826,21 @@ if (!function_exists('bricks_proven_winners_archive_shortcode')) {
                     type="search"
                     class="pw-search"
                     id="pw-search"
-                    placeholder="Search horse name…"
-                    aria-label="Search horse name"
+                    placeholder="Search horse, track, or race…"
+                    aria-label="Search horse, track, or race"
                     autocomplete="off"
                 />
                 <div class="pw-toolbar-row">
                     <div class="pw-filters" role="tablist" aria-label="Filter winners">
                         <button type="button" class="pw-chip is-active" data-pw-filter="all">All winners</button>
                         <button type="button" class="pw-chip" data-pw-filter="featured">Big prices (10/1+)</button>
+                        <button type="button" class="pw-chip" data-pw-filter="ew-big">Big EW (10/1+)</button>
                     </div>
                     <select class="pw-select" id="pw-sort" aria-label="Sort results">
                         <option value="recent">Most recent</option>
                         <option value="roi-desc">ROI high–low</option>
                         <option value="price-desc">Price high–low</option>
+                        <option value="ew-desc">EW profit high–low</option>
                     </select>
                     <select class="pw-select" id="pw-track" aria-label="Filter by track">
                         <option value="">All tracks</option>
@@ -810,6 +855,9 @@ if (!function_exists('bricks_proven_winners_archive_shortcode')) {
                         <option value="365">Last 365 days</option>
                         <?php foreach ($years as $year): ?>
                             <option value="year-<?php echo esc_attr($year); ?>"><?php echo esc_html($year); ?></option>
+                        <?php endforeach; ?>
+                        <?php foreach ($months as $month_key): ?>
+                            <option value="month-<?php echo esc_attr($month_key); ?>"><?php echo esc_html(wp_date('F Y', strtotime($month_key . '-01'))); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -845,6 +893,10 @@ if (!function_exists('bricks_proven_winners_archive_shortcode')) {
                         $best_profit = ($best_key !== '' && !empty($strategies[$best_key]))
                             ? floatval($strategies[$best_key]['profit'] ?? 0)
                             : 0.0;
+                        $ew_simple_profit = floatval($strategies['ew_simple']['profit'] ?? 0);
+                        $ew_edge_profit = floatval($strategies['ew_edge']['profit'] ?? 0);
+                        $ew_best = max($ew_simple_profit, $ew_edge_profit);
+                        $ew_hit = !empty($strategies['ew_simple']['hit']) || !empty($strategies['ew_edge']['hit']);
                         $card_url = !empty($case['race_url']) ? $case['race_url'] : '#';
                         $meeting_date = (string) ($case['meeting_date'] ?? '');
                         $date_label = $meeting_date !== ''
@@ -852,16 +904,21 @@ if (!function_exists('bricks_proven_winners_archive_shortcode')) {
                             : '';
                         $course = (string) ($case['course'] ?? '');
                         $horse = (string) ($case['horse'] ?? '');
+                        $race_title = (string) ($case['race_title'] ?? '');
+                        $search_haystack = strtolower(trim(implode(' ', array_filter([$horse, $course, $race_title, $date_label]))));
                         ?>
                         <a
                             href="<?php echo esc_url($card_url); ?>"
                             class="pw-card<?php echo $is_featured ? ' is-featured' : ''; ?><?php echo ($case_index >= $per_page) ? ' is-hidden' : ''; ?>"
                             data-pw-featured="<?php echo $is_featured ? '1' : '0'; ?>"
+                            data-pw-ew-hit="<?php echo $ew_hit ? '1' : '0'; ?>"
                             data-pw-horse="<?php echo esc_attr(strtolower($horse)); ?>"
+                            data-pw-search="<?php echo esc_attr($search_haystack); ?>"
                             data-pw-course="<?php echo esc_attr($course); ?>"
                             data-pw-date="<?php echo esc_attr($meeting_date); ?>"
                             data-pw-sp="<?php echo esc_attr((string) $sp_decimal); ?>"
                             data-pw-best-roi="<?php echo esc_attr((string) $best_profit); ?>"
+                            data-pw-ew-roi="<?php echo esc_attr((string) $ew_best); ?>"
                         >
                             <?php if (!empty($case['image_url'])): ?>
                                 <span class="pw-card-media">
@@ -890,6 +947,7 @@ if (!function_exists('bricks_proven_winners_archive_shortcode')) {
                         </a>
                     <?php endforeach; ?>
                 </div>
+                <div class="pw-card-hold" id="pw-card-hold" hidden aria-hidden="true"></div>
                 <div class="pw-load-more-wrap" id="pw-load-more-wrap"<?php echo (count($cases) <= $per_page) ? ' hidden' : ''; ?>>
                     <button type="button" class="pw-load-more" id="pw-load-more">Load more</button>
                 </div>
@@ -925,6 +983,7 @@ if (!function_exists('bricks_proven_winners_maybe_enqueue_scripts')) {
     function bricks_proven_winners_maybe_enqueue_scripts() {
         if (
             get_query_var('proven_winners_page')
+            || (function_exists('bricks_proven_winners_is_request') && bricks_proven_winners_is_request())
             || (function_exists('bricks_current_post_has_shortcode') && bricks_current_post_has_shortcode(['proven_winners_archive']))
         ) {
             bricks_proven_winners_enqueue_styles();

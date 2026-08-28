@@ -1,33 +1,43 @@
 (function () {
     'use strict';
 
-    document.addEventListener('DOMContentLoaded', function () {
-        var root = document.getElementById('proven-winners-archive');
-        if (!root) {
+    function initProvenWinnersArchive(root) {
+        if (!root || root.getAttribute('data-pw-ready') === '1') {
             return;
         }
+        root.setAttribute('data-pw-ready', '1');
 
-        var masonry = document.getElementById('pw-masonry');
+        var masonry = root.querySelector('#pw-masonry') || root.querySelector('.pw-masonry');
         if (!masonry) {
             return;
         }
 
+        var hold = root.querySelector('#pw-card-hold');
+        if (!hold) {
+            hold = document.createElement('div');
+            hold.id = 'pw-card-hold';
+            hold.className = 'pw-card-hold';
+            hold.hidden = true;
+            hold.setAttribute('aria-hidden', 'true');
+            root.appendChild(hold);
+        }
+
         var chips = root.querySelectorAll('.pw-chip');
-        var searchInput = document.getElementById('pw-search');
-        var sortSelect = document.getElementById('pw-sort');
-        var trackSelect = document.getElementById('pw-track');
-        var dateSelect = document.getElementById('pw-date');
-        var resultsMeta = document.getElementById('pw-results-meta');
-        var loadMoreWrap = document.getElementById('pw-load-more-wrap');
-        var loadMoreBtn = document.getElementById('pw-load-more');
-        var noResults = document.getElementById('pw-no-results');
+        var searchInput = root.querySelector('#pw-search') || root.querySelector('.pw-search');
+        var sortSelect = root.querySelector('#pw-sort');
+        var trackSelect = root.querySelector('#pw-track');
+        var dateSelect = root.querySelector('#pw-date');
+        var resultsMeta = root.querySelector('#pw-results-meta');
+        var loadMoreWrap = root.querySelector('#pw-load-more-wrap');
+        var loadMoreBtn = root.querySelector('#pw-load-more');
+        var noResults = root.querySelector('#pw-no-results');
 
         var perPage = parseInt(root.getAttribute('data-pw-per-page') || '24', 10);
         if (!perPage || perPage < 1) {
             perPage = 24;
         }
 
-        var allCards = Array.prototype.slice.call(masonry.querySelectorAll('.pw-card'));
+        var allCards = Array.prototype.slice.call(root.querySelectorAll('.pw-card'));
         var activeFilter = 'all';
         var visibleLimit = perPage;
 
@@ -46,34 +56,52 @@
             return d.getTime();
         }
 
+        function norm(str) {
+            return String(str || '')
+                .toLowerCase()
+                .replace(/[_-]+/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
         function cardMatchesFilters(card) {
             var featured = card.getAttribute('data-pw-featured') === '1';
+            var ewHit = card.getAttribute('data-pw-ew-hit') === '1';
             if (activeFilter === 'featured' && !featured) {
                 return false;
             }
+            if (activeFilter === 'ew-big' && !(featured && ewHit)) {
+                return false;
+            }
 
-            var query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+            var query = searchInput ? norm(searchInput.value) : '';
             if (query) {
-                var horse = (card.getAttribute('data-pw-horse') || '').toLowerCase();
-                if (horse.indexOf(query) === -1) {
+                var haystack = norm(
+                    card.getAttribute('data-pw-search') ||
+                        card.getAttribute('data-pw-horse') ||
+                        ''
+                );
+                if (haystack.indexOf(query) === -1) {
                     return false;
                 }
             }
 
             if (trackSelect && trackSelect.value) {
-                var course = card.getAttribute('data-pw-course') || '';
-                if (course !== trackSelect.value) {
+                if (norm(card.getAttribute('data-pw-course')) !== norm(trackSelect.value)) {
                     return false;
                 }
             }
 
             if (dateSelect && dateSelect.value) {
-                var cardDate = parseDate(card.getAttribute('data-pw-date') || '');
+                var cardDateStr = card.getAttribute('data-pw-date') || '';
+                var cardDate = parseDate(cardDateStr);
                 var val = dateSelect.value;
                 if (val.indexOf('year-') === 0) {
-                    var year = val.slice(5);
-                    var cardYear = (card.getAttribute('data-pw-date') || '').slice(0, 4);
-                    if (cardYear !== year) {
+                    if (cardDateStr.slice(0, 4) !== val.slice(5)) {
+                        return false;
+                    }
+                } else if (val.indexOf('month-') === 0) {
+                    if (cardDateStr.slice(0, 7) !== val.slice(6)) {
                         return false;
                     }
                 } else {
@@ -96,6 +124,12 @@
                     if (roiB !== roiA) {
                         return roiB - roiA;
                     }
+                } else if (mode === 'ew-desc') {
+                    var ewA = parseFloat(a.getAttribute('data-pw-ew-roi') || '0');
+                    var ewB = parseFloat(b.getAttribute('data-pw-ew-roi') || '0');
+                    if (ewB !== ewA) {
+                        return ewB - ewA;
+                    }
                 } else if (mode === 'price-desc') {
                     var spA = parseFloat(a.getAttribute('data-pw-sp') || '0');
                     var spB = parseFloat(b.getAttribute('data-pw-sp') || '0');
@@ -115,13 +149,14 @@
 
             allCards.forEach(function (card) {
                 card.classList.add('is-hidden');
+                hold.appendChild(card);
             });
 
             sorted.forEach(function (card, index) {
                 if (index < visibleLimit) {
                     card.classList.remove('is-hidden');
+                    masonry.appendChild(card);
                 }
-                masonry.appendChild(card);
             });
 
             var shown = Math.min(visibleLimit, sorted.length);
@@ -151,8 +186,10 @@
             visibleLimit = perPage;
         }
 
-        chips.forEach(function (chip) {
-            chip.addEventListener('click', function () {
+        root.addEventListener('click', function (event) {
+            var chip = event.target.closest ? event.target.closest('.pw-chip') : null;
+            if (chip && root.contains(chip)) {
+                event.preventDefault();
                 chips.forEach(function (c) {
                     c.classList.remove('is-active');
                 });
@@ -160,33 +197,47 @@
                 activeFilter = chip.getAttribute('data-pw-filter') || 'all';
                 resetPagination();
                 applyView();
-            });
-        });
-
-        if (searchInput) {
-            searchInput.addEventListener('input', function () {
-                resetPagination();
-                applyView();
-            });
-        }
-
-        [sortSelect, trackSelect, dateSelect].forEach(function (el) {
-            if (!el) {
                 return;
             }
-            el.addEventListener('change', function () {
-                resetPagination();
-                applyView();
-            });
-        });
-
-        if (loadMoreBtn) {
-            loadMoreBtn.addEventListener('click', function () {
+            if (loadMoreBtn && (event.target === loadMoreBtn || loadMoreBtn.contains(event.target))) {
+                event.preventDefault();
                 visibleLimit += perPage;
                 applyView();
-            });
-        }
+            }
+        });
+
+        root.addEventListener('input', function (event) {
+            if (searchInput && event.target === searchInput) {
+                resetPagination();
+                applyView();
+            }
+        });
+
+        root.addEventListener('change', function (event) {
+            var target = event.target;
+            if (!target) {
+                return;
+            }
+            if (target === sortSelect || target === trackSelect || target === dateSelect) {
+                resetPagination();
+                applyView();
+            }
+        });
 
         applyView();
-    });
+    }
+
+    function boot() {
+        var roots = document.querySelectorAll('.proven-winners-page, #proven-winners-archive');
+        if (!roots.length) {
+            return;
+        }
+        Array.prototype.forEach.call(roots, initProvenWinnersArchive);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
 })();
