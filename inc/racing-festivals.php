@@ -2,8 +2,8 @@
 /**
  * UK & Irish racing festival landing hubs (/festivals/{slug}/).
  *
- * Seasonal hubs for Cheltenham, Grand National, Royal Ascot, Galway — timed to
- * the UK/Irish racing calendar with Fhorsite ratings, racecourse links, and live cards.
+ * Seasonal directory of 16 major UK and Irish meetings, timed to the racing
+ * calendar with Fhorsite ratings, racecourse links, and live cards.
  *
  * Bricks: [racing_festivals_index] · [racing_festival_hub]
  */
@@ -17,14 +17,15 @@ if (!function_exists('bricks_festival_definitions')) {
             'cheltenham' => [
                 'slug' => 'cheltenham',
                 'aliases' => ['cheltenham-festival'],
-                'name' => 'The Cheltenham Festival',
+                'name' => 'Cheltenham Festival',
                 'short_name' => 'Cheltenham Festival',
                 'course' => 'Cheltenham',
                 'course_slug' => 'cheltenham',
                 'country' => 'England',
                 'region' => 'uk-jumps',
+                'directory' => 'uk',
                 'season' => 'spring',
-                'typical_timing' => 'March (Race Week)',
+                'typical_timing' => 'March (4 days, mid-March)',
                 'window_start' => '03-10',
                 'window_end' => '03-14',
                 'lead' => 'National Hunt\'s flagship meeting — Champion Hurdle, Queen Mother Champion Chase, Stayers\' Hurdle, and the Cheltenham Gold Cup. Fhorsite speed ratings and Points Engine picks for every UK jumps festival race.',
@@ -38,14 +39,15 @@ if (!function_exists('bricks_festival_definitions')) {
             'grand-national' => [
                 'slug' => 'grand-national',
                 'aliases' => ['aintree', 'grand-national-festival', 'aintree-grand-national'],
-                'name' => 'Grand National Festival',
+                'name' => 'Aintree Grand National Meeting',
                 'short_name' => 'Grand National',
                 'course' => 'Aintree',
                 'course_slug' => 'aintree',
                 'country' => 'England',
                 'region' => 'uk-jumps',
+                'directory' => 'uk',
                 'season' => 'spring',
-                'typical_timing' => 'April (Aintree meeting)',
+                'typical_timing' => 'April (3 days, early to mid-April)',
                 'window_start' => '04-03',
                 'window_end' => '04-05',
                 'lead' => 'Aintree\'s three-day festival culminating in the Randox Grand National — the world\'s most famous steeplechase. Turf and jumps ratings, draw-bias notes, and published Points Engine win picks.',
@@ -53,6 +55,66 @@ if (!function_exists('bricks_festival_definitions')) {
                     ['name' => 'Manifesto Novices\' Chase', 'day' => 'Thursday', 'day_offset' => 0],
                     ['name' => 'Mildmay Novices\' Hurdle', 'day' => 'Friday', 'day_offset' => 1],
                     ['name' => 'Randox Grand National', 'day' => 'Saturday', 'day_offset' => 2],
+                ],
+            ],
+            'scottish-grand-national' => [
+                'slug' => 'scottish-grand-national',
+                'aliases' => ['ayr', 'scottish-national', 'ayr-scottish-grand-national'],
+                'name' => 'Scottish Grand National Festival',
+                'short_name' => 'Scottish Grand National',
+                'course' => 'Ayr',
+                'course_slug' => 'ayr',
+                'country' => 'Scotland',
+                'region' => 'uk-jumps',
+                'directory' => 'uk',
+                'season' => 'spring',
+                'typical_timing' => 'April (2 days, mid-April at Ayr)',
+                'window_start' => '04-17',
+                'window_end' => '04-18',
+                'lead' => 'Two days of National Hunt racing at Ayr, headlined by the Scottish Grand National in mid-April. Fhorsite jumps ratings, course form, and Points Engine picks for the Ayr festival card.',
+                'highlight_races' => [
+                    ['name' => 'Scottish Champion Hurdle', 'day' => 'Friday', 'day_offset' => 0],
+                    ['name' => 'Scottish Grand National', 'day' => 'Saturday', 'day_offset' => 1],
+                ],
+            ],
+            'guineas-festival' => [
+                'slug' => 'guineas-festival',
+                'aliases' => ['guineas', 'newmarket-guineas', '2000-guineas'],
+                'name' => 'Guineas Festival',
+                'short_name' => 'Guineas Festival',
+                'course' => 'Newmarket',
+                'course_slug' => 'newmarket',
+                'country' => 'England',
+                'region' => 'uk-flat',
+                'directory' => 'uk',
+                'season' => 'spring',
+                'typical_timing' => 'Early May (2 days at Newmarket)',
+                'window_start' => '05-01',
+                'window_end' => '05-03',
+                'lead' => 'Newmarket\'s Classic curtain-raiser — the 2000 Guineas and 1000 Guineas over the Rowley Mile. Turf speed ratings, draw-bias notes, and Fhorsite Points Engine analysis for Guineas weekend.',
+                'highlight_races' => [
+                    ['name' => '2000 Guineas', 'day' => 'Saturday', 'day_offset' => 1],
+                    ['name' => '1000 Guineas', 'day' => 'Sunday', 'day_offset' => 2],
+                ],
+            ],
+            'derby-festival' => [
+                'slug' => 'derby-festival',
+                'aliases' => ['derby', 'epsom-derby', 'the-derby', 'oaks'],
+                'name' => 'The Derby Festival',
+                'short_name' => 'Derby Festival',
+                'course' => 'Epsom',
+                'course_slug' => 'epsom',
+                'country' => 'England',
+                'region' => 'uk-flat',
+                'directory' => 'uk',
+                'season' => 'summer',
+                'typical_timing' => 'Early June (2 days at Epsom Downs)',
+                'window_start' => '06-05',
+                'window_end' => '06-06',
+                'lead' => 'Epsom Downs\' two-day Classic meeting — the Oaks and the Derby on the unique cambered turf. Fhorsite speed figures, course form, and published Points Engine win picks for the Derby Festival.',
+                'highlight_races' => [
+                    ['name' => 'The Oaks', 'day' => 'Friday', 'day_offset' => 0],
+                    ['name' => 'The Derby', 'day' => 'Saturday', 'day_offset' => 1],
                 ],
             ],
             'royal-ascot' => [
@@ -64,8 +126,9 @@ if (!function_exists('bricks_festival_definitions')) {
                 'course_slug' => 'ascot',
                 'country' => 'England',
                 'region' => 'uk-flat',
+                'directory' => 'uk',
                 'season' => 'summer',
-                'typical_timing' => 'June (Royal Meeting)',
+                'typical_timing' => 'Mid-June (5 days at Ascot)',
                 'window_start' => '06-17',
                 'window_end' => '06-21',
                 'lead' => 'Five days of elite flat racing on Ascot\'s turf — from the Gold Cup to the Diamond Jubilee Stakes. Turf speed ratings, draw bias, and Nap of the Day-style Points Engine analysis for every Royal Ascot race.',
@@ -74,6 +137,132 @@ if (!function_exists('bricks_festival_definitions')) {
                     ['name' => 'Prince of Wales\'s Stakes', 'day' => 'Wednesday', 'day_offset' => 1],
                     ['name' => 'Ascot Gold Cup', 'day' => 'Thursday', 'day_offset' => 2],
                     ['name' => 'Diamond Jubilee Stakes', 'day' => 'Saturday', 'day_offset' => 4],
+                ],
+            ],
+            'glorious-goodwood' => [
+                'slug' => 'glorious-goodwood',
+                'aliases' => ['goodwood', 'goodwood-festival', 'qatar-goodwood'],
+                'name' => 'Glorious Goodwood',
+                'short_name' => 'Glorious Goodwood',
+                'course' => 'Goodwood',
+                'course_slug' => 'goodwood',
+                'country' => 'England',
+                'region' => 'uk-flat',
+                'directory' => 'uk',
+                'season' => 'summer',
+                'typical_timing' => 'Late July / early August (5 days at Goodwood)',
+                'window_start' => '07-28',
+                'window_end' => '08-01',
+                'lead' => 'Five days on the Goodwood downs — Sussex Stakes, Nassau Stakes, and the Stewards\' Cup. Turf speed ratings, draw-bias notes, and Fhorsite Points Engine history for Glorious Goodwood.',
+                'highlight_races' => [
+                    ['name' => 'Goodwood Cup', 'day' => 'Tuesday', 'day_offset' => 0],
+                    ['name' => 'Sussex Stakes', 'day' => 'Wednesday', 'day_offset' => 1],
+                    ['name' => 'Nassau Stakes', 'day' => 'Saturday', 'day_offset' => 4],
+                    ['name' => 'Stewards\' Cup', 'day' => 'Saturday', 'day_offset' => 4],
+                ],
+            ],
+            'ebor-festival' => [
+                'slug' => 'ebor-festival',
+                'aliases' => ['ebor', 'york-ebor', 'york-festival'],
+                'name' => 'The Ebor Festival',
+                'short_name' => 'Ebor Festival',
+                'course' => 'York',
+                'course_slug' => 'york',
+                'country' => 'England',
+                'region' => 'uk-flat',
+                'directory' => 'uk',
+                'season' => 'summer',
+                'typical_timing' => 'August (4 days at York)',
+                'window_start' => '08-19',
+                'window_end' => '08-22',
+                'lead' => 'York\'s four-day August meeting — Juddmonte International, Yorkshire Oaks, Nunthorpe Stakes, and the Ebor Handicap. Knavesmire speed ratings, draw bias, and Points Engine winners.',
+                'highlight_races' => [
+                    ['name' => 'Juddmonte International', 'day' => 'Wednesday', 'day_offset' => 0],
+                    ['name' => 'Yorkshire Oaks', 'day' => 'Thursday', 'day_offset' => 1],
+                    ['name' => 'Nunthorpe Stakes', 'day' => 'Friday', 'day_offset' => 2],
+                    ['name' => 'Ebor Handicap', 'day' => 'Saturday', 'day_offset' => 3],
+                ],
+            ],
+            'st-leger-festival' => [
+                'slug' => 'st-leger-festival',
+                'aliases' => ['st-leger', 'doncaster-st-leger', 'st-leger-stakes'],
+                'name' => 'St Leger Festival',
+                'short_name' => 'St Leger Festival',
+                'course' => 'Doncaster',
+                'course_slug' => 'doncaster',
+                'country' => 'England',
+                'region' => 'uk-flat',
+                'directory' => 'uk',
+                'season' => 'autumn',
+                'typical_timing' => 'September (4 days at Doncaster)',
+                'window_start' => '09-10',
+                'window_end' => '09-13',
+                'lead' => 'Doncaster\'s four-day September festival culminating in the St Leger, the oldest Classic. Town Moor ratings, staying-trip form, and Fhorsite Points Engine picks for St Leger week.',
+                'highlight_races' => [
+                    ['name' => 'Champagne Stakes', 'day' => 'Thursday', 'day_offset' => 0],
+                    ['name' => 'St Leger Stakes', 'day' => 'Saturday', 'day_offset' => 2],
+                ],
+            ],
+            'british-champions-day' => [
+                'slug' => 'british-champions-day',
+                'aliases' => ['champions-day', 'qipco-champions-day', 'british-champions'],
+                'name' => 'British Champions Day',
+                'short_name' => 'Champions Day',
+                'course' => 'Ascot',
+                'course_slug' => 'ascot',
+                'country' => 'England',
+                'region' => 'uk-flat',
+                'directory' => 'uk',
+                'season' => 'autumn',
+                'typical_timing' => 'Mid-October (1 day at Ascot)',
+                'window_start' => '10-17',
+                'window_end' => '10-17',
+                'lead' => 'QIPCO British Champions Day at Ascot — the one-day finale of the flat season, including the Champion Stakes and Queen Elizabeth II Stakes. Fhorsite turf speed figures and Points Engine analysis.',
+                'highlight_races' => [
+                    ['name' => 'British Champions Sprint', 'day' => 'Saturday', 'day_offset' => 0],
+                    ['name' => 'Queen Elizabeth II Stakes', 'day' => 'Saturday', 'day_offset' => 0],
+                    ['name' => 'Champion Stakes', 'day' => 'Saturday', 'day_offset' => 0],
+                ],
+            ],
+            'punchestown' => [
+                'slug' => 'punchestown',
+                'aliases' => ['punchestown-festival'],
+                'name' => 'Punchestown Festival',
+                'short_name' => 'Punchestown Festival',
+                'course' => 'Punchestown',
+                'course_slug' => 'punchestown',
+                'country' => 'Ireland',
+                'region' => 'ireland',
+                'directory' => 'ireland',
+                'season' => 'spring',
+                'typical_timing' => 'Late April / early May (5 days at Punchestown)',
+                'window_start' => '04-28',
+                'window_end' => '05-02',
+                'lead' => 'Five days of Irish National Hunt championship racing at Punchestown in late April and early May. Irish jumps speed figures, course form, and Fhorsite Points Engine picks for Punchestown Festival week.',
+                'highlight_races' => [
+                    ['name' => 'Punchestown Champion Chase', 'day' => 'Tuesday', 'day_offset' => 0],
+                    ['name' => 'Punchestown Gold Cup', 'day' => 'Wednesday', 'day_offset' => 1],
+                    ['name' => 'Champion Stayers Hurdle', 'day' => 'Thursday', 'day_offset' => 2],
+                    ['name' => 'Punchestown Champion Hurdle', 'day' => 'Friday', 'day_offset' => 3],
+                ],
+            ],
+            'irish-grand-national' => [
+                'slug' => 'irish-grand-national',
+                'aliases' => ['fairyhouse', 'fairyhouse-easter', 'easter-festival', 'irish-national'],
+                'name' => 'Irish Grand National',
+                'short_name' => 'Fairyhouse Easter Festival',
+                'course' => 'Fairyhouse',
+                'course_slug' => 'fairyhouse',
+                'country' => 'Ireland',
+                'region' => 'ireland',
+                'directory' => 'ireland',
+                'season' => 'spring',
+                'typical_timing' => 'Easter Monday (Fairyhouse Easter Festival)',
+                'window_start' => '04-03',
+                'window_end' => '04-06',
+                'lead' => 'Fairyhouse\'s Easter Festival, climaxing in the Irish Grand National on Easter Monday. Irish staying-chase ratings, racecourse guide notes, and published Fhorsite Points Engine winners.',
+                'highlight_races' => [
+                    ['name' => 'Irish Grand National', 'day' => 'Easter Monday', 'day_offset' => 3],
                 ],
             ],
             'galway' => [
@@ -85,8 +274,9 @@ if (!function_exists('bricks_festival_definitions')) {
                 'course_slug' => 'galway',
                 'country' => 'Ireland',
                 'region' => 'ireland',
+                'directory' => 'ireland',
                 'season' => 'summer',
-                'typical_timing' => 'July / August',
+                'typical_timing' => 'Late July / early August (7 days at Galway)',
                 'window_start' => '07-28',
                 'window_end' => '08-03',
                 'lead' => 'Ireland\'s summer racing carnival — seven days of flat and jumps action at Ballybrit. Irish racing speed figures, course form, and Fhorsite Points Engine picks for Galway festival week.',
@@ -94,6 +284,67 @@ if (!function_exists('bricks_festival_definitions')) {
                     ['name' => 'Galway Plate', 'day' => 'Wednesday', 'day_offset' => 0],
                     ['name' => 'Galway Hurdle', 'day' => 'Thursday', 'day_offset' => 1],
                     ['name' => 'Irish St Leger trial races', 'day' => 'Friday–Sunday', 'day_offset' => 2, 'day_span' => 2],
+                ],
+            ],
+            'listowel-harvest' => [
+                'slug' => 'listowel-harvest',
+                'aliases' => ['listowel', 'harvest-festival', 'listowel-festival', 'kerry-national'],
+                'name' => 'Listowel Harvest Festival',
+                'short_name' => 'Listowel Harvest Festival',
+                'course' => 'Listowel',
+                'course_slug' => 'listowel',
+                'country' => 'Ireland',
+                'region' => 'ireland',
+                'directory' => 'ireland',
+                'season' => 'autumn',
+                'typical_timing' => 'September (7 days, mid-to-late September at Listowel)',
+                'window_start' => '09-20',
+                'window_end' => '09-26',
+                'lead' => 'Seven days of mixed racing at Listowel in mid-to-late September, including the Kerry National. Irish festival speed figures, course form, and Fhorsite Points Engine picks for Harvest Festival week.',
+                'highlight_races' => [
+                    ['name' => 'Kerry National', 'day' => 'Wednesday', 'day_offset' => 3],
+                ],
+            ],
+            'leopardstown-autumnfest' => [
+                'slug' => 'leopardstown-autumnfest',
+                'aliases' => ['autumnfest', 'leopardstown-autumn', 'leopardstown-autumn-festival'],
+                'name' => 'Leopardstown AutumnFest',
+                'short_name' => 'AutumnFest',
+                'course' => 'Leopardstown',
+                'course_slug' => 'leopardstown',
+                'country' => 'Ireland',
+                'region' => 'ireland',
+                'directory' => 'ireland',
+                'season' => 'autumn',
+                'typical_timing' => 'October (mid-October at Leopardstown)',
+                'window_start' => '10-10',
+                'window_end' => '10-12',
+                'lead' => 'Leopardstown\'s mid-October AutumnFest meeting on the Foxrock turf. Irish flat ratings, autumn form, and Fhorsite Points Engine history at Leopardstown.',
+                'highlight_races' => [
+                    ['name' => 'Killavullan Stakes', 'day' => 'Saturday', 'day_offset' => 0],
+                    ['name' => 'Eyrefield Stakes', 'day' => 'Sunday', 'day_offset' => 1],
+                ],
+            ],
+            'leopardstown-christmas' => [
+                'slug' => 'leopardstown-christmas',
+                'aliases' => ['christmas-festival', 'leopardstown-christmas-festival', 'savills-chase'],
+                'name' => 'Leopardstown Christmas Festival',
+                'short_name' => 'Leopardstown Christmas',
+                'course' => 'Leopardstown',
+                'course_slug' => 'leopardstown',
+                'country' => 'Ireland',
+                'region' => 'ireland',
+                'directory' => 'ireland',
+                'season' => 'winter',
+                'typical_timing' => 'December (26–29 December)',
+                'window_start' => '12-26',
+                'window_end' => '12-29',
+                'lead' => 'Leopardstown\'s four-day Christmas Festival (26–29 December) — Savills Chase, Matheson Hurdle, and Dublin Chase. Irish jumps ratings and Fhorsite Points Engine picks for the festive meeting.',
+                'highlight_races' => [
+                    ['name' => 'Racing Post Novice Chase', 'day' => '26 December', 'day_offset' => 0],
+                    ['name' => 'Savills Chase', 'day' => '27 December', 'day_offset' => 1],
+                    ['name' => 'Matheson Hurdle', 'day' => '28 December', 'day_offset' => 2],
+                    ['name' => 'Dublin Chase', 'day' => '29 December', 'day_offset' => 3],
                 ],
             ],
         ]);
@@ -206,6 +457,64 @@ if (!function_exists('bricks_festival_sort_by_next_start')) {
             return strcmp((string) ($oa['start'] ?? ''), (string) ($ob['start'] ?? ''));
         });
         return $items;
+    }
+}
+
+if (!function_exists('bricks_festival_directory_key')) {
+    /**
+     * Geographic directory bucket used on /festivals/.
+     *
+     * @return 'uk'|'ireland'
+     */
+    function bricks_festival_directory_key(array $festival) {
+        $explicit = sanitize_key((string) ($festival['directory'] ?? ''));
+        if ($explicit === 'ireland' || $explicit === 'uk') {
+            return $explicit;
+        }
+        if (($festival['region'] ?? '') === 'ireland') {
+            return 'ireland';
+        }
+        return 'uk';
+    }
+}
+
+if (!function_exists('bricks_festival_directory_sections')) {
+    /**
+     * H2 sections for the festivals index.
+     *
+     * @return array<string, array{id:string,title:string,intro:string}>
+     */
+    function bricks_festival_directory_sections() {
+        return [
+            'uk' => [
+                'id' => 'major-uk-horse-racing-festivals',
+                'title' => 'Major UK Horse Racing Festivals',
+                'intro' => 'Ten flagship British fixtures spanning the jumps and flat seasons — from the Cheltenham Festival and Aintree Grand National Meeting through the Guineas Festival, Derby Festival, Royal Ascot, Glorious Goodwood, Ebor Festival, St Leger Festival, and British Champions Day.',
+            ],
+            'ireland' => [
+                'id' => 'major-irish-horse-racing-festivals',
+                'title' => 'Major Irish Horse Racing Festivals',
+                'intro' => 'Six major Irish racing festivals — Punchestown Festival, the Irish Grand National at Fairyhouse, Galway Festival, Listowel Harvest Festival, Leopardstown AutumnFest, and the Leopardstown Christmas Festival.',
+            ],
+        ];
+    }
+}
+
+if (!function_exists('bricks_festival_grouped_for_index')) {
+    /**
+     * Festivals grouped for the UK / Irish directory grids.
+     *
+     * @return array{uk: array<int, array<string, mixed>>, ireland: array<int, array<string, mixed>>}
+     */
+    function bricks_festival_grouped_for_index() {
+        $groups = ['uk' => [], 'ireland' => []];
+        foreach (bricks_festival_definitions() as $def) {
+            $key = bricks_festival_directory_key($def);
+            $groups[$key][] = $def;
+        }
+        $groups['uk'] = bricks_festival_sort_by_next_start($groups['uk']);
+        $groups['ireland'] = bricks_festival_sort_by_next_start($groups['ireland']);
+        return $groups;
     }
 }
 
@@ -413,6 +722,9 @@ if (!function_exists('bricks_festival_enqueue_styles')) {
         .rf-btn-secondary{background:#fff;border:1px solid #e2e8f0;color:#334155}
         .rf-section{margin:2rem 0}
         .rf-section h2{margin:0 0 .75rem;font-size:1.3rem}
+        .rf-directory-section{margin:0 0 2.5rem}
+        .rf-directory-section h2{margin:0 0 .5rem;font-size:1.45rem;line-height:1.25}
+        .rf-directory-section > p{margin:0 0 1rem;color:#475569;font-size:1.05rem;line-height:1.6;max-width:760px}
         .rf-race-list{margin:0;padding:0;list-style:none;display:grid;gap:.5rem}
         .rf-race-list a.rf-race-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.65rem .85rem;border:1px solid #e2e8f0;border-radius:8px;background:#fff;font-size:.9rem;text-decoration:none;color:inherit;transition:border-color .2s,box-shadow .2s,transform .2s}
         .rf-race-list a.rf-race-row:hover,.rf-race-list a.rf-race-row:focus-visible{border-color:var(--rf-green);box-shadow:0 4px 14px rgba(15,23,42,.08);transform:translateY(-1px);outline:none}
@@ -421,7 +733,7 @@ if (!function_exists('bricks_festival_enqueue_styles')) {
         .rf-race-row-date{font-size:.8rem;color:#64748b}
         .rf-race-row-chevron{font-size:1.2rem;line-height:1;color:#94a3b8;flex-shrink:0;transition:transform .2s,color .2s}
         .rf-race-list a.rf-race-row:hover .rf-race-row-chevron,.rf-race-list a.rf-race-row:focus-visible .rf-race-row-chevron{color:var(--rf-green);transform:translateX(2px)}
-        .rf-grid--index{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem;margin:0 0 2rem}
+        .rf-grid--index{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem;margin:0}
         .rf-card{display:flex;flex-direction:column;gap:.4rem;padding:0;border:1px solid #e2e8f0;border-radius:12px;background:#fff;text-decoration:none;color:inherit;overflow:hidden;transition:border-color .2s,box-shadow .2s,transform .2s}
         .rf-card:hover,.rf-card:focus-visible{border-color:var(--rf-green);box-shadow:0 6px 18px rgba(15,23,42,.08);transform:translateY(-2px);outline:none}
         .rf-card.is-live{border-color:#86efac;background:#fff}
@@ -445,9 +757,9 @@ if (!function_exists('bricks_festival_enqueue_styles')) {
         .rf-breadcrumb{margin:0 0 1rem;font-size:.875rem;color:#64748b}
         .rf-breadcrumb a{color:#15803d;font-weight:600;text-decoration:none}
         .rf-breadcrumb a:hover{text-decoration:underline}
-        @media (max-width:900px){.rf-grid--index{grid-template-columns:1fr}.rf-card--featured{grid-template-columns:1fr}}
-        @media (min-width:901px) and (max-width:1100px){.rf-grid--index{grid-template-columns:repeat(2,minmax(0,1fr))}}
-        @media (min-width:1100px){.rf-grid--index:not(:has(.rf-card--featured)){grid-template-columns:repeat(4,minmax(0,1fr))}}
+        @media (max-width:900px){.rf-grid--index{grid-template-columns:1fr}.rf-card--featured{grid-template-columns:1fr;grid-column:1/-1}}
+        @media (min-width:901px) and (max-width:1100px){.rf-grid--index{grid-template-columns:repeat(2,minmax(0,1fr))}.rf-card--featured{grid-column:1/-1}}
+        @media (min-width:1100px){.rf-grid--index{grid-template-columns:repeat(3,minmax(0,1fr))}.rf-card--featured{grid-column:1/-1}}
         ';
         wp_register_style('bricks-racing-festivals', false);
         wp_enqueue_style('bricks-racing-festivals');
