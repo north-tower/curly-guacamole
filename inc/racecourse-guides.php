@@ -59,6 +59,9 @@ if (!function_exists('bricks_track_slug_aliases')) {
             'galway' => 'Galway',
             'cheltenham' => 'Cheltenham',
             'aintree' => 'Aintree',
+            'ayr' => 'Ayr',
+            'fairyhouse' => 'Fairyhouse',
+            'listowel' => 'Listowel',
         ]);
     }
 }
@@ -112,6 +115,7 @@ if (!function_exists('bricks_track_course_region_overrides')) {
         return (array) apply_filters('bricks_track_course_region_overrides', [
             'Cheltenham' => 'uk-jumps',
             'Aintree' => 'uk-jumps',
+            'Ayr' => 'uk-jumps',
             'Cartmel' => 'uk-jumps',
             'Warwick' => 'uk-jumps',
             'Wincanton' => 'uk-jumps',
@@ -143,6 +147,7 @@ if (!function_exists('bricks_track_course_region_overrides')) {
             'Curragh' => 'ireland',
             'Galway' => 'ireland',
             'Fairyhouse' => 'ireland',
+            'Listowel' => 'ireland',
             'Navan' => 'ireland',
             'Naas' => 'ireland',
             'Gowran Park' => 'ireland',

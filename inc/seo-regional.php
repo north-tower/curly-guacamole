@@ -239,6 +239,7 @@ if (!function_exists('bricks_seo_post_is_racing_content')) {
             'grand-national',
             'royal-ascot',
             'galway-festival',
+            'punchestown-festival',
             'racing-festivals',
             'case-study',
             'case-studies',

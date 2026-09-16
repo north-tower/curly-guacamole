@@ -704,7 +704,8 @@ if (!function_exists('bricks_festival_is_request')) {
 if (!function_exists('bricks_festival_enqueue_styles')) {
     function bricks_festival_enqueue_styles() {
         $css = '
-        .racing-festivals-page{--rf-green:#16a34a}
+        .racing-festivals-page-shell{box-sizing:border-box;width:100%;padding:24px 24px 32px}
+        .racing-festivals-page{--rf-green:#16a34a;box-sizing:border-box;width:100%;max-width:1180px;margin:0 auto}
         .rf-hero{margin-bottom:1.5rem}
         .rf-title{margin:0 0 .5rem;font-size:clamp(1.75rem,3vw,2.35rem);line-height:1.15}
         .rf-lead{margin:0;color:#475569;font-size:1.05rem;line-height:1.6;max-width:760px}
@@ -757,7 +758,7 @@ if (!function_exists('bricks_festival_enqueue_styles')) {
         .rf-breadcrumb{margin:0 0 1rem;font-size:.875rem;color:#64748b}
         .rf-breadcrumb a{color:#15803d;font-weight:600;text-decoration:none}
         .rf-breadcrumb a:hover{text-decoration:underline}
-        @media (max-width:900px){.rf-grid--index{grid-template-columns:1fr}.rf-card--featured{grid-template-columns:1fr;grid-column:1/-1}}
+        @media (max-width:900px){.racing-festivals-page-shell{padding:16px 16px 24px}.rf-grid--index{grid-template-columns:1fr}.rf-card--featured{grid-template-columns:1fr;grid-column:1/-1}}
         @media (min-width:901px) and (max-width:1100px){.rf-grid--index{grid-template-columns:repeat(2,minmax(0,1fr))}.rf-card--featured{grid-column:1/-1}}
         @media (min-width:1100px){.rf-grid--index{grid-template-columns:repeat(3,minmax(0,1fr))}.rf-card--featured{grid-column:1/-1}}
         ';
@@ -837,15 +838,8 @@ if (!function_exists('bricks_racing_festivals_index_shortcode')) {
     function bricks_racing_festivals_index_shortcode() {
         bricks_festival_enqueue_styles();
 
-        $festivals = bricks_festival_sort_by_next_start(bricks_festival_definitions());
-        $live_slug = '';
-        foreach ($festivals as $def) {
-            $occ = bricks_festival_resolve_occurrence($def);
-            if (($occ['status'] ?? '') === 'live') {
-                $live_slug = $def['slug'] ?? '';
-                break;
-            }
-        }
+        $groups = bricks_festival_grouped_for_index();
+        $sections = bricks_festival_directory_sections();
 
         ob_start();
         ?>
@@ -853,18 +847,31 @@ if (!function_exists('bricks_racing_festivals_index_shortcode')) {
             <header class="rf-hero">
                 <h1 class="rf-title">UK &amp; Irish Racing Festivals</h1>
                 <p class="rf-lead">
-                    Seasonal Fhorsite ratings hubs for the biggest meetings on the calendar — Cheltenham Festival, Grand National, Royal Ascot, and Galway — with racecourse guides, key races, and Points Engine history.
+                    A directory of the 16 major UK and Irish racing festivals — Cheltenham Festival, Aintree Grand National Meeting, Royal Ascot, Galway Festival, Punchestown, and more — with racecourse guides, key races, and Points Engine history.
                 </p>
             </header>
 
-            <div class="rf-grid rf-grid--index">
-                <?php foreach ($festivals as $def): ?>
-                    <?php
-                    $is_live = ($def['slug'] ?? '') === $live_slug && $live_slug !== '';
-                    echo bricks_festival_render_card($def, ['featured' => $is_live]);
-                    ?>
-                <?php endforeach; ?>
-            </div>
+            <?php foreach ($sections as $group_key => $section): ?>
+                <?php
+                $festivals = $groups[$group_key] ?? [];
+                if ($festivals === []) {
+                    continue;
+                }
+                ?>
+                <section class="rf-directory-section" aria-labelledby="<?php echo esc_attr($section['id']); ?>">
+                    <h2 id="<?php echo esc_attr($section['id']); ?>"><?php echo esc_html($section['title']); ?></h2>
+                    <p><?php echo esc_html($section['intro']); ?></p>
+                    <div class="rf-grid rf-grid--index">
+                        <?php foreach ($festivals as $def): ?>
+                            <?php
+                            $occ = bricks_festival_resolve_occurrence($def);
+                            $is_live = ($occ['status'] ?? '') === 'live';
+                            echo bricks_festival_render_card($def, ['featured' => $is_live]);
+                            ?>
+                        <?php endforeach; ?>
+                    </div>
+                </section>
+            <?php endforeach; ?>
 
             <section class="rf-section">
                 <h2>Racecourses directory</h2>
@@ -1028,10 +1035,18 @@ if (!function_exists('bricks_racing_festival_hub_shortcode')) {
             <section class="rf-section" aria-labelledby="rf-related">
                 <h2 id="rf-related">Other festival hubs</h2>
                 <div class="rf-related-grid">
-                    <?php foreach (bricks_festival_definitions() as $other): ?>
-                        <?php if (($other['slug'] ?? '') === ($festival['slug'] ?? '')) { continue; } ?>
-                        <?php echo bricks_festival_render_card($other, ['compact' => true]); ?>
-                    <?php endforeach; ?>
+                    <?php
+                    $current_group = bricks_festival_directory_key($festival);
+                    foreach (bricks_festival_sort_by_next_start(bricks_festival_definitions()) as $other):
+                        if (($other['slug'] ?? '') === ($festival['slug'] ?? '')) {
+                            continue;
+                        }
+                        if (bricks_festival_directory_key($other) !== $current_group) {
+                            continue;
+                        }
+                        echo bricks_festival_render_card($other, ['compact' => true]);
+                    endforeach;
+                    ?>
                 </div>
             </section>
         </div>
@@ -1214,7 +1229,7 @@ if (!function_exists('bricks_festival_render_settings_page')) {
         ?>
         <div class="wrap">
             <h1>Racing Festival Hubs</h1>
-            <p>Virtual URLs: <code>/festivals/</code>, <code>/festivals/cheltenham/</code>, <code>/festivals/grand-national/</code>, <code>/festivals/royal-ascot/</code>, <code>/festivals/galway/</code></p>
+            <p>Virtual URLs: <code>/festivals/</code> plus one hub per meeting (UK: Cheltenham, Grand National, Scottish Grand National, Guineas, Derby, Royal Ascot, Goodwood, Ebor, St Leger, Champions Day; Ireland: Punchestown, Irish Grand National, Galway, Listowel, AutumnFest, Christmas).</p>
             <form method="post">
                 <?php wp_nonce_field('bricks_festival_settings'); ?>
                 <table class="form-table">
@@ -1248,7 +1263,7 @@ if (!function_exists('bricks_festival_render_settings_page')) {
 if (!function_exists('bricks_festival_build_meta_title')) {
     function bricks_festival_build_meta_title() {
         if (get_query_var('festivals_index')) {
-            return 'UK & Irish Racing Festivals | Cheltenham, Grand National, Ascot, Galway | Fhorsite';
+            return 'UK & Irish Racing Festivals | Cheltenham, Royal Ascot, Galway, Punchestown | Fhorsite';
         }
         $def = bricks_festival_resolve_slug((string) get_query_var('festival_slug'));
         if (!$def) {
@@ -1261,7 +1276,7 @@ if (!function_exists('bricks_festival_build_meta_title')) {
 if (!function_exists('bricks_festival_build_meta_description')) {
     function bricks_festival_build_meta_description() {
         if (get_query_var('festivals_index')) {
-            return 'Seasonal Fhorsite ratings hubs for Cheltenham Festival, Grand National, Royal Ascot, and Galway — key races, racecourse guides, and Points Engine winners timed to the UK & Irish racing calendar.';
+            return 'Directory of 16 major UK and Irish racing festivals — Cheltenham Festival, Aintree Grand National, Royal Ascot, Guineas, Derby, Galway, Punchestown, and more — with Fhorsite ratings, racecourse guides, and Points Engine winners.';
         }
         $def = bricks_festival_resolve_slug((string) get_query_var('festival_slug'));
         if (!$def) {
@@ -1293,14 +1308,26 @@ if (!function_exists('bricks_festival_output_json_ld')) {
 
         if (get_query_var('festivals_index')) {
             $url = bricks_festival_url();
-            $items = [];
-            $pos = 1;
-            foreach (bricks_festival_definitions() as $def) {
-                $items[] = [
-                    '@type' => 'ListItem',
-                    'position' => $pos++,
-                    'name' => $def['name'],
-                    'url' => bricks_festival_url($def['slug']),
+            $groups = bricks_festival_grouped_for_index();
+            $lists = [];
+            foreach (bricks_festival_directory_sections() as $group_key => $section) {
+                $elements = [];
+                $pos = 1;
+                foreach ($groups[$group_key] ?? [] as $def) {
+                    $elements[] = [
+                        '@type' => 'ListItem',
+                        'position' => $pos++,
+                        'name' => $def['name'],
+                        'url' => bricks_festival_url($def['slug']),
+                    ];
+                }
+                $lists[] = [
+                    '@type' => 'ItemList',
+                    '@id' => $url . '#' . $section['id'],
+                    'name' => $section['title'],
+                    'description' => $section['intro'],
+                    'numberOfItems' => count($elements),
+                    'itemListElement' => $elements,
                 ];
             }
             bricks_seo_print_json_ld([
@@ -1310,10 +1337,7 @@ if (!function_exists('bricks_festival_output_json_ld')) {
                 'name' => 'UK & Irish Racing Festivals',
                 'description' => bricks_festival_build_meta_description(),
                 'url' => $url,
-                'mainEntity' => [
-                    '@type' => 'ItemList',
-                    'itemListElement' => $items,
-                ],
+                'mainEntity' => $lists,
             ]);
             return;
         }
