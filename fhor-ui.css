@@ -48,7 +48,9 @@
 #brx-content.sb-page-shell,
 .sb-page-shell,
 #brx-content.racing-festivals-page-shell,
-.racing-festivals-page-shell {
+.racing-festivals-page-shell,
+#brx-content.racecourse-guide-page,
+.racecourse-guide-page {
   box-sizing: border-box;
   overflow-x: clip;
   width: 100%;
@@ -58,7 +60,8 @@
 }
 
 .proven-winners-page-shell .proven-winners-page,
-.racing-festivals-page-shell .racing-festivals-page {
+.racing-festivals-page-shell .racing-festivals-page,
+.racecourse-guide-page .racecourse-guide-shell {
   box-sizing: border-box;
   width: 100%;
   max-width: 1180px;
@@ -385,6 +388,21 @@
   border-radius: var(--fhor-radius-sm);
 }
 
+.dosage-metrics {
+  font-weight: 700;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: #4338ca;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+  cursor: help;
+}
+
+.dosage-metrics--empty {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
 /* Expanded runner details — stay in viewport while table scrolls */
 .details-row > td {
   padding: 12px !important;
@@ -593,7 +611,9 @@
   #brx-content.sb-page-shell,
   .sb-page-shell,
   #brx-content.racing-festivals-page-shell,
-  .racing-festivals-page-shell {
+  .racing-festivals-page-shell,
+  #brx-content.racecourse-guide-page,
+  .racecourse-guide-page {
     padding: 16px 16px calc(24px + var(--fhor-fab-clearance)) !important;
   }
 

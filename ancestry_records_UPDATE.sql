@@ -17,10 +17,14 @@ BEGIN
             IF(sire.runner_id IS NOT NULL, sire.runner_id, run.sire_id) AS sire_id,
             IF(sire.name IS NOT NULL, sire.name, run.sire_name) AS sire_name,
             IF(sire.foaling_date IS NOT NULL, sire.foaling_date, DATE(CONCAT(run.sire_year_born, '-01-01'))) AS sire_DOB,
-            sire.bred AS sire_origin
+            sire.bred AS sire_origin,
+
+            IF(run.dam_sire_id IS NOT NULL, run.dam_sire_id, NULL) AS dam_sire_id,
+            IF(run.dam_sire_name IS NOT NULL AND run.dam_sire_name != '', run.dam_sire_name, NULL) AS dam_sire_name
 		FROM
 			(SELECT * FROM (
 				SELECT runner_id, name, foaling_date, bred, dam_id, dam_name, dam_year_born, sire_id, sire_name, sire_year_born,
+                    dam_sire_id, dam_sire_name,
 					ROW_NUMBER() OVER (PARTITION BY runner_id ORDER BY loaded_at DESC) rn
                 FROM daily_runners_beta) a
                 WHERE rn = 1) run

@@ -42,6 +42,7 @@ add_filter( 'bricks/builder/i18n', function( $i18n ) {
 } );
 
     require_once __DIR__ . '/inc/helpers-core.php';
+    require_once __DIR__ . '/inc/pedigree-dosage.php';
     require_once __DIR__ . '/inc/race-detail-perf.php';
     require_once __DIR__ . '/inc/enqueue.php';
     require_once __DIR__ . '/inc/rewrites.php';
@@ -2112,6 +2113,21 @@ if ($runners && count($runners) > 0) {
     bricks_debug_log("Race Detail Debug - Runners sorted by FSr (highest first)");
 }
 
+$dosage_lookup = [];
+if (!empty($runners) && function_exists('bricks_dosage_metrics_for_runners')) {
+    try {
+        $dosage_lookup = bricks_dosage_metrics_for_runners($runners);
+        if (!is_array($dosage_lookup)) {
+            $dosage_lookup = [];
+        }
+    } catch (Throwable $e) {
+        $dosage_lookup = [];
+        if (function_exists('bricks_debug_log')) {
+            bricks_debug_log('Dosage metrics failed: ' . $e->getMessage());
+        }
+    }
+}
+
 // Trainers-for-course signal (5y lookback up to yesterday) for trainers in this race.
 $trainer_course_lookup = [];
 $trainer_course_ranks = [];
@@ -3079,6 +3095,19 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
             background: #e5e7eb;
             color: #374151;
         }
+        .dosage-metrics {
+            font-weight: 700;
+            font-size: 11px;
+            font-variant-numeric: tabular-nums;
+            color: #4338ca;
+            white-space: nowrap;
+            letter-spacing: 0.01em;
+            cursor: help;
+        }
+        .dosage-metrics--empty {
+            color: #94a3b8;
+            font-weight: 600;
+        }
         /* Race Detail Modern Styling */
         .race-detail-container {
             max-width: 1400px;
@@ -3978,6 +4007,9 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
             <span class="lin5-quality-badge lin5-quality-na" style="vertical-align:middle;">N/A</span>
             (more runs = more reliable).
         </span>
+        <br>
+        <strong style="color:#111827;">DI/CD</strong> = Dosage Index and Center of Distribution from Chefs-de-Race in the 4-generation male-line pedigree.
+        Higher DI/CD = more speed influence; lower = more stamina. Format: DI: X.XX | CD: Y.YY
     </div>
             
             <div class="runners-mobile-toolbar">
@@ -3992,6 +4024,7 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
                     <option value="fsrr|number">FSRr</option>
                     <option value="comb|number">Comb</option>
                     <option value="sire_5y|number">Lin5</option>
+                    <option value="dosage_di|number">DI/CD</option>
                     <option value="dslr|number">DSLR</option>
                     <option value="cloth_number|number">No.</option>
                     <?php if (!$is_national_hunt): ?>
@@ -4036,6 +4069,7 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
 <th class="sortable" tabindex="0" data-sort="number" data-column="maturity_edge" title="Maturity Edge Rating">Mat <span class="sort-arrow"></span></th>
 <?php endif; ?>
 <th class="sortable" tabindex="0" data-sort="number" data-column="sire_5y" title="Lineage 5Y: sire PRB% in locked window (last 5 years to yesterday), Flat, Mar-Oct">Lin5 <span class="sort-arrow"></span></th>
+<th class="sortable" tabindex="0" data-sort="number" data-column="dosage_di" title="Dosage Index and Center of Distribution from 4-generation Chefs-de-Race scoring">DI/CD <span class="sort-arrow"></span></th>
 <th class="sortable" tabindex="0" data-sort="number" data-column="cls" title="Class Change from Last Run">Cls <span class="sort-arrow"></span></th>
 <th class="sortable" tabindex="0" data-sort="number" data-column="or_diff" title="Official Rating Difference from Last Run">OR+/- <span class="sort-arrow"></span></th>
 <th class="sortable" tabindex="0" data-sort="text" data-column="jockey" title="Jockey Name and Claim">Jockey <span class="sort-arrow"></span></th>
@@ -4245,6 +4279,31 @@ if ($speed_data) {
                                     . (($baseline_prb_used !== null) ? ' Baseline PRB: ' . number_format(floatval($baseline_prb_used), 1) . '%.' : '')
                                     . ' Signal quality: ' . $sire_5y_quality['label'] . '.';
                             }
+
+                            $dosage = [
+                                'display' => 'DI: — | CD: —',
+                                'di' => null,
+                                'cd' => null,
+                                'di_is_infinite' => false,
+                                'tooltip' => 'Dosage unavailable for this runner.',
+                            ];
+                            if (function_exists('bricks_dosage_metrics_for_runner_row')) {
+                                try {
+                                    $dosage = bricks_dosage_metrics_for_runner_row($dosage_lookup, $runner, $index);
+                                } catch (Throwable $e) {
+                                    $dosage['tooltip'] = 'Dosage unavailable for this runner.';
+                                }
+                            }
+                            $dosage_display = isset($dosage['display']) ? (string) $dosage['display'] : 'DI: — | CD: —';
+                            $dosage_tooltip = isset($dosage['tooltip']) ? (string) $dosage['tooltip'] : '';
+                            $dosage_is_empty = ($dosage_display === 'DI: — | CD: —');
+                            if (!empty($dosage['di_is_infinite'])) {
+                                $dosage_sort_value = 9999;
+                            } elseif (isset($dosage['di']) && is_numeric($dosage['di'])) {
+                                $dosage_sort_value = floatval($dosage['di']);
+                            } else {
+                                $dosage_sort_value = -9999;
+                            }
                             
                             // Row styling
                             $row_bg = $index % 2 === 0 ? '#ffffff' : '#f9fafb';
@@ -4311,6 +4370,7 @@ if ($speed_data) {
                         data-name="<?php echo esc_attr($runner->name ?: ''); ?>"
                         data-maturity-edge="<?php echo esc_attr($maturity_edge ? $maturity_edge['score'] : '-9999'); ?>"
                         data-sire5y="<?php echo esc_attr($sire_5y_pct !== null ? $sire_5y_pct : '-9999'); ?>"
+                        data-dosage-di="<?php echo esc_attr($dosage_sort_value); ?>"
                         data-cls="<?php echo esc_attr($cls); ?>"
                         data-or-diff="<?php echo esc_attr($or_diff); ?>"
                         data-model_points="<?php echo esc_attr($points_score); ?>"
@@ -4456,6 +4516,12 @@ if ($speed_data) {
                             <?php if ($runner->gender): ?>
                                 <div style="font-size:11px;color:#6b7280;text-transform:uppercase;margin-top:2px;"><?php echo esc_html($runner->gender); ?></div>
                             <?php endif; ?>
+                            <div
+                                class="dosage-metrics<?php echo $dosage_is_empty ? ' dosage-metrics--empty' : ''; ?>"
+                                title="<?php echo esc_attr($dosage_tooltip); ?>"
+                                style="margin-top:4px;">
+                                <?php echo esc_html($dosage_display); ?>
+                            </div>
                             <?php if ($maturity_edge): ?>
                                 <span
                                     class="maturity-edge-badge <?php echo esc_attr($maturity_edge['class']); ?>"
@@ -4494,6 +4560,15 @@ if ($speed_data) {
                                                 <?php echo esc_html($sire_5y_quality['label']); ?>
                                             </span>
                                         </span>
+                                    </div>
+                                </td>
+
+                                <!-- Dosage Index / Center of Distribution -->
+                                <td class="runner-cell runner-cell--stat runner-cell--dosage" data-label="DI/CD">
+                                    <div
+                                        class="dosage-metrics<?php echo $dosage_is_empty ? ' dosage-metrics--empty' : ''; ?>"
+                                        title="<?php echo esc_attr($dosage_tooltip); ?>">
+                                        <?php echo esc_html($dosage_display); ?>
                                     </div>
                                 </td>
 
@@ -4559,7 +4634,7 @@ if ($speed_data) {
 
 <!-- Hidden Details Row -->
 <tr class="details-row details-row-<?php echo $index; ?>" style="background:rgba(59,130,246,0.05);">
-    <td colspan="<?php echo $is_national_hunt ? '16' : ($show_maturity_edge ? '20' : '19'); ?>">
+    <td colspan="<?php echo $is_national_hunt ? '17' : ($show_maturity_edge ? '21' : '20'); ?>">
 
         <div class="runner-sr-history">
             <h4 class="runner-sr-history__title">📊 Speed Rating History - <?php echo esc_html($runner->name); ?></h4>
@@ -6558,6 +6633,7 @@ jQuery(document).on('click', '.toggle-details-btn', function() {
                     'lbf': 'lbf',
                     'maturity_edge': 'maturityEdge',
                     'sire_5y': 'sire5y',
+                    'dosage_di': 'dosageDi',
                     'cls': 'cls',
                     'or_diff': 'orDiff',
                     'jockey': 'jockey',

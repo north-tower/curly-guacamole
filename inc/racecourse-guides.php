@@ -1012,6 +1012,8 @@ if (!function_exists('bricks_track_render_static_section')) {
 if (!function_exists('bricks_track_enqueue_styles')) {
     function bricks_track_enqueue_styles() {
         $css = '
+        .racecourse-guide-page{box-sizing:border-box;width:100%;padding:24px 24px 32px}
+        .racecourse-guide-shell{box-sizing:border-box;width:100%;max-width:1180px;margin:0 auto}
         .racecourse-guide-static{margin:0 0 2rem}
         .racecourse-guide-hero{margin-bottom:1.5rem}
         .racecourse-guide-title{margin:0 0 .5rem;font-size:clamp(1.75rem,3vw,2.25rem);line-height:1.2}
@@ -1078,6 +1080,7 @@ if (!function_exists('bricks_track_enqueue_styles')) {
         .rcg-region-hub-card em{font-style:normal;font-size:.75rem;font-weight:700;color:#15803d;margin-top:.25rem}
         .rcg-index-card-region{display:block;font-size:.72rem;font-weight:700;color:#15803d;margin-top:.1rem}
         @media (max-width:767px){
+            .racecourse-guide-page{padding:16px 16px 24px}
             .rcg-index-toolbar--sticky-mobile{position:sticky;top:0;z-index:20;background:#fff;padding:.75rem 0;margin-top:.5rem;border-bottom:1px solid #e2e8f0}
             .rcg-index-search{max-width:none}
             .rcg-index-az{display:none}

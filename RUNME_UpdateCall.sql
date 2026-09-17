@@ -17,6 +17,19 @@ SELECT CONCAT('todays_runners_insights_UPDATE completed at ', NOW()) AS status;
 CALL `ancestry_records_UPDATE`();
 SELECT CONCAT('ancestry_records_UPDATE completed at ', NOW()) AS status;
 
+IF EXISTS (
+  SELECT 1
+  FROM information_schema.ROUTINES
+  WHERE ROUTINE_SCHEMA = DATABASE()
+    AND ROUTINE_TYPE = 'PROCEDURE'
+    AND ROUTINE_NAME = 'chefs_de_race_UPDATE'
+) THEN
+  CALL `chefs_de_race_UPDATE`();
+  SELECT CONCAT('chefs_de_race_UPDATE completed at ', NOW()) AS status;
+ELSE
+  SELECT CONCAT('chefs_de_race_UPDATE not found in ', DATABASE(), ', skipped at ', NOW()) AS status;
+END IF;
+
 CALL `separated_comment_count_UPDATE`();
 SELECT CONCAT('separated_comment_count_UPDATE completed at ', NOW()) AS status;
 
