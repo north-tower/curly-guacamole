@@ -2,7 +2,7 @@
 /**
  * UK & Irish racing festival landing hubs (/festivals/{slug}/).
  *
- * Seasonal directory of 16 major UK and Irish meetings, timed to the racing
+ * Seasonal directory of 17 major UK and Irish meetings, timed to the racing
  * calendar with Fhorsite ratings, racecourse links, and live cards.
  *
  * Bricks: [racing_festivals_index] · [racing_festival_hub]
@@ -201,6 +201,28 @@ if (!function_exists('bricks_festival_definitions')) {
                 'highlight_races' => [
                     ['name' => 'Champagne Stakes', 'day' => 'Thursday', 'day_offset' => 0],
                     ['name' => 'St Leger Stakes', 'day' => 'Saturday', 'day_offset' => 2],
+                ],
+            ],
+            'ayr-gold-cup' => [
+                'slug' => 'ayr-gold-cup',
+                'aliases' => ['ayr-gold-cup-festival', 'ladbrokes-ayr-gold-cup', 'ladbrokes-ayr-gold-cup-festival', 'gold-cup-ayr'],
+                'name' => 'Ladbrokes Ayr Gold Cup Festival',
+                'short_name' => 'Ayr Gold Cup Festival',
+                'course' => 'Ayr',
+                'course_slug' => 'ayr',
+                'country' => 'Scotland',
+                'region' => 'uk-flat',
+                'directory' => 'uk',
+                'season' => 'autumn',
+                'typical_timing' => 'September (3 days, mid-to-late September at Ayr)',
+                'window_start' => '09-17',
+                'window_end' => '09-19',
+                'lead' => 'Scotland\'s biggest flat festival — three days at Ayr culminating in the Ayr Gold Cup, one of Europe\'s most valuable sprint handicaps. Turf speed ratings, draw-bias notes, and Fhorsite Points Engine picks for Gold Cup week.',
+                'highlight_races' => [
+                    ['name' => 'Ladbrokes Kilkerran Handicap', 'day' => 'Thursday', 'day_offset' => 0],
+                    ['name' => 'Ayr Bronze Cup', 'day' => 'Friday', 'day_offset' => 1],
+                    ['name' => 'Ayr Silver Cup', 'day' => 'Saturday', 'day_offset' => 2],
+                    ['name' => 'Ayr Gold Cup', 'day' => 'Saturday', 'day_offset' => 2],
                 ],
             ],
             'british-champions-day' => [
@@ -847,7 +869,7 @@ if (!function_exists('bricks_racing_festivals_index_shortcode')) {
             <header class="rf-hero">
                 <h1 class="rf-title">UK &amp; Irish Racing Festivals</h1>
                 <p class="rf-lead">
-                    A directory of the 16 major UK and Irish racing festivals — Cheltenham Festival, Aintree Grand National Meeting, Royal Ascot, Galway Festival, Punchestown, and more — with racecourse guides, key races, and Points Engine history.
+                    A directory of the 17 major UK and Irish racing festivals — Cheltenham Festival, Aintree Grand National Meeting, Royal Ascot, Ayr Gold Cup Festival, Galway Festival, Punchestown, and more — with racecourse guides, key races, and Points Engine history.
                 </p>
             </header>
 
@@ -1276,7 +1298,7 @@ if (!function_exists('bricks_festival_build_meta_title')) {
 if (!function_exists('bricks_festival_build_meta_description')) {
     function bricks_festival_build_meta_description() {
         if (get_query_var('festivals_index')) {
-            return 'Directory of 16 major UK and Irish racing festivals — Cheltenham Festival, Aintree Grand National, Royal Ascot, Guineas, Derby, Galway, Punchestown, and more — with Fhorsite ratings, racecourse guides, and Points Engine winners.';
+            return 'Directory of 17 major UK and Irish racing festivals — Cheltenham Festival, Aintree Grand National, Royal Ascot, Ayr Gold Cup, Guineas, Derby, Galway, Punchestown, and more — with Fhorsite ratings, racecourse guides, and Points Engine winners.';
         }
         $def = bricks_festival_resolve_slug((string) get_query_var('festival_slug'));
         if (!$def) {

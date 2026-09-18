@@ -462,8 +462,9 @@ if (!function_exists('bricks_dosage_table_has_column')) {
         if (array_key_exists($key, $cache)) {
             return $cache[$key];
         }
-        $col = $wpdb->get_var($wpdb->prepare("SHOW COLUMNS FROM `{$table}` LIKE %s", $column));
-        $cache[$key] = !empty($col);
+        $row = $wpdb->get_row($wpdb->prepare("SHOW COLUMNS FROM `{$table}` LIKE %s", $column), ARRAY_A);
+        $field = isset($row['Field']) ? (string) $row['Field'] : '';
+        $cache[$key] = ($field !== '' && strcasecmp($field, $column) === 0);
         return $cache[$key];
     }
 }
@@ -529,6 +530,15 @@ if (!function_exists('bricks_dosage_fetch_horses_by_ids_or_names')) {
                 }
             }
 
+            $order_col = '';
+            foreach (['race_id', 'loaded_at'] as $candidate) {
+                if (bricks_dosage_table_has_column($table, $candidate)) {
+                    $order_col = $candidate;
+                    $select[] = "`{$order_col}`";
+                    break;
+                }
+            }
+
             $where = [];
             $params = [];
             if (!empty($ids) && bricks_dosage_table_has_column($table, 'runner_id')) {
@@ -547,10 +557,10 @@ if (!function_exists('bricks_dosage_fetch_horses_by_ids_or_names')) {
             }
 
             $sql = 'SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE (" . implode(' OR ', $where) . ')';
-            if (bricks_dosage_table_has_column($table, 'loaded_at') && bricks_dosage_table_has_column($table, 'runner_id')) {
+            if ($order_col !== '' && bricks_dosage_table_has_column($table, 'runner_id')) {
                 $sql = 'SELECT * FROM (
-                    SELECT inner_q.*, ROW_NUMBER() OVER (PARTITION BY runner_id ORDER BY loaded_at DESC) rn
-                    FROM (' . $sql . ') inner_q
+                    SELECT src.*, ROW_NUMBER() OVER (PARTITION BY runner_id ORDER BY `' . $order_col . '` DESC) rn
+                    FROM (' . $sql . ') src
                 ) ranked WHERE rn = 1';
             }
 
