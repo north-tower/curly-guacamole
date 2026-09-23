@@ -891,21 +891,22 @@
         body.innerHTML = rows.map(function (bet) {
             var pnl = bet.result === 'pending' ? '—' : money(bet.profit);
             var pnlClass = bet.result === 'pending' ? '' : (Number(bet.profit) > 0 ? 'bt-pos' : (Number(bet.profit) < 0 ? 'bt-neg' : ''));
+            var action = showingDemo
+                ? escapeHtml(bet.note || '')
+                : '<button type="button" class="bt-icon bt-edit" data-id="' + escapeHtml(bet.id) + '">Edit</button>'
+                    + '<button type="button" class="bt-icon is-danger bt-del" data-id="' + escapeHtml(bet.id) + '">Delete</button>';
+            var actionLabel = showingDemo ? 'Note' : '';
             return '<tr>'
-                + '<td>' + escapeHtml(formatWhen(bet.placed_at)) + '</td>'
-                + '<td>' + escapeHtml(bet.course || '') + '</td>'
-                + '<td>' + escapeHtml(bet.selection_label || '') + '</td>'
-                + '<td>' + escapeHtml(bet.type_label || bet.bet_type || '') + '</td>'
-                + '<td>' + escapeHtml(bet.odds_display || '') + '</td>'
-                + '<td>' + money(bet.total_stake) + '</td>'
-                + '<td><span class="bt-badge is-' + escapeHtml(bet.result || 'pending') + '">' + escapeHtml(labelResult(bet.result)) + '</span></td>'
-                + '<td class="' + pnlClass + '">' + pnl + '</td>'
-                + '<td>' + escapeHtml(bet.system_name || '—') + '</td>'
-                + '<td>' + (showingDemo
-                    ? escapeHtml(bet.note || '')
-                    : '<button type="button" class="bt-icon bt-edit" data-id="' + escapeHtml(bet.id) + '">Edit</button>'
-                        + '<button type="button" class="bt-icon is-danger bt-del" data-id="' + escapeHtml(bet.id) + '">Delete</button>')
-                + '</td>'
+                + '<td data-label="Date"><span>' + escapeHtml(formatWhen(bet.placed_at)) + '</span></td>'
+                + '<td data-label="Course"><span>' + escapeHtml(bet.course || '') + '</span></td>'
+                + '<td data-label="Selection"><span>' + escapeHtml(bet.selection_label || '') + '</span></td>'
+                + '<td data-label="Type"><span>' + escapeHtml(bet.type_label || bet.bet_type || '') + '</span></td>'
+                + '<td data-label="Odds"><span>' + escapeHtml(bet.odds_display || '') + '</span></td>'
+                + '<td data-label="Stake"><span>' + money(bet.total_stake) + '</span></td>'
+                + '<td data-label="Result"><span class="bt-badge is-' + escapeHtml(bet.result || 'pending') + '">' + escapeHtml(labelResult(bet.result)) + '</span></td>'
+                + '<td data-label="P/L" class="' + pnlClass + '"><span>' + pnl + '</span></td>'
+                + '<td data-label="System"><span>' + escapeHtml(bet.system_name || '—') + '</span></td>'
+                + '<td class="bt-td-actions" data-label="' + actionLabel + '"><span>' + action + '</span></td>'
                 + '</tr>';
         }).join('');
     }
