@@ -1953,7 +1953,7 @@ if (!function_exists('fhor_sb_shortcode')) {
                             <p class="sb-note" id="sb-today-meta"></p>
                             <div style="overflow-x:auto;">
                                 <table class="sb-table" id="sb-today-table">
-                                    <thead><tr><th>Time</th><th>Horse</th><th>Course</th><th>FSr</th><th>Rank</th><th>Pts</th><th>Price</th></tr></thead>
+                                    <thead><tr><th>Time</th><th>Horse</th><th>Course</th><th>FSr</th><th>Rank</th><th>Pts</th><th>Price</th><th></th></tr></thead>
                                     <tbody></tbody>
                                 </table>
                             </div>
@@ -2062,7 +2062,7 @@ if (!function_exists('fhor_sb_qualifiers_shortcode')) {
                             <?php else: ?>
                                 <div style="overflow-x:auto;">
                                     <table class="sb-table">
-                                        <thead><tr><th>Time</th><th>Horse</th><th>Course</th><th>FSr</th><th>Rank</th><th>Pts</th><th>Price</th></tr></thead>
+                                        <thead><tr><th>Time</th><th>Horse</th><th>Course</th><th>FSr</th><th>Rank</th><th>Pts</th><th>Price</th><th></th></tr></thead>
                                         <tbody>
                                         <?php foreach ($block['rows'] as $row): ?>
                                             <tr>
@@ -2073,6 +2073,19 @@ if (!function_exists('fhor_sb_qualifiers_shortcode')) {
                                                 <td><?php echo esc_html((string) ($row['fsr_rank'] ?? '–')); ?></td>
                                                 <td><?php echo $row['pts'] === null ? '–' : esc_html((string) $row['pts']); ?></td>
                                                 <td><?php echo esc_html($row['forecast'] ?? ''); ?></td>
+                                                <td><?php
+                                                if (function_exists('fhor_bt_log_button_html')) {
+                                                    echo fhor_bt_log_button_html([
+                                                        'horse' => $row['horse'] ?? '',
+                                                        'course' => $row['course'] ?? '',
+                                                        'time' => $row['time'] ?? '',
+                                                        'date' => $block['date'] ?? '',
+                                                        'odds' => $row['forecast'] ?? '',
+                                                        'system' => $sys['name'] ?? '',
+                                                        'system_id' => $sys['id'] ?? '',
+                                                    ]);
+                                                }
+                                                ?></td>
                                             </tr>
                                         <?php endforeach; ?>
                                         </tbody>

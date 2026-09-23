@@ -540,8 +540,10 @@ function bricks_tracker_floating_quick_link() {
         get_query_var('my_points_backtest') ||
         get_query_var('fhor_system_builder') ||
         get_query_var('fhor_my_qualifiers') ||
+        get_query_var('fhor_bet_tracker') ||
         (function_exists('fhor_sb_is_request') && fhor_sb_is_request()) ||
-        (function_exists('fhor_sb_is_qualifiers_request') && fhor_sb_is_qualifiers_request())
+        (function_exists('fhor_sb_is_qualifiers_request') && fhor_sb_is_qualifiers_request()) ||
+        (function_exists('fhor_bt_is_request') && fhor_bt_is_request())
     ) {
         return;
     }
@@ -552,6 +554,7 @@ function bricks_tracker_floating_quick_link() {
             <?php if (function_exists('fhor_sb_user_can_access') && fhor_sb_user_can_access()): ?>
             <a class="fhor-fab__link fhor-fab__link--builder" href="<?php echo esc_url(home_url('/system-builder/')); ?>" title="Open System Builder">📐 System Builder</a>
             <a class="fhor-fab__link fhor-fab__link--qualifiers" href="<?php echo esc_url(home_url('/my-qualifiers/')); ?>" title="Open My Daily Qualifiers">🔔 My Qualifiers</a>
+            <a class="fhor-fab__link fhor-fab__link--bets" href="<?php echo esc_url(home_url('/bet-tracker/')); ?>" title="Open Bet Tracker">📈 Bet Tracker</a>
             <?php endif; ?>
             <?php if (function_exists('bricks_user_can_access_points_backtest') && bricks_user_can_access_points_backtest()): ?>
             <a class="fhor-fab__link fhor-fab__link--picks" href="<?php echo esc_url(home_url('/today-picks/')); ?>" title="Open Today's Picks (audit sheet)">📋 Today's Picks</a>

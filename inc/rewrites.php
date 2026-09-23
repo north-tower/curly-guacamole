@@ -185,9 +185,11 @@ function bricks_setup_virtual_page_post() {
         || get_query_var('daily_archive_date')
         || get_query_var('fhor_system_builder')
         || get_query_var('fhor_my_qualifiers')
+        || get_query_var('fhor_bet_tracker')
         || (function_exists('fhor_sb_is_qualifiers_request') && fhor_sb_is_qualifiers_request())
         || (function_exists('bricks_proven_winners_is_request') && bricks_proven_winners_is_request())
         || (function_exists('fhor_sb_is_request') && fhor_sb_is_request())
+        || (function_exists('fhor_bt_is_request') && fhor_bt_is_request())
         || (function_exists('bricks_festival_is_request') && bricks_festival_is_request())
         || (function_exists('bricks_daily_archive_is_request') && bricks_daily_archive_is_request())
         || (strpos($request_uri, '/my-tracker') !== false)
@@ -196,6 +198,7 @@ function bricks_setup_virtual_page_post() {
         || (strpos($request_uri, '/today-picks') !== false)
         || (strpos($request_uri, '/system-builder') !== false)
         || (strpos($request_uri, '/my-qualifiers') !== false)
+        || (strpos($request_uri, '/bet-tracker') !== false)
         || (strpos($request_uri, '/daily/archive/') !== false)
         || (strpos($request_uri, '/tracks') !== false);
     if (!$is_virtual) {
