@@ -753,7 +753,11 @@ if (!function_exists('fhor_bt_styles')) {
         .bt-icon.is-danger{color:#b91c1c}
         .bt-empty{color:#64748b;font-size:.9rem;padding:.85rem .9rem;margin:0;border:1px dashed #cbd5e1;border-radius:10px;background:#f8fafc}
         .bt-banner{margin:0 0 .8rem;padding:.7rem .8rem;border-radius:10px;background:#fef2f2;color:#991b1b;font-size:.86rem}
-        .bt-banner.is-demo{background:#eff6ff;color:#1e3a8a}
+        .bt-sample{display:flex;flex-wrap:wrap;gap:.75rem 1rem;align-items:center;justify-content:space-between;margin:0 0 .9rem;padding:.9rem 1rem;border-radius:12px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a}
+        .bt-sample[hidden]{display:none}
+        .bt-sample.is-mine{background:#f8fafc;border-color:#e2e8f0;color:#334155}
+        .bt-sample strong{display:block;margin:0 0 .25rem;font-size:.98rem}
+        .bt-sample p{margin:0;max-width:46rem;font-size:.88rem;line-height:1.5}
         .bt-gate{max-width:860px;margin:1.5rem auto;padding:0 0 2rem}
         .bt-preview{margin-top:1rem;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;background:#fff}
         .bt-preview-bar{display:flex;justify-content:space-between;gap:.5rem;padding:.7rem .9rem;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:.75rem;font-weight:700;color:#64748b}
@@ -900,7 +904,13 @@ if (!function_exists('fhor_bt_app_html')) {
                 <button type="button" class="bt-btn bt-btn-primary" id="bt-add">Add bet</button>
             </header>
             <p class="bt-banner" id="bt-banner" hidden></p>
-            <p class="bt-banner is-demo" id="bt-demo" hidden></p>
+            <div class="bt-sample" id="bt-demo" hidden>
+                <div>
+                    <strong id="bt-demo-title">This is a sample book</strong>
+                    <p id="bt-demo-copy">The chart and history below are an example. Add a bet and the sample is replaced by your own book.</p>
+                </div>
+                <button type="button" class="bt-btn" id="bt-demo-toggle">Hide sample</button>
+            </div>
             <div class="bt-stats" id="bt-stats">
                 <div class="bt-stat"><span>Bankroll</span><b id="bt-bankroll-stat">—</b><em id="bt-bankroll-sub">Starting balance</em></div>
                 <div class="bt-stat"><span>Today’s stake</span><b id="bt-today-stat">—</b><em id="bt-today-sub">Locked for today</em></div>
@@ -915,7 +925,7 @@ if (!function_exists('fhor_bt_app_html')) {
                     <button type="button" class="bt-tab" data-range="30">Last Month</button>
                     <button type="button" class="bt-tab" data-range="365">Last Year</button>
                     <button type="button" class="bt-tab is-on" data-range="all">All-Time</button>
-                    <button type="button" class="bt-tab" id="bt-demo-toggle" hidden>Sample book</button>
+                    <button type="button" class="bt-btn" id="bt-demo-peek" hidden>Sample book</button>
                     <select id="bt-system-filter" aria-label="Filter by system"><option value="">All systems</option></select>
                 </div>
                 <div class="bt-chart-grid">

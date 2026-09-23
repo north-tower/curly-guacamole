@@ -10,6 +10,7 @@
     var chart = null;
     var quoteTimer = null;
     var showingDemo = false;
+    var preferSample = true;
 
     function boot() {
         document.addEventListener('click', onLogClick);
@@ -494,18 +495,12 @@
             render();
         });
         document.getElementById('bt-system-filter').addEventListener('change', render);
-        var demoToggle = document.getElementById('bt-demo-toggle');
-        if (demoToggle) {
-            demoToggle.addEventListener('click', function () {
-                if (!state.demo) {
-                    return;
-                }
-                showingDemo = !showingDemo;
-                fillSystems(book().bets || []);
-                syncDemo();
-                render();
-            });
-        }
+        [document.getElementById('bt-demo-toggle'), document.getElementById('bt-demo-peek')].forEach(function (demoToggle) {
+            if (!demoToggle) {
+                return;
+            }
+            demoToggle.addEventListener('click', toggleDemo);
+        });
         document.getElementById('bt-settings-form').addEventListener('submit', function (event) {
             event.preventDefault();
             saveSettings();
@@ -571,9 +566,10 @@
         state = data || {};
         state.bets = state.bets || [];
         if (!state.bets.length) {
-            showingDemo = !!state.demo;
+            showingDemo = preferSample && !!state.demo;
         } else if (state.bets.length > previousCount) {
             showingDemo = false;
+            preferSample = false;
         }
         fillSettings(state.settings || {});
         fillSystems(book().bets || []);
@@ -581,28 +577,67 @@
         render();
     }
 
+    function toggleDemo() {
+        if (!state.demo) {
+            return;
+        }
+        showingDemo = !showingDemo;
+        if (!(state.bets || []).length) {
+            preferSample = showingDemo;
+        }
+        fillSystems(book().bets || []);
+        syncDemo();
+        render();
+    }
+
     function syncDemo() {
-        var note = document.getElementById('bt-demo');
+        var box = document.getElementById('bt-demo');
+        var title = document.getElementById('bt-demo-title');
+        var copy = document.getElementById('bt-demo-copy');
         var toggle = document.getElementById('bt-demo-toggle');
-        var title = document.getElementById('bt-history-title');
+        var peek = document.getElementById('bt-demo-peek');
+        var history = document.getElementById('bt-history-title');
         var extra = document.getElementById('bt-extra-head');
+        var add = document.getElementById('bt-add');
         var hasOwn = (state.bets || []).length > 0;
-        if (note) {
-            note.hidden = !showingDemo;
-            note.textContent = showingDemo
-                ? 'Sample book from the Over 5/1 each-way sheet, 2–16 September. No-alert days are left out. Santerno at Naas has no price on the sheet, so that line is not included. Saving a bet of your own replaces this view.'
-                : '';
+        if (box) {
+            box.hidden = !(showingDemo || !hasOwn);
+            box.classList.toggle('is-mine', !showingDemo);
         }
-        if (toggle) {
-            toggle.hidden = !state.demo || (!hasOwn && showingDemo);
-            toggle.textContent = showingDemo ? 'My bets' : 'Sample book';
-            toggle.classList.toggle('is-on', showingDemo && hasOwn);
+        if (showingDemo) {
+            if (title) {
+                title.textContent = 'This is a sample book';
+            }
+            if (copy) {
+                copy.textContent = hasOwn
+                    ? 'You are looking at the example Over 5/1 each-way sheet from 2–16 September, not your saved bets. Your own bets are unchanged.'
+                    : 'The chart, totals, and history below are an example: the Over 5/1 each-way sheet from 2–16 September. Nothing here is saved to your account. Add a bet and this sample is replaced by your own book.';
+            }
+            if (toggle) {
+                toggle.textContent = hasOwn ? 'Show my bets' : 'Hide sample';
+            }
+        } else if (!hasOwn) {
+            if (title) {
+                title.textContent = 'Your book is empty';
+            }
+            if (copy) {
+                copy.textContent = 'Add a bet whenever you are ready. It is saved to your account, and the sample stays out of the way. You can bring the sample back to see the layout again.';
+            }
+            if (toggle) {
+                toggle.textContent = 'Show sample';
+            }
         }
-        if (title) {
-            title.textContent = showingDemo ? 'Sample history' : 'History';
+        if (peek) {
+            peek.hidden = !state.demo || !hasOwn || showingDemo;
+        }
+        if (history) {
+            history.textContent = showingDemo ? 'Sample history' : 'History';
         }
         if (extra) {
             extra.textContent = showingDemo ? 'Note' : '';
+        }
+        if (add) {
+            add.textContent = (!hasOwn && showingDemo) ? 'Add your first bet' : 'Add bet';
         }
     }
 
