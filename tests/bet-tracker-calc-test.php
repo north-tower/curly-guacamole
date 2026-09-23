@@ -29,6 +29,8 @@ bt_eq('3.5', 3.5, fhor_bt_parse_odds('3.5'));
 bt_eq('evens', 2.0, fhor_bt_parse_odds('evens'));
 bt_eq('10-1', 11.0, fhor_bt_parse_odds('10-1'));
 bt_eq('4/1', 5.0, fhor_bt_parse_odds('4/1'));
+bt_eq('11/4F', 3.75, fhor_bt_parse_odds('11/4F'));
+bt_eq('10/8f', 2.25, fhor_bt_parse_odds('10/8 f'));
 bt_assert('reject 0.5', fhor_bt_parse_odds('0.5') === null);
 bt_assert('reject 1', fhor_bt_parse_odds('1') === null);
 

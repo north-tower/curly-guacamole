@@ -265,6 +265,10 @@ if (!function_exists('fhor_sb_sanitize_filters')) {
             'stall_min' => '',
             'stall_max' => '',
             'pts_rank_max' => '',
+            'di_min' => '',
+            'di_max' => '',
+            'cd_min' => '',
+            'cd_max' => '',
             'pace_zone' => '',
             'style' => '',
             'pms_min' => '',
@@ -313,7 +317,7 @@ if (!function_exists('fhor_sb_sanitize_filters')) {
             'dslr_min', 'dslr_max', 'db_min', 'db_max', 'tnr_min', 'comb_min',
             'win_strike_min', 'place_strike_min', 'odds_min', 'odds_max', 'sp_min', 'sp_max',
             'fsrr_min', 'sr_lto_min', 'age_min', 'age_max', 'stall_min', 'stall_max',
-            'pts_rank_max', 'pms_min',
+            'pts_rank_max', 'pms_min', 'di_min', 'di_max', 'cd_min', 'cd_max',
         ];
         foreach ($nums as $key) {
             if (isset($raw[$key]) && $raw[$key] !== '' && is_numeric($raw[$key])) {
@@ -507,6 +511,12 @@ if (!function_exists('fhor_sb_fetch_historic')) {
         $select[] = fhor_sb_sql_optional($hr, 'hrunb', ['SR_LTO', 'sr_lto'], 'sr_lto');
         $select[] = fhor_sb_sql_optional($hr, 'hrunb', ['SR_2'], 'sr_2');
         $select[] = fhor_sb_sql_optional($hr, 'hrunb', ['SR_3'], 'sr_3');
+        $select[] = fhor_sb_sql_optional($hr, 'hrunb', ['sire_id'], 'sire_id', '0');
+        $select[] = fhor_sb_sql_optional($hr, 'hrunb', ['sire_name', 'sire'], 'sire_name', "''");
+        $select[] = fhor_sb_sql_optional($hr, 'hrunb', ['dam_id'], 'dam_id', '0');
+        $select[] = fhor_sb_sql_optional($hr, 'hrunb', ['dam_name', 'dam'], 'dam_name', "''");
+        $select[] = fhor_sb_sql_optional($hr, 'hrunb', ['dam_sire_id'], 'dam_sire_id', '0');
+        $select[] = fhor_sb_sql_optional($hr, 'hrunb', ['dam_sire_name', 'damsire', 'damsire_name'], 'dam_sire_name', "''");
 
         $dch = 'daily_comment_history';
         $dch_exists = fhor_sb_table_exists($dch);
@@ -551,10 +561,14 @@ if (!function_exists('fhor_sb_fetch_historic')) {
             $where[] = 'hracb.course LIKE %s';
             $params[] = '%' . $wpdb->esc_like($filters['course']) . '%';
         }
-        if ($country_col) {
-            fhor_sb_in_where("hracb.`$country_col`", $filters['country'], $where, $params);
-        }
-        fhor_sb_in_where('hracb.race_type', $filters['race_type'], $where, $params);
+        fhor_sb_apply_country_where(
+            'hracb.course',
+            $country_col ? "hracb.`$country_col`" : '',
+            $filters['country'],
+            $where,
+            $params
+        );
+        fhor_sb_apply_race_type_where('hracb.race_type', $filters['race_type'], $where, $params);
         if ($class_col && $filters['class'] !== '') {
             $where[] = "hracb.`$class_col` LIKE %s";
             $params[] = '%' . $wpdb->esc_like($filters['class']) . '%';
@@ -564,12 +578,7 @@ if (!function_exists('fhor_sb_fetch_historic')) {
             $params[] = '%' . $wpdb->esc_like($filters['track_type']) . '%';
         }
         if ($hcap_col && $filters['handicap'] !== '') {
-            if (strtolower($filters['handicap']) === 'yes') {
-                $where[] = "(hracb.`$hcap_col` IN ('Y','Yes','1','HCap','Handicap') OR LOWER(hracb.`$hcap_col`) LIKE %s)";
-                $params[] = '%handicap%';
-            } elseif (strtolower($filters['handicap']) === 'no') {
-                $where[] = "(hracb.`$hcap_col` IN ('N','No','0','') OR hracb.`$hcap_col` IS NULL)";
-            }
+            fhor_sb_apply_handicap_where("hracb.`$hcap_col`", $filters['handicap'], $where, $params);
         }
         if ($age_col && $filters['age_range'] !== '') {
             $where[] = "hracb.`$age_col` LIKE %s";
@@ -678,6 +687,15 @@ if (!function_exists('fhor_sb_fetch_live')) {
             'form_figures' => 'form_figures',
             'age' => 'age',
             'stall_number' => 'stall_number',
+            'sire_id' => 'sire_id',
+            'sire_name' => 'sire_name',
+            'sire' => 'sire_name',
+            'dam_id' => 'dam_id',
+            'dam_name' => 'dam_name',
+            'dam' => 'dam_name',
+            'dam_sire_id' => 'dam_sire_id',
+            'dam_sire_name' => 'dam_sire_name',
+            'damsire' => 'dam_sire_name',
             'prize_pos_1' => 'prize_pos_1',
             'going' => 'going',
         ];
@@ -717,9 +735,16 @@ if (!function_exists('fhor_sb_fetch_live')) {
             $where[] = 'sp.course LIKE %s';
             $params[] = '%' . $wpdb->esc_like($filters['course']) . '%';
         }
-        fhor_sb_in_where('sp.race_type', $filters['race_type'], $where, $params);
-        if (!empty($filters['country']) && !empty($used_alias['country'])) {
-            fhor_sb_in_where('sp.country', $filters['country'], $where, $params);
+        fhor_sb_apply_race_type_where('sp.race_type', $filters['race_type'], $where, $params);
+        fhor_sb_apply_country_where(
+            'sp.course',
+            !empty($used_alias['country']) ? 'sp.country' : '',
+            $filters['country'],
+            $where,
+            $params
+        );
+        if (!empty($used_alias['handicap']) && $filters['handicap'] !== '') {
+            fhor_sb_apply_handicap_where('sp.handicap', $filters['handicap'], $where, $params);
         }
         if ($filters['class'] !== '' && !empty($used_alias['class'])) {
             $where[] = 'sp.class LIKE %s';
@@ -747,6 +772,297 @@ if (!function_exists('fhor_sb_fetch_live')) {
     }
 }
 
+if (!function_exists('fhor_sb_country_courses')) {
+    function fhor_sb_country_courses() {
+        return [
+            'ireland' => [
+                'ballinrobe', 'bellewstown', 'clonmel', 'cork', 'curragh', 'down royal', 'downpatrick',
+                'dundalk', 'fairyhouse', 'galway', 'gowran', 'kilbeggan', 'killarney', 'laytown',
+                'leopardstown', 'limerick', 'listowel', 'mallow', 'naas', 'navan', 'phoenix park',
+                'powerstown', 'punchestown', 'roscommon', 'sligo', 'thurles', 'tipperary', 'tramore', 'wexford',
+            ],
+            'scotland' => ['ayr', 'hamilton', 'kelso', 'musselburgh', 'perth'],
+            'wales' => ['bangor on dee', 'bangor', 'chepstow', 'ffos las'],
+            'england' => [
+                'aintree', 'ascot', 'bath', 'beverley', 'brighton', 'carlisle', 'cartmel', 'catterick',
+                'chelmsford', 'cheltenham', 'chester', 'doncaster', 'epsom', 'exeter', 'fakenham',
+                'folkestone', 'fontwell', 'goodwood', 'great leighs', 'haydock', 'hereford', 'hexham',
+                'huntingdon', 'kempton', 'leicester', 'lingfield', 'ludlow', 'market rasen', 'newbury',
+                'newcastle', 'newmarket', 'newton abbot', 'nottingham', 'plumpton', 'pontefract', 'redcar',
+                'ripon', 'salisbury', 'sandown', 'sedgefield', 'southwell', 'stratford', 'taunton',
+                'thirsk', 'towcester', 'uttoxeter', 'warwick', 'wetherby', 'wincanton', 'windsor',
+                'wolverhampton', 'worcester', 'yarmouth', 'york',
+            ],
+        ];
+    }
+}
+
+if (!function_exists('fhor_sb_normalize_course_name')) {
+    function fhor_sb_normalize_course_name($course) {
+        $c = strtolower((string) $course);
+        $c = str_replace(['_', '-'], ' ', $c);
+        $c = preg_replace('/[^a-z0-9 ]+/', ' ', $c);
+        $c = preg_replace('/\s+/', ' ', trim((string) $c));
+        $c = preg_replace('/^the\s+/', '', $c);
+        $c = preg_replace('/\s+(park|bridge|downs|city|aw)$/', '', (string) $c);
+        return trim((string) $c);
+    }
+}
+
+if (!function_exists('fhor_sb_country_bucket')) {
+    function fhor_sb_country_bucket($country) {
+        $c = strtolower(trim((string) $country));
+        if ($c === '') {
+            return '';
+        }
+        if (preg_match('/ireland|\beire\b|\bire\b|\birl\b/', $c)) {
+            return 'ireland';
+        }
+        if (preg_match('/scotland|\bsco\b/', $c)) {
+            return 'scotland';
+        }
+        if (preg_match('/wales|cymru|\bwal\b/', $c)) {
+            return 'wales';
+        }
+        if (preg_match('/england|\beng\b/', $c)) {
+            return 'england';
+        }
+        return '';
+    }
+}
+
+if (!function_exists('fhor_sb_course_country')) {
+    function fhor_sb_course_country($course) {
+        $key = fhor_sb_normalize_course_name($course);
+        if ($key === '') {
+            return '';
+        }
+        $flat = [];
+        foreach (fhor_sb_country_courses() as $bucket => $names) {
+            foreach ($names as $name) {
+                $flat[$name] = $bucket;
+            }
+        }
+        if (isset($flat[$key])) {
+            return $flat[$key];
+        }
+        $names = array_keys($flat);
+        usort($names, function ($a, $b) {
+            return strlen($b) <=> strlen($a);
+        });
+        foreach ($names as $name) {
+            if (preg_match('/(?:^| )' . preg_quote($name, '/') . '(?: |$)/', $key)) {
+                return $flat[$name];
+            }
+        }
+        return '';
+    }
+}
+
+if (!function_exists('fhor_sb_meeting_country')) {
+    function fhor_sb_meeting_country($course, $country = '') {
+        $from_course = fhor_sb_course_country($course);
+        if ($from_course !== '') {
+            return $from_course;
+        }
+        return fhor_sb_country_bucket($country);
+    }
+}
+
+if (!function_exists('fhor_sb_country_matches')) {
+    function fhor_sb_country_matches($course, $country, array $selected) {
+        $wanted = [];
+        foreach ($selected as $item) {
+            $bucket = fhor_sb_country_bucket($item);
+            if ($bucket !== '') {
+                $wanted[$bucket] = true;
+            }
+        }
+        if (!$wanted) {
+            return true;
+        }
+        $bucket = fhor_sb_meeting_country($course, $country);
+        return $bucket !== '' && isset($wanted[$bucket]);
+    }
+}
+
+if (!function_exists('fhor_sb_apply_country_where')) {
+    function fhor_sb_apply_country_where($course_expr, $country_expr, array $selected, array &$where, array &$params) {
+        $wanted = [];
+        foreach ($selected as $item) {
+            $bucket = fhor_sb_country_bucket($item);
+            if ($bucket !== '') {
+                $wanted[$bucket] = true;
+            }
+        }
+        if (!$wanted || $course_expr === '') {
+            return;
+        }
+        global $wpdb;
+        $exclude = [];
+        foreach (fhor_sb_country_courses() as $bucket => $names) {
+            if (!isset($wanted[$bucket])) {
+                foreach ($names as $name) {
+                    $exclude[] = $name;
+                }
+            }
+        }
+        foreach ($exclude as $name) {
+            $like = function_exists('esc_like') && isset($wpdb) ? $wpdb->esc_like($name) : $name;
+            $where[] = 'LOWER(' . $course_expr . ') NOT LIKE %s';
+            $params[] = '%' . $like . '%';
+        }
+        if ($country_expr === '') {
+            return;
+        }
+        $blocked = [];
+        $labels = [
+            'ireland' => ['ireland', 'eire', 'ire', 'irl', 'northern ireland', 'republic of ireland'],
+            'scotland' => ['scotland', 'sco'],
+            'wales' => ['wales', 'wal', 'cymru'],
+            'england' => ['england', 'eng'],
+        ];
+        foreach ($labels as $bucket => $words) {
+            if (!isset($wanted[$bucket])) {
+                foreach ($words as $word) {
+                    $blocked[] = $word;
+                }
+            }
+        }
+        if (!$blocked) {
+            return;
+        }
+        $ph = implode(',', array_fill(0, count($blocked), '%s'));
+        $where[] = '(' . $country_expr . " IS NULL OR TRIM(" . $country_expr . ") = '' OR LOWER(TRIM(" . $country_expr . ")) NOT IN ($ph))";
+        foreach ($blocked as $word) {
+            $params[] = $word;
+        }
+    }
+}
+
+if (!function_exists('fhor_sb_handicap_state')) {
+    function fhor_sb_handicap_state($value) {
+        if ($value === null) {
+            return null;
+        }
+        $v = strtolower(trim((string) $value));
+        if ($v === '') {
+            return null;
+        }
+        if (is_numeric($v)) {
+            return intval($v) === 1;
+        }
+        if (preg_match('/non[-\s]?handicap/', $v) || preg_match('/^(n|no|non|false)$/', $v)) {
+            return false;
+        }
+        if (preg_match('/^(y|yes|true|hcap|handicap)$/', $v) || strpos($v, 'handicap') !== false || strpos($v, 'hcap') !== false) {
+            return true;
+        }
+        return null;
+    }
+}
+
+if (!function_exists('fhor_sb_apply_handicap_where')) {
+    function fhor_sb_apply_handicap_where($expr, $mode, array &$where, array &$params) {
+        $mode = strtolower((string) $mode);
+        if ($mode === 'yes') {
+            $where[] = "(
+                $expr IN (1,'1','Y','Yes','y','yes','HCap','Handicap')
+                OR (
+                    LOWER(CAST($expr AS CHAR)) LIKE %s
+                    AND LOWER(CAST($expr AS CHAR)) NOT LIKE %s
+                )
+            )";
+            $params[] = '%handicap%';
+            $params[] = '%non%';
+            return;
+        }
+        if ($mode === 'no') {
+            $where[] = "$expr IN (0,'0','N','No','n','no','Non-Handicap','Non Handicap','Non-handicap')";
+        }
+    }
+}
+
+if (!function_exists('fhor_sb_race_type_matches')) {
+    function fhor_sb_race_type_matches($race_type, array $wanted) {
+        $wanted = array_values(array_filter($wanted, function ($v) {
+            return $v !== '';
+        }));
+        if (!$wanted) {
+            return true;
+        }
+        $t = strtolower(trim((string) $race_type));
+        if ($t === '') {
+            return false;
+        }
+        foreach ($wanted as $type) {
+            $type = strtolower((string) $type);
+            if ($type === 'nh flat') {
+                if (strpos($t, 'nh flat') !== false || strpos($t, 'national hunt flat') !== false || strpos($t, 'bumper') !== false) {
+                    return true;
+                }
+            } elseif ($type === 'flat') {
+                if (strpos($t, 'flat') !== false && strpos($t, 'nh') === false && strpos($t, 'national hunt') === false && strpos($t, 'bumper') === false) {
+                    return true;
+                }
+            } elseif ($type === 'hurdle') {
+                if (strpos($t, 'hurdle') !== false) {
+                    return true;
+                }
+            } elseif ($type === 'chase') {
+                if (strpos($t, 'chase') !== false || strpos($t, 'steeple') !== false) {
+                    return true;
+                }
+            } elseif (strpos($t, $type) !== false) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+if (!function_exists('fhor_sb_apply_race_type_where')) {
+    function fhor_sb_apply_race_type_where($expr, array $types, array &$where, array &$params) {
+        $parts = [];
+        foreach ($types as $type) {
+            $type = strtolower((string) $type);
+            if ($type === 'hurdle') {
+                $parts[] = "$expr LIKE %s";
+                $params[] = '%Hurdle%';
+            } elseif ($type === 'chase') {
+                $parts[] = "($expr LIKE %s OR $expr LIKE %s)";
+                $params[] = '%Chase%';
+                $params[] = '%Steeple%';
+            } elseif ($type === 'nh flat') {
+                $parts[] = "($expr LIKE %s OR $expr LIKE %s OR $expr LIKE %s)";
+                $params[] = '%NH Flat%';
+                $params[] = '%National Hunt Flat%';
+                $params[] = '%Bumper%';
+            } elseif ($type === 'flat') {
+                $parts[] = "($expr LIKE %s AND $expr NOT LIKE %s AND $expr NOT LIKE %s AND $expr NOT LIKE %s)";
+                $params[] = '%Flat%';
+                $params[] = '%NH%';
+                $params[] = '%National Hunt%';
+                $params[] = '%Bumper%';
+            }
+        }
+        if ($parts) {
+            $where[] = '(' . implode(' OR ', $parts) . ')';
+        }
+    }
+}
+
+if (!function_exists('fhor_sb_speed_figure')) {
+    function fhor_sb_speed_figure($row) {
+        foreach (['wt_speed_rating', 'speed_rating', 'sr_lto', 'SR_LTO'] as $key) {
+            if (isset($row->{$key}) && is_numeric($row->{$key})) {
+                return floatval($row->{$key});
+            }
+        }
+        return null;
+    }
+}
+
 if (!function_exists('fhor_sb_row_passes_runner_filters')) {
     function fhor_sb_row_passes_runner_filters($row, array $filters) {
         $num = function ($val) {
@@ -771,30 +1087,11 @@ if (!function_exists('fhor_sb_row_passes_runner_filters')) {
         $fsr = $num($row->fsr ?? null);
         $sr = $num($row->wt_speed_rating ?? $row->speed_rating ?? $row->sr_lto ?? null);
 
-        if (!empty($filters['country'])) {
-            $country = strtolower(trim((string) ($row->country ?? '')));
-            $ok = false;
-            foreach ($filters['country'] as $c) {
-                if ($c !== '' && $country !== '' && strpos($country, strtolower($c)) !== false) {
-                    $ok = true;
-                    break;
-                }
-            }
-            if (!$ok && $country !== '') {
-                return false;
-            }
+        if (!fhor_sb_country_matches($row->course ?? '', $row->country ?? '', $filters['country'] ?? [])) {
+            return false;
         }
-        if (!empty($filters['race_type'])) {
-            $ok = false;
-            foreach ($filters['race_type'] as $t) {
-                if ($t !== '' && stripos((string) ($row->race_type ?? ''), $t) !== false) {
-                    $ok = true;
-                    break;
-                }
-            }
-            if (!$ok) {
-                return false;
-            }
+        if (!fhor_sb_race_type_matches($row->race_type ?? '', $filters['race_type'] ?? [])) {
+            return false;
         }
         if ($filters['class'] !== '' && stripos((string) ($row->class ?? ''), $filters['class']) === false) {
             return false;
@@ -817,12 +1114,12 @@ if (!function_exists('fhor_sb_row_passes_runner_filters')) {
                 return false;
             }
         }
-        $hcap = strtolower(trim((string) ($row->handicap ?? '')));
-        if ($filters['handicap'] === 'yes' && !preg_match('/y|yes|1|hcap|handicap/i', $hcap)) {
-            return false;
-        }
-        if ($filters['handicap'] === 'no' && $hcap !== '' && preg_match('/y|yes|1|hcap|handicap/i', $hcap)) {
-            return false;
+        if (($filters['handicap'] ?? '') === 'yes' || ($filters['handicap'] ?? '') === 'no') {
+            $handicap = fhor_sb_handicap_state($row->handicap ?? null);
+            $want_handicap = $filters['handicap'] === 'yes';
+            if ($handicap === null || $handicap !== $want_handicap) {
+                return false;
+            }
         }
         if ($filters['trainer'] !== '' && stripos((string) ($row->trainer_name ?? ''), $filters['trainer']) === false) {
             return false;
@@ -948,11 +1245,16 @@ if (!function_exists('fhor_sb_row_passes_runner_filters')) {
         }
 
         $field = intval($row->_field_size ?? 0);
-        if ($filters['field_min'] !== '' && $field < intval($filters['field_min'])) {
-            return false;
-        }
-        if ($filters['field_max'] !== '' && $field > intval($filters['field_max'])) {
-            return false;
+        if (($filters['field_min'] ?? '') !== '' || ($filters['field_max'] ?? '') !== '') {
+            if ($field < 1) {
+                return false;
+            }
+            if (($filters['field_min'] ?? '') !== '' && $field < intval($filters['field_min'])) {
+                return false;
+            }
+            if (($filters['field_max'] ?? '') !== '' && $field > intval($filters['field_max'])) {
+                return false;
+            }
         }
         if ($filters['fsr_rank_max'] !== '' && (intval($row->_fsr_rank ?? 999) > intval($filters['fsr_rank_max']) || intval($row->_fsr_rank ?? 0) < 1)) {
             return false;
@@ -961,6 +1263,20 @@ if (!function_exists('fhor_sb_row_passes_runner_filters')) {
             return false;
         }
         if ($filters['pts_rank_max'] !== '' && (intval($row->_pts_rank ?? 999) > intval($filters['pts_rank_max']) || intval($row->_pts_rank ?? 0) < 1)) {
+            return false;
+        }
+        $di_min = $filters['di_min'] ?? '';
+        $di_max = $filters['di_max'] ?? '';
+        if ($di_min !== '' || $di_max !== '') {
+            if (!empty($row->_dosage_di_infinite)) {
+                if ($di_max !== '') {
+                    return false;
+                }
+            } elseif (!$between($num($row->_dosage_di ?? null), $di_min, $di_max)) {
+                return false;
+            }
+        }
+        if (!$between($num($row->_dosage_cd ?? null), $filters['cd_min'] ?? '', $filters['cd_max'] ?? '')) {
             return false;
         }
         return true;
@@ -1042,8 +1358,113 @@ if (!function_exists('fhor_sb_attach_pace')) {
     }
 }
 
+if (!function_exists('fhor_sb_needs_dosage')) {
+    function fhor_sb_needs_dosage(array $filters) {
+        foreach (['di_min', 'di_max', 'cd_min', 'cd_max'] as $key) {
+            if (($filters[$key] ?? '') !== '') {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+if (!function_exists('fhor_sb_attach_dosage')) {
+    function fhor_sb_attach_dosage(array $rows) {
+        if (empty($rows) || !function_exists('bricks_dosage_metrics_for_runners')) {
+            return $rows;
+        }
+        static $cache = [];
+
+        $missing = [];
+        foreach ($rows as $row) {
+            $id = intval($row->runner_id ?? 0);
+            if ($id <= 0 || isset($cache['id:' . $id])) {
+                continue;
+            }
+            if (trim((string) ($row->sire_name ?? $row->sire ?? '')) === '') {
+                $missing[$id] = $id;
+            }
+        }
+        if ($missing && function_exists('bricks_dosage_fetch_horses_by_ids_or_names')) {
+            $by_id = [];
+            foreach (array_chunk(array_values($missing), 300) as $chunk) {
+                $found = bricks_dosage_fetch_horses_by_ids_or_names($chunk, []);
+                if (!is_array($found)) {
+                    continue;
+                }
+                foreach ($found as $horse) {
+                    $hid = intval($horse['runner_id'] ?? 0);
+                    if ($hid > 0 && !isset($by_id[$hid])) {
+                        $by_id[$hid] = $horse;
+                    }
+                }
+            }
+            foreach ($rows as $row) {
+                $id = intval($row->runner_id ?? 0);
+                if ($id <= 0 || !isset($by_id[$id])) {
+                    continue;
+                }
+                $horse = $by_id[$id];
+                foreach (['sire_id', 'sire_name', 'dam_id', 'dam_name', 'dam_sire_id', 'dam_sire_name'] as $field) {
+                    if (!isset($row->{$field}) || $row->{$field} === '' || $row->{$field} === null) {
+                        $row->{$field} = $horse[$field];
+                    }
+                }
+            }
+        }
+
+        $pending = [];
+        $seen = [];
+        foreach ($rows as $row) {
+            $id = intval($row->runner_id ?? 0);
+            $key = $id > 0 ? ('id:' . $id) : '';
+            if ($key === '' || isset($cache[$key]) || isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            if (empty($row->name)) {
+                $row->name = $row->horse_name ?? '';
+            }
+            $pending[] = $row;
+        }
+        foreach (array_chunk($pending, 150) as $chunk) {
+            $lookup = bricks_dosage_metrics_for_runners($chunk);
+            if (!is_array($lookup)) {
+                $lookup = [];
+            }
+            foreach ($chunk as $idx => $row) {
+                $metrics = function_exists('bricks_dosage_metrics_for_runner_row')
+                    ? bricks_dosage_metrics_for_runner_row($lookup, $row, $idx)
+                    : [];
+                $inf = !empty($metrics['di_is_infinite']);
+                $di = isset($metrics['di']) && is_numeric($metrics['di']) && !$inf ? (float) $metrics['di'] : null;
+                $cd = isset($metrics['cd']) && is_numeric($metrics['cd']) ? (float) $metrics['cd'] : null;
+                $id = intval($row->runner_id ?? 0);
+                if ($id > 0) {
+                    $cache['id:' . $id] = ['di' => $di, 'cd' => $cd, 'inf' => $inf];
+                }
+            }
+        }
+
+        foreach ($rows as $row) {
+            $id = intval($row->runner_id ?? 0);
+            $hit = ($id > 0 && isset($cache['id:' . $id]))
+                ? $cache['id:' . $id]
+                : ['di' => null, 'cd' => null, 'inf' => false];
+            $row->_dosage_di = $hit['di'];
+            $row->_dosage_cd = $hit['cd'];
+            $row->_dosage_di_infinite = !empty($hit['inf']);
+        }
+        return $rows;
+    }
+}
+
 if (!function_exists('fhor_sb_annotate_and_filter')) {
     function fhor_sb_annotate_and_filter(array $rows, array $filters) {
+        if (fhor_sb_needs_dosage($filters)) {
+            $rows = fhor_sb_attach_dosage($rows);
+        }
         $by_race = [];
         foreach ($rows as $row) {
             $rid = intval($row->race_id ?? 0);
@@ -1112,12 +1533,13 @@ if (!function_exists('fhor_sb_annotate_and_filter')) {
                 });
                 $kept = [reset($kept)];
             } elseif ($filters['pick_mode'] === 'top_sr' && count($kept) > 1) {
+                $kept = array_values(array_filter($kept, function ($row) {
+                    return fhor_sb_speed_figure($row) !== null;
+                }));
                 usort($kept, function ($a, $b) {
-                    $sa = floatval($a->wt_speed_rating ?? $a->speed_rating ?? $a->sr_lto ?? -9999);
-                    $sb = floatval($b->wt_speed_rating ?? $b->speed_rating ?? $b->sr_lto ?? -9999);
-                    return $sb <=> $sa;
+                    return fhor_sb_speed_figure($b) <=> fhor_sb_speed_figure($a);
                 });
-                $kept = [reset($kept)];
+                $kept = $kept ? [reset($kept)] : [];
             } elseif ($filters['pick_mode'] === 'top_pts' && count($kept) > 1) {
                 usort($kept, function ($a, $b) {
                     return floatval($b->_pts ?? 0) <=> floatval($a->_pts ?? 0);
@@ -1231,9 +1653,18 @@ if (!function_exists('fhor_sb_run_backtest')) {
             }
             if (count($samples) < 20) {
                 $bsp_odds = fhor_sb_bsp_decimal($row);
+                $meeting = fhor_sb_meeting_country($row->course ?? '', $row->country ?? '');
+                $meeting_labels = [
+                    'england' => 'England',
+                    'ireland' => 'Ireland',
+                    'scotland' => 'Scotland',
+                    'wales' => 'Wales',
+                ];
                 $samples[] = [
                     'horse' => (string) ($row->horse_name ?? ''),
                     'course' => (string) ($row->course ?? ''),
+                    'country' => $meeting_labels[$meeting] ?? '',
+                    'field' => intval($row->_field_size ?? 0),
                     'date' => (string) ($row->meeting_date ?? ''),
                     'sp' => (string) ($row->starting_price ?? ''),
                     'isp' => $isp_settle['odds'],
@@ -1306,6 +1737,14 @@ if (!function_exists('fhor_sb_today_qualifiers')) {
                 'pts' => isset($row->_pts) ? round(floatval($row->_pts), 1) : null,
                 'pace_zone' => isset($row->zone) ? intval($row->zone) : null,
                 'forecast' => $row->forecast_price ?? ($fc ? (string) $fc : ''),
+                'di' => !empty($row->_dosage_di_infinite)
+                    ? 'Inf'
+                    : ((isset($row->_dosage_di) && is_numeric($row->_dosage_di))
+                        ? number_format((float) $row->_dosage_di, 2, '.', '')
+                        : null),
+                'cd' => (isset($row->_dosage_cd) && is_numeric($row->_dosage_cd))
+                    ? number_format((float) $row->_dosage_cd, 2, '.', '')
+                    : null,
                 'race_id' => intval($row->race_id ?? 0),
                 'race_url' => function_exists('bricks_race_url') ? bricks_race_url(intval($row->race_id ?? 0)) : '',
             ];
@@ -1553,7 +1992,11 @@ if (!function_exists('fhor_sb_send_daily_alert_emails')) {
                 }
                 $lines = [($sys['name'] ?? 'System') . ' — ' . intval($q['count']) . ' qualifier(s)'];
                 foreach (array_slice($q['rows'], 0, 12) as $row) {
-                    $lines[] = trim(($row['time'] ?? '') . ' ' . ($row['course'] ?? '') . ' · ' . ($row['horse'] ?? '') . '  FSr ' . ($row['fsr'] ?? '–'));
+                    $dosage = '';
+                    if (($row['di'] ?? null) !== null || ($row['cd'] ?? null) !== null) {
+                        $dosage = '  DI ' . ($row['di'] ?? '–') . ' CD ' . ($row['cd'] ?? '–');
+                    }
+                    $lines[] = trim(($row['time'] ?? '') . ' ' . ($row['course'] ?? '') . ' · ' . ($row['horse'] ?? '') . '  FSr ' . ($row['fsr'] ?? '–') . $dosage);
                 }
                 $blocks[] = implode("\n", $lines);
             }
@@ -1830,6 +2273,16 @@ if (!function_exists('fhor_sb_shortcode')) {
                         </div>
                     </details>
                     <details class="sb-group">
+                        <summary>Dosage (DI / CD)</summary>
+                        <div class="sb-grid">
+                            <div class="sb-field"><label for="sb-dimin">DI min</label><input id="sb-dimin" name="di_min" type="number" step="0.01" placeholder="e.g. 1.20"></div>
+                            <div class="sb-field"><label for="sb-dimax">DI max</label><input id="sb-dimax" name="di_max" type="number" step="0.01" placeholder="e.g. 3.00"></div>
+                            <div class="sb-field"><label for="sb-cdmin">CD min</label><input id="sb-cdmin" name="cd_min" type="number" step="0.01" placeholder="e.g. 0.00"></div>
+                            <div class="sb-field"><label for="sb-cdmax">CD max</label><input id="sb-cdmax" name="cd_max" type="number" step="0.01" placeholder="e.g. 0.80"></div>
+                        </div>
+                        <p class="sb-note">Dosage Index and Center of Distribution use the same 4-generation Chefs-de-Race male line as the race card. Higher figures mean more speed influence. Set a minimum, a maximum, or both. A horse with no dosage figure is left out once a level is set. The rule applies to historic results and to today’s qualifiers. A long lookback takes longer, because each horse is scored from its pedigree.</p>
+                    </details>
+                    <details class="sb-group">
                         <summary>Draw, fitness, connections</summary>
                         <div class="sb-grid">
                             <div class="sb-field"><label for="sb-dbmin">Draw bias % min</label><input id="sb-dbmin" name="db_min" type="number" step="0.1"></div>
@@ -1953,7 +2406,7 @@ if (!function_exists('fhor_sb_shortcode')) {
                             <p class="sb-note" id="sb-today-meta"></p>
                             <div style="overflow-x:auto;">
                                 <table class="sb-table" id="sb-today-table">
-                                    <thead><tr><th>Time</th><th>Horse</th><th>Course</th><th>FSr</th><th>Rank</th><th>Pts</th><th>Price</th><th></th></tr></thead>
+                                    <thead><tr><th>Time</th><th>Horse</th><th>Course</th><th>FSr</th><th>Rank</th><th>Pts</th><th>DI</th><th>CD</th><th>Price</th><th></th></tr></thead>
                                     <tbody></tbody>
                                 </table>
                             </div>
@@ -2062,7 +2515,7 @@ if (!function_exists('fhor_sb_qualifiers_shortcode')) {
                             <?php else: ?>
                                 <div style="overflow-x:auto;">
                                     <table class="sb-table">
-                                        <thead><tr><th>Time</th><th>Horse</th><th>Course</th><th>FSr</th><th>Rank</th><th>Pts</th><th>Price</th><th></th></tr></thead>
+                                        <thead><tr><th>Time</th><th>Horse</th><th>Course</th><th>FSr</th><th>Rank</th><th>Pts</th><th>DI</th><th>CD</th><th>Price</th><th></th></tr></thead>
                                         <tbody>
                                         <?php foreach ($block['rows'] as $row): ?>
                                             <tr>
@@ -2072,6 +2525,8 @@ if (!function_exists('fhor_sb_qualifiers_shortcode')) {
                                                 <td><?php echo $row['fsr'] === null ? '–' : esc_html((string) $row['fsr']); ?></td>
                                                 <td><?php echo esc_html((string) ($row['fsr_rank'] ?? '–')); ?></td>
                                                 <td><?php echo $row['pts'] === null ? '–' : esc_html((string) $row['pts']); ?></td>
+                                                <td><?php echo ($row['di'] ?? null) === null ? '–' : esc_html((string) $row['di']); ?></td>
+                                                <td><?php echo ($row['cd'] ?? null) === null ? '–' : esc_html((string) $row['cd']); ?></td>
                                                 <td><?php echo esc_html($row['forecast'] ?? ''); ?></td>
                                                 <td><?php
                                                 if (function_exists('fhor_bt_log_button_html')) {

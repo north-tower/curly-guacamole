@@ -11,6 +11,15 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+if (!empty($_SERVER['REQUEST_URI']) && preg_match('#/bet-tracker(?:/|$)#i', (string) $_SERVER['REQUEST_URI'])) {
+    if (!defined('DONOTCACHEPAGE')) {
+        define('DONOTCACHEPAGE', true);
+    }
+    if (!defined('DONOTCACHEDB')) {
+        define('DONOTCACHEDB', true);
+    }
+}
+
 require_once __DIR__ . '/bet-tracker-calc.php';
 
 if (!function_exists('fhor_bt_url')) {
@@ -139,8 +148,16 @@ if (!function_exists('fhor_bt_load_bets')) {
         $user_id = intval($user_id);
         $bets_table = fhor_bt_bets_table();
         $legs_table = fhor_bt_legs_table();
+        $wpdb->suppress_errors(true);
         $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $bets_table WHERE user_id = %d ORDER BY placed_at ASC, id ASC", $user_id));
         $leg_rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $legs_table WHERE user_id = %d ORDER BY bet_id ASC, leg_index ASC", $user_id));
+        if (($rows === null || $leg_rows === null) && $wpdb->last_error) {
+            delete_option('fhor_bt_db_version');
+            fhor_bt_install_tables();
+            $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $bets_table WHERE user_id = %d ORDER BY placed_at ASC, id ASC", $user_id));
+            $leg_rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $legs_table WHERE user_id = %d ORDER BY bet_id ASC, leg_index ASC", $user_id));
+        }
+        $wpdb->suppress_errors(false);
         $by_bet = [];
         foreach ((array) $leg_rows as $leg) {
             $bid = (int) $leg->bet_id;
@@ -248,6 +265,13 @@ if (!function_exists('fhor_bt_recalculate')) {
             'summary' => $stake_label,
         ]);
         $cmp['bets'] = fhor_bt_annotate_bets($cmp['bets']);
+        try {
+            $demo = fhor_bt_compare(fhor_bt_demo_bets(), $settings, '2026-09-17');
+            $demo['bets'] = fhor_bt_annotate_bets($demo['bets']);
+            $cmp['demo'] = $demo;
+        } catch (Throwable $e) {
+            $cmp['demo'] = null;
+        }
         return $cmp;
     }
 }
@@ -377,12 +401,26 @@ if (!function_exists('fhor_bt_guard')) {
         if (!is_user_logged_in()) {
             wp_send_json_error(['message' => 'Please log in.'], 401);
         }
-        check_ajax_referer('fhor_bet_tracker', 'nonce');
+        $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
+        if (!wp_verify_nonce($nonce, 'fhor_bet_tracker')) {
+            wp_send_json_error(['message' => 'Your session needs a refresh.', 'code' => 'nonce'], 403);
+        }
         if (!fhor_bt_is_premium()) {
             wp_send_json_error(['message' => 'Bet Tracker is included with Fhorsite Premium.'], 403);
         }
     }
 }
+
+if (!function_exists('fhor_bt_ajax_nonce')) {
+    function fhor_bt_ajax_nonce() {
+        if (!is_user_logged_in()) {
+            wp_send_json_error(['message' => 'Please log in.'], 401);
+        }
+        nocache_headers();
+        wp_send_json_success(['nonce' => wp_create_nonce('fhor_bet_tracker')]);
+    }
+}
+add_action('wp_ajax_fhor_bt_nonce', 'fhor_bt_ajax_nonce');
 
 if (!function_exists('fhor_bt_ajax_denied')) {
     function fhor_bt_ajax_denied() {
@@ -390,10 +428,20 @@ if (!function_exists('fhor_bt_ajax_denied')) {
     }
 }
 
+if (!function_exists('fhor_bt_send_book')) {
+    function fhor_bt_send_book($user_id) {
+        try {
+            wp_send_json_success(fhor_bt_recalculate($user_id));
+        } catch (Throwable $e) {
+            wp_send_json_error(['message' => 'The tracker could not load your book.'], 500);
+        }
+    }
+}
+
 if (!function_exists('fhor_bt_ajax_bootstrap')) {
     function fhor_bt_ajax_bootstrap() {
         fhor_bt_guard();
-        wp_send_json_success(fhor_bt_recalculate(get_current_user_id()));
+        fhor_bt_send_book(get_current_user_id());
     }
 }
 add_action('wp_ajax_fhor_bt_bootstrap', 'fhor_bt_ajax_bootstrap');
@@ -410,7 +458,7 @@ if (!function_exists('fhor_bt_ajax_save_settings')) {
             'points_per_bet' => isset($_POST['points_per_bet']) ? wp_unslash($_POST['points_per_bet']) : 1,
         ]);
         update_user_meta(get_current_user_id(), fhor_bt_settings_key(), $settings);
-        wp_send_json_success(fhor_bt_recalculate(get_current_user_id()));
+        fhor_bt_send_book(get_current_user_id());
     }
 }
 add_action('wp_ajax_fhor_bt_save_settings', 'fhor_bt_ajax_save_settings');
@@ -530,7 +578,7 @@ if (!function_exists('fhor_bt_ajax_save_bet')) {
             }
             wp_send_json_error(['message' => 'A selection could not be stored.'], 500);
         }
-        wp_send_json_success(fhor_bt_recalculate($user_id));
+        fhor_bt_send_book($user_id);
     }
 }
 add_action('wp_ajax_fhor_bt_save_bet', 'fhor_bt_ajax_save_bet');
@@ -549,7 +597,7 @@ if (!function_exists('fhor_bt_ajax_delete_bet')) {
         }
         $wpdb->delete(fhor_bt_legs_table(), ['bet_id' => $bet_id, 'user_id' => $user_id], ['%d', '%d']);
         $wpdb->delete($table, ['id' => $bet_id, 'user_id' => $user_id], ['%d', '%d']);
-        wp_send_json_success(fhor_bt_recalculate($user_id));
+        fhor_bt_send_book($user_id);
     }
 }
 add_action('wp_ajax_fhor_bt_delete_bet', 'fhor_bt_ajax_delete_bet');
@@ -705,6 +753,7 @@ if (!function_exists('fhor_bt_styles')) {
         .bt-icon.is-danger{color:#b91c1c}
         .bt-empty{color:#64748b;font-size:.9rem;padding:.85rem .9rem;margin:0;border:1px dashed #cbd5e1;border-radius:10px;background:#f8fafc}
         .bt-banner{margin:0 0 .8rem;padding:.7rem .8rem;border-radius:10px;background:#fef2f2;color:#991b1b;font-size:.86rem}
+        .bt-banner.is-demo{background:#eff6ff;color:#1e3a8a}
         .bt-gate{max-width:860px;margin:1.5rem auto;padding:0 0 2rem}
         .bt-preview{margin-top:1rem;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;background:#fff}
         .bt-preview-bar{display:flex;justify-content:space-between;gap:.5rem;padding:.7rem .9rem;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:.75rem;font-weight:700;color:#64748b}
@@ -851,6 +900,7 @@ if (!function_exists('fhor_bt_app_html')) {
                 <button type="button" class="bt-btn bt-btn-primary" id="bt-add">Add bet</button>
             </header>
             <p class="bt-banner" id="bt-banner" hidden></p>
+            <p class="bt-banner is-demo" id="bt-demo" hidden></p>
             <div class="bt-stats" id="bt-stats">
                 <div class="bt-stat"><span>Bankroll</span><b id="bt-bankroll-stat">—</b><em id="bt-bankroll-sub">Starting balance</em></div>
                 <div class="bt-stat"><span>Today’s stake</span><b id="bt-today-stat">—</b><em id="bt-today-sub">Locked for today</em></div>
@@ -865,6 +915,7 @@ if (!function_exists('fhor_bt_app_html')) {
                     <button type="button" class="bt-tab" data-range="30">Last Month</button>
                     <button type="button" class="bt-tab" data-range="365">Last Year</button>
                     <button type="button" class="bt-tab is-on" data-range="all">All-Time</button>
+                    <button type="button" class="bt-tab" id="bt-demo-toggle" hidden>Sample book</button>
                     <select id="bt-system-filter" aria-label="Filter by system"><option value="">All systems</option></select>
                 </div>
                 <div class="bt-chart-grid">
@@ -894,13 +945,13 @@ if (!function_exists('fhor_bt_app_html')) {
                 </form>
             </section>
             <section class="bt-panel">
-                <h2>History</h2>
+                <h2 id="bt-history-title">History</h2>
                 <p class="bt-empty" id="bt-empty">Loading bets…</p>
                 <div class="bt-table-wrap" id="bt-table-wrap" hidden>
                     <table class="bt-table">
                         <thead>
                             <tr>
-                                <th>Date</th><th>Course</th><th>Selection</th><th>Type</th><th>Odds</th><th>Stake</th><th>Result</th><th>P/L</th><th>System</th><th></th>
+                                <th>Date</th><th>Course</th><th>Selection</th><th>Type</th><th>Odds</th><th>Stake</th><th>Result</th><th>P/L</th><th>System</th><th id="bt-extra-head"></th>
                             </tr>
                         </thead>
                         <tbody id="bt-table-body"></tbody>

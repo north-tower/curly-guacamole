@@ -9,6 +9,7 @@
     var range = 'all';
     var chart = null;
     var quoteTimer = null;
+    var showingDemo = false;
 
     function boot() {
         document.addEventListener('click', onLogClick);
@@ -18,31 +19,74 @@
         }
         if (document.getElementById('fhor-bet-tracker') && Number(fhorBt.premium)) {
             bindApp();
-            loadBook();
+            refreshNonce().then(function () {
+                loadBook();
+            });
         }
         if (fhorBt.prefill && fhorBt.prefill.horse && Number(fhorBt.premium)) {
             openFromPrefill(fhorBt.prefill);
         }
     }
 
-    function post(action, fields) {
+    function parseBody(text) {
+        var trimmed = String(text || '').replace(/^\uFEFF/, '').trim();
+        try {
+            return JSON.parse(trimmed);
+        } catch (e) {
+            if (trimmed === '-1' || trimmed === '0') {
+                return { success: false, data: { message: 'Your session needs a refresh.', code: 'nonce' } };
+            }
+            return { success: false, data: { message: 'Request was rejected. Refresh the page and try again.' } };
+        }
+    }
+
+    function refreshNonce() {
+        var url = fhorBt.ajax + (String(fhorBt.ajax).indexOf('?') === -1 ? '?' : '&') + 'action=fhor_bt_nonce';
+        return fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(function (res) { return res.text(); }).then(function (text) {
+            var json = parseBody(text);
+            if (json && json.success && json.data && json.data.nonce) {
+                fhorBt.nonce = json.data.nonce;
+                return true;
+            }
+            return false;
+        }).catch(function () {
+            return false;
+        });
+    }
+
+    function post(action, fields, retried) {
         var body = new window.FormData();
         body.append('action', action);
-        body.append('nonce', fhorBt.nonce);
+        body.append('nonce', fhorBt.nonce || '');
         Object.keys(fields || {}).forEach(function (key) {
             if (fields[key] === undefined || fields[key] === null) {
                 return;
             }
             body.append(key, fields[key]);
         });
-        return fetch(fhorBt.ajax, { method: 'POST', credentials: 'same-origin', body: body })
+        return fetch(fhorBt.ajax, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: body
+        })
             .then(function (res) { return res.text(); })
             .then(function (text) {
-                try {
-                    return JSON.parse(text);
-                } catch (e) {
-                    return { success: false, data: { message: 'Request was rejected. Refresh the page and try again.' } };
+                var json = parseBody(text);
+                var stale = json && json.data && json.data.code === 'nonce';
+                if (!retried && stale) {
+                    return refreshNonce().then(function (ok) {
+                        if (!ok) {
+                            return json;
+                        }
+                        return post(action, fields, true);
+                    });
                 }
+                return json;
             })
             .catch(function () {
                 return { success: false, data: { message: 'Network error. Try again.' } };
@@ -76,11 +120,18 @@
         return dt.getUTCFullYear() + '-' + m + '-' + d;
     }
 
+    function book() {
+        if (showingDemo && state.demo) {
+            return state.demo;
+        }
+        return state;
+    }
+
     function inRange(date) {
         if (range === 'all') {
             return true;
         }
-        var today = state.today || String(fhorBt.now || '').slice(0, 10);
+        var today = book().today || state.today || String(fhorBt.now || '').slice(0, 10);
         var start = shiftDate(today, (parseInt(range, 10) || 7) - 1);
         return String(date || '') >= start;
     }
@@ -443,6 +494,18 @@
             render();
         });
         document.getElementById('bt-system-filter').addEventListener('change', render);
+        var demoToggle = document.getElementById('bt-demo-toggle');
+        if (demoToggle) {
+            demoToggle.addEventListener('click', function () {
+                if (!state.demo) {
+                    return;
+                }
+                showingDemo = !showingDemo;
+                fillSystems(book().bets || []);
+                syncDemo();
+                render();
+            });
+        }
         document.getElementById('bt-settings-form').addEventListener('submit', function (event) {
             event.preventDefault();
             saveSettings();
@@ -504,11 +567,43 @@
     }
 
     function applyPayload(data) {
+        var previousCount = (state.bets || []).length;
         state = data || {};
         state.bets = state.bets || [];
+        if (!state.bets.length) {
+            showingDemo = !!state.demo;
+        } else if (state.bets.length > previousCount) {
+            showingDemo = false;
+        }
         fillSettings(state.settings || {});
-        fillSystems(state.bets);
+        fillSystems(book().bets || []);
+        syncDemo();
         render();
+    }
+
+    function syncDemo() {
+        var note = document.getElementById('bt-demo');
+        var toggle = document.getElementById('bt-demo-toggle');
+        var title = document.getElementById('bt-history-title');
+        var extra = document.getElementById('bt-extra-head');
+        var hasOwn = (state.bets || []).length > 0;
+        if (note) {
+            note.hidden = !showingDemo;
+            note.textContent = showingDemo
+                ? 'Sample book from the Over 5/1 each-way sheet, 2–16 September. No-alert days are left out. Santerno at Naas has no price on the sheet, so that line is not included. Saving a bet of your own replaces this view.'
+                : '';
+        }
+        if (toggle) {
+            toggle.hidden = !state.demo || (!hasOwn && showingDemo);
+            toggle.textContent = showingDemo ? 'My bets' : 'Sample book';
+            toggle.classList.toggle('is-on', showingDemo && hasOwn);
+        }
+        if (title) {
+            title.textContent = showingDemo ? 'Sample history' : 'History';
+        }
+        if (extra) {
+            extra.textContent = showingDemo ? 'Note' : '';
+        }
     }
 
     function fillSettings(settings) {
@@ -548,7 +643,7 @@
         if (sel) {
             system = sel.value;
         }
-        return (state.bets || []).filter(function (bet) {
+        return (book().bets || []).filter(function (bet) {
             var date = bet.date || String(bet.placed_at || '').slice(0, 10);
             if (system && bet.system_name !== system) {
                 return false;
@@ -558,8 +653,9 @@
     }
 
     function render() {
+        var view = book();
         var bets = visibleBets();
-        var settings = state.settings || {};
+        var settings = view.settings || state.settings || {};
         var profit = 0;
         var shadow = 0;
         var staked = 0;
@@ -603,7 +699,7 @@
         });
         paintStats(profit, shadow, staked, hits, decided, settings);
         paintWhatIf(profit, shadow, decided);
-        drawChart(labels, actualSeries, shadowSeries, state.actual_label || 'Your staking', state.shadow_label || 'Shadow');
+        drawChart(labels, actualSeries, shadowSeries, view.actual_label || 'Your staking', view.shadow_label || 'Shadow');
         paintTable(bets);
     }
 
@@ -612,16 +708,21 @@
         if (!bank) {
             return;
         }
-        bank.textContent = money(state.bankroll);
-        document.getElementById('bt-bankroll-sub').textContent = 'Opened at ' + money(settings.starting_bankroll);
+        var view = book();
+        bank.textContent = money(view.bankroll);
+        document.getElementById('bt-bankroll-sub').textContent = showingDemo
+            ? 'Sample book, opened at ' + money(settings.starting_bankroll)
+            : 'Opened at ' + money(settings.starting_bankroll);
         var today = document.getElementById('bt-today-stat');
         var todaySub = document.getElementById('bt-today-sub');
         if (settings.mode === 'flat') {
-            today.textContent = money(state.flat_line) + ' / line';
+            today.textContent = money(view.flat_line) + ' / line';
             todaySub.textContent = String(settings.points_per_bet) + ' pt × ' + money(settings.point_value);
         } else {
-            today.textContent = money(state.today_budget);
-            todaySub.textContent = 'Per bet from ' + money(state.today_opening);
+            today.textContent = money(view.today_budget);
+            todaySub.textContent = showingDemo
+                ? 'Locked for 17 Sept, from ' + money(view.today_opening)
+                : 'Per bet from ' + money(view.today_opening);
         }
         var profitEl = document.getElementById('bt-view-profit');
         profitEl.textContent = money(profit);
@@ -650,8 +751,9 @@
         if (!box) {
             return;
         }
-        var actualLabel = state.actual_label || 'your staking';
-        var shadowLabel = state.shadow_label || 'the other method';
+        var view = book();
+        var actualLabel = view.actual_label || 'your staking';
+        var shadowLabel = view.shadow_label || 'the other method';
         var text;
         if (!decided) {
             text = 'Settle a bet in this view to compare staking methods.';
@@ -739,9 +841,11 @@
         }
         if (!bets.length) {
             empty.hidden = false;
-            empty.textContent = (state.bets || []).length
-                ? 'No bets in this view.'
-                : 'No bets yet. Add one, or use Log Bet on a daily qualifier.';
+            empty.textContent = showingDemo
+                ? 'No sample bets in this view.'
+                : ((state.bets || []).length
+                    ? 'No bets in this view.'
+                    : 'No bets yet. Add one, or use Log Bet on a daily qualifier.');
             wrap.hidden = true;
             body.innerHTML = '';
             return;
@@ -762,8 +866,11 @@
                 + '<td><span class="bt-badge is-' + escapeHtml(bet.result || 'pending') + '">' + escapeHtml(labelResult(bet.result)) + '</span></td>'
                 + '<td class="' + pnlClass + '">' + pnl + '</td>'
                 + '<td>' + escapeHtml(bet.system_name || '—') + '</td>'
-                + '<td><button type="button" class="bt-icon bt-edit" data-id="' + escapeHtml(bet.id) + '">Edit</button>'
-                + '<button type="button" class="bt-icon is-danger bt-del" data-id="' + escapeHtml(bet.id) + '">Delete</button></td>'
+                + '<td>' + (showingDemo
+                    ? escapeHtml(bet.note || '')
+                    : '<button type="button" class="bt-icon bt-edit" data-id="' + escapeHtml(bet.id) + '">Edit</button>'
+                        + '<button type="button" class="bt-icon is-danger bt-del" data-id="' + escapeHtml(bet.id) + '">Delete</button>')
+                + '</td>'
                 + '</tr>';
         }).join('');
     }

@@ -102,6 +102,7 @@ if (!function_exists('fhor_bt_parse_odds')) {
     function fhor_bt_parse_odds($raw) {
         $raw = strtolower(trim((string) $raw));
         $raw = str_replace([' ', '–', '—'], ['', '-', '-'], $raw);
+        $raw = preg_replace('/(?:fav|favourite|favorite|f)$/', '', $raw);
         if ($raw === '') {
             return null;
         }
@@ -623,5 +624,111 @@ if (!function_exists('fhor_bt_compare')) {
             'shadow_label' => fhor_bt_mode_label($settings, $shadow_mode),
             'settings' => $settings,
         ];
+    }
+}
+
+if (!function_exists('fhor_bt_demo_leg')) {
+    function fhor_bt_demo_leg($horse, $course, $odds, $result) {
+        return [
+            'horse' => $horse,
+            'course' => $course,
+            'odds_input' => $odds,
+            'odds' => fhor_bt_parse_odds($odds),
+            'result' => $result,
+        ];
+    }
+}
+
+if (!function_exists('fhor_bt_demo_bet')) {
+    function fhor_bt_demo_bet($id, $when, $type, $course, $label, $odds_display, array $legs, $each_way, $note = '') {
+        return [
+            'id' => $id,
+            'placed_at' => $when,
+            'bet_type' => $type,
+            'each_way' => $each_way,
+            'ew_fraction' => 0.25,
+            'stake_mode' => 'auto',
+            'manual_total' => 0,
+            'system_name' => 'Over 5/1 EW',
+            'system_id' => 'demo-over-5-1-ew',
+            'course' => $course,
+            'selection_label' => $label,
+            'odds_display' => $odds_display,
+            'note' => $note,
+            'legs' => $legs,
+        ];
+    }
+}
+
+if (!function_exists('fhor_bt_demo_bets')) {
+    /**
+     * September sheet headed "Over 5/1 EW".
+     * Prices are the odds column. A 3rd marked W is an each-way place.
+     * Bracketed DBLE rows are one double. Days marked NO ALERT are omitted.
+     * Santerno (Naas, 16 Sept) has no price on the sheet, so it is left out.
+     */
+    function fhor_bt_demo_bets() {
+        $bets = [];
+        $id = 1;
+        $single = function ($when, $course, $horse, $odds, $result, $each_way, $note = '') use (&$bets, &$id) {
+            $bets[] = fhor_bt_demo_bet(
+                $id++,
+                $when,
+                'single',
+                $course,
+                $horse,
+                $odds,
+                [fhor_bt_demo_leg($horse, $course, $odds, $result)],
+                $each_way,
+                $note
+            );
+        };
+
+        $single('2026-09-02 14:05:00', 'Haydock', 'Turning Up', '4/9', 'won', false);
+        $single('2026-09-02 15:03:00', 'Salisbury', 'Minsmere', '50/1', 'lost', true);
+        $single('2026-09-02 15:52:00', 'Haydock', 'Deputy Vice', '10/1', 'placed', true, '3rd');
+        $single('2026-09-05 16:15:00', 'Haydock', 'Elarqam', '14/1', 'placed', true, '3rd');
+        $single('2026-09-05 17:00:00', 'Thirsk', 'Native Instinct', '9/2', 'lost', false);
+        $single('2026-09-07 16:45:00', '', 'Without Prejudice', '11/4', 'won', false);
+        $bets[] = fhor_bt_demo_bet(
+            $id++,
+            '2026-09-08 14:17:00',
+            'double',
+            'Multiple',
+            'Magic Harry / Battenburg Belles',
+            '10/8 · 3/1',
+            [
+                fhor_bt_demo_leg('Magic Harry', 'Leicester', '10/8', 'won'),
+                fhor_bt_demo_leg('Battenburg Belles', 'Catterick', '3/1', 'won'),
+            ],
+            false,
+            'Double'
+        );
+        $single('2026-09-10 14:35:00', 'Epsom Downs', 'Galileo', '22/1', 'lost', true);
+        $single('2026-09-10 14:10:00', 'Kempton', 'Point Worcester', '7/2', 'lost', false);
+        $single('2026-09-11 15:15:00', 'Doncaster', 'Rock Montreal', '5/2', 'placed', false, '2nd');
+        $single('2026-09-11 14:36:00', 'Sandown', 'Alloway', '11/4', 'placed', false, '2nd');
+        $bets[] = fhor_bt_demo_bet(
+            $id++,
+            '2026-09-12 16:07:00',
+            'double',
+            'Multiple',
+            'King Sharja / Macarone',
+            '9/2 · 6/1',
+            [
+                fhor_bt_demo_leg('King Sharja', 'Musselburgh', '9/2', 'won'),
+                fhor_bt_demo_leg('Macarone', 'Bath', '6/1', 'won'),
+            ],
+            false,
+            'Double'
+        );
+        $single('2026-09-14 15:00:00', 'Sedgefield', 'Seteye', '11/1', 'won', true);
+        $single('2026-09-15 16:00:00', 'Uttoxeter', 'Grady Checkout', '5/1', 'lost', false);
+        $single('2026-09-15 14:23:00', 'Redcar', 'Lady Dublin', '9/2', 'lost', false);
+        $single('2026-09-16 13:00:00', 'Yarmouth', 'Bidsta', '8/15', 'won', true, 'Place won');
+        $single('2026-09-16 13:30:00', 'Sandown', 'United Authority', '11/2', 'won', true, 'Each-way');
+        $single('2026-09-16 14:00:00', 'Beverley', 'Roku Maria', '8/3', 'won', false);
+
+        return $bets;
     }
 }

@@ -1,4 +1,17 @@
-<?php 
+<?php
+/**
+ * This file belongs in wp-content/themes/bricks-child/.
+ * A copy dropped in wp-content/themes/ is loaded as the parent theme and
+ * fatals looking for themes/inc. Hand off to the child theme and stop.
+ */
+if (basename(__DIR__) !== 'bricks-child') {
+	$fhor_child_functions = __DIR__ . '/bricks-child/functions.php';
+	if (is_file($fhor_child_functions)) {
+		require_once $fhor_child_functions;
+		return;
+	}
+}
+
 /**
  * Register/enqueue custom scripts and styles hghg
  */

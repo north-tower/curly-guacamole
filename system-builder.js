@@ -91,6 +91,10 @@
                 stall_min: val('stall_min'),
                 stall_max: val('stall_max'),
                 pts_rank_max: val('pts_rank_max'),
+                di_min: val('di_min'),
+                di_max: val('di_max'),
+                cd_min: val('cd_min'),
+                cd_max: val('cd_max'),
                 pace_zone: val('pace_zone'),
                 style: val('style'),
                 pms_min: val('pms_min'),
@@ -110,9 +114,10 @@
                 'cls_min', 'cls_max', 'dslr_min', 'dslr_max', 'db_min', 'db_max', 'tnr_min', 'comb_min',
                 'win_strike_min', 'place_strike_min', 'odds_min', 'odds_max', 'sp_min', 'sp_max',
                 'fsrr_min', 'sr_lto_min', 'age_min', 'age_max', 'stall_min', 'stall_max',
-                'pts_rank_max', 'pace_zone', 'style', 'pms_min', 'trainer', 'jockey'
+                'pts_rank_max', 'di_min', 'di_max', 'cd_min', 'cd_max', 'pace_zone', 'style', 'pms_min', 'trainer', 'jockey'
             ].forEach(function (key) {
-                setVal(key, filters[key] || '');
+                var value = filters[key];
+                setVal(key, value === undefined || value === null ? '' : value);
             });
             setChecked('country[]', filters.country);
             setChecked('race_type[]', filters.race_type);
@@ -198,7 +203,11 @@
                 var pl = (row.profit >= 0 ? '+' : '') + row.profit;
                 var isp = row.isp != null ? Number(row.isp).toFixed(2) : (row.sp || '–');
                 var bsp = row.bsp != null ? Number(row.bsp).toFixed(2) : '–';
-                tr.innerHTML = '<td>' + escapeHtml(row.horse) + '</td><td>' + escapeHtml(row.course) + ' · ' + escapeHtml(row.date) + '</td><td>' + escapeHtml(isp) + '</td><td>' + escapeHtml(bsp) + '</td><td>' + escapeHtml(row.pos) + '</td><td>' + pl + '</td>';
+                var race = escapeHtml(row.course)
+                    + (row.country ? ' · ' + escapeHtml(row.country) : '')
+                    + ' · ' + escapeHtml(row.date)
+                    + (row.field ? ' · ' + escapeHtml(row.field) + ' ran' : '');
+                tr.innerHTML = '<td>' + escapeHtml(row.horse) + '</td><td>' + race + '</td><td>' + escapeHtml(isp) + '</td><td>' + escapeHtml(bsp) + '</td><td>' + escapeHtml(row.pos) + '</td><td>' + pl + '</td>';
                 tb.appendChild(tr);
             });
             reveal('sb-results');
@@ -219,7 +228,7 @@
                     ? '<a href="' + escapeHtml(row.race_url) + '">' + escapeHtml(row.horse) + '</a>'
                     : escapeHtml(row.horse);
                 var log = '<button type="button" class="sb-btn fhor-bt-log" data-horse="' + escapeHtml(row.horse) + '" data-course="' + escapeHtml(row.course) + '" data-time="' + escapeHtml(row.time) + '" data-date="' + escapeHtml(block.date || '') + '" data-odds="' + escapeHtml(row.forecast || '') + '" data-system="">⚡ Log Bet</button>';
-                tr.innerHTML = '<td>' + escapeHtml(row.time) + '</td><td>' + name + '</td><td>' + escapeHtml(row.course) + '</td><td>' + (row.fsr == null ? '–' : row.fsr) + '</td><td>' + (row.fsr_rank || '–') + '</td><td>' + (row.pts == null ? '–' : row.pts) + '</td><td>' + escapeHtml(row.forecast || '') + '</td><td>' + log + '</td>';
+                tr.innerHTML = '<td>' + escapeHtml(row.time) + '</td><td>' + name + '</td><td>' + escapeHtml(row.course) + '</td><td>' + (row.fsr == null ? '–' : row.fsr) + '</td><td>' + (row.fsr_rank || '–') + '</td><td>' + (row.pts == null ? '–' : row.pts) + '</td><td>' + (row.di == null ? '–' : escapeHtml(row.di)) + '</td><td>' + (row.cd == null ? '–' : escapeHtml(row.cd)) + '</td><td>' + escapeHtml(row.forecast || '') + '</td><td>' + log + '</td>';
                 tb.appendChild(tr);
             });
         }
