@@ -12,6 +12,21 @@
     var showingDemo = false;
     var preferSample = true;
 
+    function debugOn() {
+        return !!(window.fhorBt && (Number(fhorBt.debug) || fhorBt.debug === true));
+    }
+
+    function logDebug(label, detail) {
+        if (!debugOn()) {
+            return;
+        }
+        if (detail === undefined) {
+            window.console.log('[fhor-bt]', label);
+            return;
+        }
+        window.console.log('[fhor-bt]', label, detail);
+    }
+
     function boot() {
         document.addEventListener('click', onLogClick);
         var modal = document.getElementById('fhor-bt-modal');
@@ -29,14 +44,20 @@
         }
     }
 
-    function parseBody(text) {
+    function parseBody(text, context) {
         var trimmed = String(text || '').replace(/^\uFEFF/, '').trim();
         try {
             return JSON.parse(trimmed);
         } catch (e) {
             if (trimmed === '-1' || trimmed === '0') {
+                logDebug('ajax nonce sentinel', context || {});
                 return { success: false, data: { message: 'Your session needs a refresh.', code: 'nonce' } };
             }
+            logDebug('ajax response is not JSON', Object.assign({}, context || {}, {
+                parseError: e && e.message ? e.message : String(e),
+                length: trimmed.length,
+                preview: trimmed.slice(0, 400)
+            }));
             return { success: false, data: { message: 'Request was rejected. Refresh the page and try again.' } };
         }
     }
@@ -47,14 +68,19 @@
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        }).then(function (res) { return res.text(); }).then(function (text) {
-            var json = parseBody(text);
+        }).then(function (res) {
+            return res.text().then(function (text) {
+                return { status: res.status, text: text };
+            });
+        }).then(function (res) {
+            var json = parseBody(res.text, { action: 'fhor_bt_nonce', status: res.status });
             if (json && json.success && json.data && json.data.nonce) {
                 fhorBt.nonce = json.data.nonce;
                 return true;
             }
             return false;
-        }).catch(function () {
+        }).catch(function (err) {
+            logDebug('nonce refresh failed', { error: err && err.message ? err.message : String(err) });
             return false;
         });
     }
@@ -69,15 +95,33 @@
             }
             body.append(key, fields[key]);
         });
+        logDebug('ajax request', {
+            action: action,
+            retried: !!retried,
+            fieldKeys: Object.keys(fields || {})
+        });
         return fetch(fhorBt.ajax, {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
             body: body
         })
-            .then(function (res) { return res.text(); })
-            .then(function (text) {
-                var json = parseBody(text);
+            .then(function (res) {
+                return res.text().then(function (text) {
+                    return { status: res.status, ok: res.ok, text: text };
+                });
+            })
+            .then(function (res) {
+                var json = parseBody(res.text, { action: action, status: res.status, ok: res.ok });
+                if (debugOn()) {
+                    logDebug('ajax parsed', {
+                        action: action,
+                        status: res.status,
+                        success: !!(json && json.success),
+                        message: json && json.data && json.data.message ? json.data.message : null,
+                        code: json && json.data && json.data.code ? json.data.code : null
+                    });
+                }
                 var stale = json && json.data && json.data.code === 'nonce';
                 if (!retried && stale) {
                     return refreshNonce().then(function (ok) {
@@ -89,7 +133,8 @@
                 }
                 return json;
             })
-            .catch(function () {
+            .catch(function (err) {
+                logDebug('ajax network error', { action: action, error: err && err.message ? err.message : String(err) });
                 return { success: false, data: { message: 'Network error. Try again.' } };
             });
     }
@@ -467,6 +512,15 @@
         post('fhor_bt_save_bet', { bet: JSON.stringify(payload) }).then(function (json) {
             button.disabled = false;
             if (!json || !json.success) {
+                logDebug('save bet failed', {
+                    message: errMsg(json),
+                    payload: {
+                        id: payload.id,
+                        bet_type: payload.bet_type,
+                        legCount: (payload.legs || []).length,
+                        stake_mode: payload.stake_mode
+                    }
+                });
                 showModalError(errMsg(json));
                 return;
             }

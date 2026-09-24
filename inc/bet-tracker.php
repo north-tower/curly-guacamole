@@ -64,10 +64,25 @@ if (!function_exists('fhor_bt_legs_table')) {
     }
 }
 
+if (!function_exists('fhor_bt_tables_exist')) {
+    function fhor_bt_tables_exist() {
+        global $wpdb;
+        $bets = fhor_bt_bets_table();
+        $legs = fhor_bt_legs_table();
+        $found_bets = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $bets));
+        $found_legs = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $legs));
+        return $found_bets === $bets && $found_legs === $legs;
+    }
+}
+
 if (!function_exists('fhor_bt_install_tables')) {
     function fhor_bt_install_tables() {
-        if (get_option('fhor_bt_db_version') === '1') {
+        if (get_option('fhor_bt_db_version') === '1' && fhor_bt_tables_exist()) {
             return;
+        }
+        if (get_option('fhor_bt_db_version') === '1' && !fhor_bt_tables_exist()) {
+            delete_option('fhor_bt_db_version');
+            fhor_bt_debug_log('install repair', ['reason' => 'missing_tables']);
         }
         global $wpdb;
         $charset = $wpdb->get_charset_collate();
@@ -116,7 +131,12 @@ if (!function_exists('fhor_bt_install_tables')) {
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta($sql_bets);
         dbDelta($sql_legs);
-        update_option('fhor_bt_db_version', '1');
+        if (fhor_bt_tables_exist()) {
+            update_option('fhor_bt_db_version', '1');
+        } else {
+            delete_option('fhor_bt_db_version');
+            fhor_bt_debug_log('install failed', ['db_error' => $wpdb->last_error]);
+        }
     }
 }
 add_action('init', 'fhor_bt_install_tables', 6);
@@ -396,16 +416,37 @@ if (!function_exists('fhor_bt_insert_legs')) {
     }
 }
 
+if (!function_exists('fhor_bt_debug_log')) {
+    function fhor_bt_debug_log($event, array $context = []) {
+        if (!defined('WP_DEBUG') || !WP_DEBUG) {
+            return;
+        }
+        $line = '[fhor-bt] ' . $event;
+        if ($context) {
+            $line .= ' ' . wp_json_encode($context);
+        }
+        error_log($line);
+    }
+}
+
 if (!function_exists('fhor_bt_guard')) {
-    function fhor_bt_guard() {
+    function fhor_bt_guard($action = '') {
         if (!is_user_logged_in()) {
+            fhor_bt_debug_log('guard denied', ['reason' => 'not_logged_in', 'action' => $action]);
             wp_send_json_error(['message' => 'Please log in.'], 401);
         }
         $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
         if (!wp_verify_nonce($nonce, 'fhor_bet_tracker')) {
+            fhor_bt_debug_log('guard denied', [
+                'reason' => 'bad_nonce',
+                'action' => $action,
+                'user_id' => get_current_user_id(),
+                'nonce_len' => strlen($nonce),
+            ]);
             wp_send_json_error(['message' => 'Your session needs a refresh.', 'code' => 'nonce'], 403);
         }
         if (!fhor_bt_is_premium()) {
+            fhor_bt_debug_log('guard denied', ['reason' => 'not_premium', 'action' => $action, 'user_id' => get_current_user_id()]);
             wp_send_json_error(['message' => 'Bet Tracker is included with Fhorsite Premium.'], 403);
         }
     }
@@ -433,6 +474,12 @@ if (!function_exists('fhor_bt_send_book')) {
         try {
             wp_send_json_success(fhor_bt_recalculate($user_id));
         } catch (Throwable $e) {
+            fhor_bt_debug_log('send_book failed', [
+                'user_id' => (int) $user_id,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
             wp_send_json_error(['message' => 'The tracker could not load your book.'], 500);
         }
     }
@@ -440,7 +487,7 @@ if (!function_exists('fhor_bt_send_book')) {
 
 if (!function_exists('fhor_bt_ajax_bootstrap')) {
     function fhor_bt_ajax_bootstrap() {
-        fhor_bt_guard();
+        fhor_bt_guard('fhor_bt_bootstrap');
         fhor_bt_send_book(get_current_user_id());
     }
 }
@@ -449,7 +496,7 @@ add_action('wp_ajax_nopriv_fhor_bt_bootstrap', 'fhor_bt_ajax_denied');
 
 if (!function_exists('fhor_bt_ajax_save_settings')) {
     function fhor_bt_ajax_save_settings() {
-        fhor_bt_guard();
+        fhor_bt_guard('fhor_bt_save_settings');
         $settings = fhor_bt_normalize_settings([
             'mode' => isset($_POST['mode']) ? sanitize_text_field(wp_unslash($_POST['mode'])) : 'percentage',
             'starting_bankroll' => isset($_POST['starting_bankroll']) ? wp_unslash($_POST['starting_bankroll']) : 100,
@@ -466,7 +513,7 @@ add_action('wp_ajax_nopriv_fhor_bt_save_settings', 'fhor_bt_ajax_denied');
 
 if (!function_exists('fhor_bt_ajax_quote')) {
     function fhor_bt_ajax_quote() {
-        fhor_bt_guard();
+        fhor_bt_guard('fhor_bt_quote');
         $user_id = get_current_user_id();
         $bets = fhor_bt_load_bets($user_id);
         $exclude = isset($_POST['exclude_id']) ? (int) $_POST['exclude_id'] : 0;
@@ -492,12 +539,35 @@ add_action('wp_ajax_nopriv_fhor_bt_quote', 'fhor_bt_ajax_denied');
 
 if (!function_exists('fhor_bt_ajax_save_bet')) {
     function fhor_bt_ajax_save_bet() {
-        fhor_bt_guard();
+        fhor_bt_guard('fhor_bt_save_bet');
+        fhor_bt_install_tables();
+        if (!fhor_bt_tables_exist()) {
+            wp_send_json_error(['message' => 'Bet Tracker storage is not set up on this site yet. Try again in a moment or contact support.'], 500);
+        }
         global $wpdb;
         $user_id = get_current_user_id();
-        $raw = isset($_POST['bet']) ? json_decode(wp_unslash($_POST['bet']), true) : null;
+        $bet_json = isset($_POST['bet']) ? wp_unslash($_POST['bet']) : '';
+        $raw = $bet_json !== '' ? json_decode($bet_json, true) : null;
+        if ($bet_json !== '' && $raw === null && json_last_error() !== JSON_ERROR_NONE) {
+            fhor_bt_debug_log('save_bet bad json', [
+                'user_id' => $user_id,
+                'json_error' => json_last_error_msg(),
+                'bet_len' => strlen($bet_json),
+            ]);
+        }
+        fhor_bt_debug_log('save_bet start', [
+            'user_id' => $user_id,
+            'bet_id' => is_array($raw) && isset($raw['id']) ? (int) $raw['id'] : 0,
+            'bet_type' => is_array($raw) && isset($raw['bet_type']) ? sanitize_key($raw['bet_type']) : '',
+            'leg_count' => is_array($raw) && isset($raw['legs']) && is_array($raw['legs']) ? count($raw['legs']) : 0,
+        ]);
         $parsed = fhor_bt_parse_bet_input($raw);
         if (is_wp_error($parsed)) {
+            fhor_bt_debug_log('save_bet validation failed', [
+                'user_id' => $user_id,
+                'code' => $parsed->get_error_code(),
+                'message' => $parsed->get_error_message(),
+            ]);
             wp_send_json_error(['message' => $parsed->get_error_message()], 400);
         }
         $bet_id = isset($raw['id']) ? (int) $raw['id'] : 0;
@@ -526,6 +596,7 @@ if (!function_exists('fhor_bt_ajax_save_bet')) {
             }
             $updated = $wpdb->update($table, $row, ['id' => $bet_id, 'user_id' => $user_id], $formats, ['%d', '%d']);
             if ($updated === false) {
+                fhor_bt_debug_log('save_bet update failed', ['user_id' => $user_id, 'bet_id' => $bet_id, 'db_error' => $wpdb->last_error]);
                 wp_send_json_error(['message' => 'Could not update that bet.'], 500);
             }
             $wpdb->delete(fhor_bt_legs_table(), ['bet_id' => $bet_id, 'user_id' => $user_id], ['%d', '%d']);
@@ -567,11 +638,13 @@ if (!function_exists('fhor_bt_ajax_save_bet')) {
                 ]
             );
             if (!$ok) {
+                fhor_bt_debug_log('save_bet insert failed', ['user_id' => $user_id, 'db_error' => $wpdb->last_error]);
                 wp_send_json_error(['message' => 'Could not save that bet.'], 500);
             }
             $bet_id = (int) $wpdb->insert_id;
         }
         if (!fhor_bt_insert_legs($bet_id, $user_id, $parsed['legs'])) {
+            fhor_bt_debug_log('save_bet legs failed', ['user_id' => $user_id, 'bet_id' => $bet_id, 'db_error' => $wpdb->last_error]);
             if (!isset($owned)) {
                 $wpdb->delete(fhor_bt_legs_table(), ['bet_id' => $bet_id, 'user_id' => $user_id], ['%d', '%d']);
                 $wpdb->delete($table, ['id' => $bet_id, 'user_id' => $user_id], ['%d', '%d']);
@@ -586,7 +659,7 @@ add_action('wp_ajax_nopriv_fhor_bt_save_bet', 'fhor_bt_ajax_denied');
 
 if (!function_exists('fhor_bt_ajax_delete_bet')) {
     function fhor_bt_ajax_delete_bet() {
-        fhor_bt_guard();
+        fhor_bt_guard('fhor_bt_delete_bet');
         global $wpdb;
         $user_id = get_current_user_id();
         $bet_id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
@@ -694,6 +767,7 @@ if (!function_exists('fhor_bt_enqueue')) {
         wp_localize_script('fhor-bet-tracker', 'fhorBt', [
             'ajax' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('fhor_bet_tracker'),
+            'debug' => (defined('WP_DEBUG') && WP_DEBUG) ? '1' : '0',
             'premium' => fhor_bt_is_premium() ? '1' : '0',
             'url' => fhor_bt_url(),
             'signup' => function_exists('fhor_get_membership_signup_url') ? fhor_get_membership_signup_url() : home_url('/register/'),
