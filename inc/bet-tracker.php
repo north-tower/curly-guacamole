@@ -75,66 +75,98 @@ if (!function_exists('fhor_bt_tables_exist')) {
     }
 }
 
-if (!function_exists('fhor_bt_install_tables')) {
-    function fhor_bt_install_tables() {
-        if (get_option('fhor_bt_db_version') === '1' && fhor_bt_tables_exist()) {
+if (!function_exists('fhor_bt_db_schema_version')) {
+    function fhor_bt_db_schema_version() {
+        return '2';
+    }
+}
+
+if (!function_exists('fhor_bt_maybe_upgrade_schema')) {
+    function fhor_bt_maybe_upgrade_schema() {
+        global $wpdb;
+        $bets = fhor_bt_bets_table();
+        if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $bets)) !== $bets) {
             return;
         }
-        if (get_option('fhor_bt_db_version') === '1' && !fhor_bt_tables_exist()) {
-            delete_option('fhor_bt_db_version');
-            fhor_bt_debug_log('install repair', ['reason' => 'missing_tables']);
+        $has_lines = $wpdb->get_var($wpdb->prepare("SHOW COLUMNS FROM `{$bets}` LIKE %s", 'lines'));
+        if ($has_lines) {
+            $wpdb->query("ALTER TABLE `{$bets}` CHANGE `lines` `line_count` smallint(5) unsigned NOT NULL DEFAULT 1");
         }
+    }
+}
+
+if (!function_exists('fhor_bt_create_tables')) {
+    function fhor_bt_create_tables() {
         global $wpdb;
         $charset = $wpdb->get_charset_collate();
         $bets = fhor_bt_bets_table();
         $legs = fhor_bt_legs_table();
-        $sql_bets = "CREATE TABLE $bets (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            user_id bigint(20) unsigned NOT NULL,
-            placed_at datetime NOT NULL,
-            bet_type varchar(32) NOT NULL DEFAULT '',
-            each_way tinyint(1) NOT NULL DEFAULT 0,
-            ew_fraction decimal(10,6) NOT NULL DEFAULT 0.250000,
-            stake_mode varchar(16) NOT NULL DEFAULT 'auto',
-            manual_total decimal(12,2) NOT NULL DEFAULT 0.00,
-            total_stake decimal(12,2) NOT NULL DEFAULT 0.00,
-            unit_stake decimal(12,2) NOT NULL DEFAULT 0.00,
-            returns_amount decimal(12,2) NOT NULL DEFAULT 0.00,
-            profit decimal(12,2) NOT NULL DEFAULT 0.00,
-            result varchar(16) NOT NULL DEFAULT 'pending',
-            lines smallint(5) unsigned NOT NULL DEFAULT 1,
-            system_name varchar(190) NOT NULL DEFAULT '',
-            system_id varchar(64) NOT NULL DEFAULT '',
-            course varchar(190) NOT NULL DEFAULT '',
-            selection_label varchar(255) NOT NULL DEFAULT '',
-            odds_display varchar(190) NOT NULL DEFAULT '',
-            note varchar(500) NOT NULL DEFAULT '',
-            created_at datetime NOT NULL,
-            updated_at datetime NOT NULL,
-            PRIMARY KEY  (id),
-            KEY user_placed (user_id, placed_at)
-        ) $charset;";
-        $sql_legs = "CREATE TABLE $legs (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            bet_id bigint(20) unsigned NOT NULL,
-            user_id bigint(20) unsigned NOT NULL,
-            leg_index smallint(5) unsigned NOT NULL DEFAULT 0,
-            horse_name varchar(190) NOT NULL DEFAULT '',
-            course varchar(190) NOT NULL DEFAULT '',
-            odds_input varchar(32) NOT NULL DEFAULT '',
-            odds_decimal decimal(10,4) NOT NULL DEFAULT 0.0000,
-            result varchar(16) NOT NULL DEFAULT 'pending',
-            PRIMARY KEY  (id),
-            KEY bet_id (bet_id),
-            KEY user_id (user_id)
-        ) $charset;";
-        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-        dbDelta($sql_bets);
-        dbDelta($sql_legs);
+        $wpdb->query("CREATE TABLE IF NOT EXISTS `{$bets}` (
+            `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            `user_id` bigint(20) unsigned NOT NULL,
+            `placed_at` datetime NOT NULL,
+            `bet_type` varchar(32) NOT NULL DEFAULT '',
+            `each_way` tinyint(1) NOT NULL DEFAULT 0,
+            `ew_fraction` decimal(10,6) NOT NULL DEFAULT 0.250000,
+            `stake_mode` varchar(16) NOT NULL DEFAULT 'auto',
+            `manual_total` decimal(12,2) NOT NULL DEFAULT 0.00,
+            `total_stake` decimal(12,2) NOT NULL DEFAULT 0.00,
+            `unit_stake` decimal(12,2) NOT NULL DEFAULT 0.00,
+            `returns_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+            `profit` decimal(12,2) NOT NULL DEFAULT 0.00,
+            `result` varchar(16) NOT NULL DEFAULT 'pending',
+            `line_count` smallint(5) unsigned NOT NULL DEFAULT 1,
+            `system_name` varchar(190) NOT NULL DEFAULT '',
+            `system_id` varchar(64) NOT NULL DEFAULT '',
+            `course` varchar(190) NOT NULL DEFAULT '',
+            `selection_label` varchar(255) NOT NULL DEFAULT '',
+            `odds_display` varchar(190) NOT NULL DEFAULT '',
+            `note` varchar(500) NOT NULL DEFAULT '',
+            `created_at` datetime NOT NULL,
+            `updated_at` datetime NOT NULL,
+            PRIMARY KEY (`id`),
+            KEY `user_placed` (`user_id`, `placed_at`)
+        ) {$charset}");
+        $wpdb->query("CREATE TABLE IF NOT EXISTS `{$legs}` (
+            `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            `bet_id` bigint(20) unsigned NOT NULL,
+            `user_id` bigint(20) unsigned NOT NULL,
+            `leg_index` smallint(5) unsigned NOT NULL DEFAULT 0,
+            `horse_name` varchar(190) NOT NULL DEFAULT '',
+            `course` varchar(190) NOT NULL DEFAULT '',
+            `odds_input` varchar(32) NOT NULL DEFAULT '',
+            `odds_decimal` decimal(10,4) NOT NULL DEFAULT 0.0000,
+            `result` varchar(16) NOT NULL DEFAULT 'pending',
+            PRIMARY KEY (`id`),
+            KEY `bet_id` (`bet_id`),
+            KEY `user_id` (`user_id`)
+        ) {$charset}");
+    }
+}
+
+if (!function_exists('fhor_bt_install_tables')) {
+    function fhor_bt_install_tables() {
+        $expected = fhor_bt_db_schema_version();
+        $current = get_option('fhor_bt_db_version');
+        if ($current === $expected && fhor_bt_tables_exist()) {
+            return;
+        }
+        if ($current === $expected && !fhor_bt_tables_exist()) {
+            delete_option('fhor_bt_db_version');
+            fhor_bt_debug_log('install repair', ['reason' => 'missing_tables']);
+        }
+        if ($current === '1' && fhor_bt_tables_exist()) {
+            fhor_bt_maybe_upgrade_schema();
+            update_option('fhor_bt_db_version', $expected);
+            return;
+        }
+        fhor_bt_create_tables();
+        fhor_bt_maybe_upgrade_schema();
         if (fhor_bt_tables_exist()) {
-            update_option('fhor_bt_db_version', '1');
+            update_option('fhor_bt_db_version', $expected);
         } else {
             delete_option('fhor_bt_db_version');
+            global $wpdb;
             fhor_bt_debug_log('install failed', ['db_error' => $wpdb->last_error]);
         }
     }
@@ -251,7 +283,7 @@ if (!function_exists('fhor_bt_persist_projection')) {
                     'returns_amount' => round((float) $bet['returns_amount'], 2),
                     'profit' => round((float) $bet['profit'], 2),
                     'result' => $bet['result'],
-                    'lines' => (int) $bet['lines'],
+                    'line_count' => (int) $bet['lines'],
                     'updated_at' => $now,
                 ],
                 [
@@ -620,7 +652,7 @@ if (!function_exists('fhor_bt_ajax_save_bet')) {
                     'returns_amount' => 0,
                     'profit' => 0,
                     'result' => 'pending',
-                    'lines' => 1,
+                    'line_count' => 1,
                     'system_name' => $parsed['system_name'],
                     'system_id' => $parsed['system_id'],
                     'course' => $parsed['course'],
