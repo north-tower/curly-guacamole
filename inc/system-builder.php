@@ -2058,6 +2058,77 @@ if (!function_exists('fhor_sb_schedule_cron')) {
 }
 add_action('init', 'fhor_sb_schedule_cron', 40);
 
+if (!function_exists('fhor_sb_starter_systems')) {
+    /**
+     * One-click examples for members (same filter shapes as internal QA).
+     *
+     * @return array<string, array{title:string,summary:string,cta:string,action:string,filters:array<string,mixed>}>
+     */
+    function fhor_sb_starter_systems() {
+        return [
+            'top_fsr' => [
+                'title' => 'Top FSr in a race',
+                'summary' => 'England Flat, top 3 FSr in the field, one pick per race. Use Run System to see how that shortlist would have performed recently.',
+                'cta' => 'Load & run backtest',
+                'action' => 'run',
+                'filters' => [
+                    'days' => '14',
+                    'bet' => 'win',
+                    'pick_mode' => 'top_fsr',
+                    'country' => ['England'],
+                    'race_type' => ['Flat'],
+                    'fsr_rank_max' => '3',
+                ],
+            ],
+            'sprint_pedigree' => [
+                'title' => 'Sprint pedigrees (≤6f)',
+                'summary' => 'Short races with speed-biased DI/CD (same figures as the race card). Good for 5f–6f handicaps when you want pedigree to agree with the trip.',
+                'cta' => 'Load sprint template',
+                'action' => 'run',
+                'filters' => [
+                    'days' => '21',
+                    'bet' => 'win',
+                    'pick_mode' => 'all',
+                    'race_type' => ['Flat'],
+                    'dist_f_max' => '6',
+                    'di_min' => '2.00',
+                    'cd_min' => '0.50',
+                    'fsr_rank_max' => '3',
+                ],
+            ],
+            'stayer_pedigree' => [
+                'title' => 'Stayer pedigrees (≥12f)',
+                'summary' => 'Longer trips with lower DI/CD — stamina-type pedigrees. Sample rows show the dosage that passed your band.',
+                'cta' => 'Load stayer template',
+                'action' => 'run',
+                'filters' => [
+                    'days' => '21',
+                    'bet' => 'win',
+                    'pick_mode' => 'all',
+                    'race_type' => ['Flat'],
+                    'dist_f_min' => '12',
+                    'di_max' => '1.40',
+                    'cd_max' => '0.50',
+                    'fsr_rank_max' => '3',
+                ],
+            ],
+            'daily_shortlist' => [
+                'title' => 'Tomorrow’s shortlist',
+                'summary' => 'FSr rank 1–2 and Points rank 1–3 on the live card. Use Find qualifiers — not Run System — to see who matches today and tomorrow.',
+                'cta' => 'Load & find qualifiers',
+                'action' => 'qualifiers',
+                'filters' => [
+                    'days' => '90',
+                    'bet' => 'win',
+                    'pick_mode' => 'all',
+                    'fsr_rank_max' => '2',
+                    'pts_rank_max' => '3',
+                ],
+            ],
+        ];
+    }
+}
+
 if (!function_exists('fhor_sb_enqueue')) {
     function fhor_sb_enqueue() {
         $qa = function_exists('fhor_sb_qa_is_active') && fhor_sb_qa_is_active();
@@ -2075,6 +2146,7 @@ if (!function_exists('fhor_sb_enqueue')) {
                 'canAlert' => fhor_sb_can_email_alerts() ? 1 : 0,
                 'maxSaved' => fhor_sb_max_saved(),
                 'qualifiersUrl' => fhor_sb_qualifiers_url(),
+                'starters' => fhor_sb_starter_systems(),
             ]);
         }
     }
@@ -2148,6 +2220,21 @@ if (!function_exists('fhor_sb_shortcode')) {
         .sb-saved-item .is-on{border-color:#16a34a;color:#15803d;background:#f0fdf4}
         .sb-empty{color:#64748b;font-size:.9rem;padding:.85rem .9rem;margin:0;border:1px dashed #cbd5e1;border-radius:10px;background:#f8fafc;line-height:1.45}
         .sb-note{font-size:.78rem;color:#64748b;margin:.4rem 0 0;line-height:1.45}
+        .sb-guide{margin:0 0 1.1rem;padding:.85rem .95rem;border:1px solid #bbf7d0;border-radius:12px;background:linear-gradient(180deg,#f0fdf4,#fff 55%)}
+        .sb-guide summary{cursor:pointer;font-weight:800;font-size:.88rem;color:#14532d;list-style:none}
+        .sb-guide summary::-webkit-details-marker{display:none}
+        .sb-guide-body{margin-top:.65rem;font-size:.82rem;color:#334155;line-height:1.55}
+        .sb-guide-steps{margin:.5rem 0 .85rem;padding-left:1.15rem}
+        .sb-guide-steps li{margin:.35rem 0}
+        .sb-guide-steps strong{color:#0f172a}
+        .sb-starters{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.6rem;margin-top:.5rem}
+        .sb-starter{border:1px solid #e2e8f0;border-radius:10px;padding:.7rem .75rem;background:#fff}
+        .sb-starter h3{margin:0 0 .3rem;font-size:.86rem;color:#0f172a}
+        .sb-starter p{margin:0 0 .55rem;font-size:.78rem;color:#475569;line-height:1.4}
+        .sb-starter .sb-btn{font-size:.78rem;padding:.42rem .65rem}
+        .sb-glossary{margin:.75rem 0 0;padding:.65rem .75rem;background:#f8fafc;border-radius:8px;font-size:.76rem;color:#475569}
+        .sb-glossary dt{font-weight:800;color:#334155;margin-top:.35rem}
+        .sb-glossary dt:first-child{margin-top:0}
         .sb-gate{max-width:640px;margin:2rem auto;padding:1.5rem;background:#fff;border:1px solid #e2e8f0;border-radius:14px}
         @media (max-width:980px){
           .sb-layout{grid-template-columns:1fr}
@@ -2165,6 +2252,30 @@ if (!function_exists('fhor_sb_shortcode')) {
                 <?php else: ?>
                     <p class="sb-tier is-free">Free · 1-year history · 1 saved system · dashboard qualifiers only. <a href="<?php echo esc_url($signup); ?>">Upgrade for alerts</a></p>
                 <?php endif; ?>
+                <details class="sb-guide" id="sb-guide" open>
+                    <summary>How System Builder works (start here)</summary>
+                    <div class="sb-guide-body">
+                        <ol class="sb-guide-steps">
+                            <li><strong>Set rules</strong> on the left — race type, distance, FSr rank, dosage (DI/CD), etc. Empty fields mean “no limit”.</li>
+                            <li><strong>Run System</strong> — replays your rules on <em>past</em> results (Industry SP). ROI shows whether the shortlist would have made or lost money; it is research, not a guarantee.</li>
+                            <li><strong>Find qualifiers</strong> — applies the same rules to <em>today’s and tomorrow’s</em> cards. DI/CD always shows for review when pedigree is available.</li>
+                            <li><strong>Save</strong> — name the system and optionally turn on email alerts (Premium). <a href="<?php echo esc_url(fhor_sb_qualifiers_url()); ?>">My Daily Qualifiers</a> lists all saved systems.</li>
+                        </ol>
+                        <p class="sb-note" style="margin:0 0 .5rem;"><strong>DI/CD</strong> (Dosage Index / Center of Distribution) uses the same Chefs-de-Race pedigree as the race card: higher = more speed influence, lower = stamina. Use sprint or stayer starters below, or the presets under Dosage (DI / CD).</p>
+                        <h3 style="margin:.6rem 0 .35rem;font-size:.82rem;text-transform:uppercase;letter-spacing:.04em;color:#64748b;">Starter systems</h3>
+                        <div class="sb-starters" id="sb-starters"></div>
+                        <dl class="sb-glossary">
+                            <dt>FSr rank</dt>
+                            <dd>Where the horse sits in the race on Fhorsite rating (1 = top).</dd>
+                            <dt>If several qualify</dt>
+                            <dd>“Back them all” = every horse that passes; “Highest FSr only” = one bet per race.</dd>
+                            <dt>Lookback</dt>
+                            <dd>How far back Run System searches. Shorter = faster. Qualifiers always use the live card.</dd>
+                            <dt>Pace / lone leader</dt>
+                            <dd>Applied on the live card and alerts only — not in historic ROI.</dd>
+                        </dl>
+                    </div>
+                </details>
             </header>
             <div class="sb-layout">
                 <form class="sb-panel sb-form" id="sb-form">
@@ -2203,6 +2314,7 @@ if (!function_exists('fhor_sb_shortcode')) {
                                 </select>
                             </div>
                         </div>
+                        <p class="sb-note">Lookback affects <strong>Run System</strong> only. <strong>Find qualifiers</strong> always uses today and tomorrow. Negative ROI on a test does not mean the tool is broken — tighten ranks or add dosage/distance filters.</p>
                     </details>
                     <details class="sb-group" open>
                         <summary>Race</summary>

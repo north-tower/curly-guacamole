@@ -335,6 +335,61 @@
             });
         });
 
+        var startersWrap = document.getElementById('sb-starters');
+        var starters = (window.fhorSb && fhorSb.starters) ? fhorSb.starters : {};
+        if (startersWrap && starters) {
+            Object.keys(starters).forEach(function (key) {
+                var s = starters[key];
+                if (!s || !s.filters) {
+                    return;
+                }
+                var card = document.createElement('div');
+                card.className = 'sb-starter';
+                card.innerHTML = '<h3>' + escapeHtml(s.title || key) + '</h3>' +
+                    '<p>' + escapeHtml(s.summary || '') + '</p>' +
+                    '<button type="button" class="sb-btn sb-btn-primary sb-starter-load" data-starter="' + escapeHtml(key) + '">' +
+                    escapeHtml(s.cta || 'Load') + '</button>';
+                startersWrap.appendChild(card);
+            });
+            startersWrap.addEventListener('click', function (event) {
+                var btn = event.target.closest('.sb-starter-load');
+                if (!btn) {
+                    return;
+                }
+                var key = btn.getAttribute('data-starter');
+                var starter = starters[key];
+                if (!starter || !starter.filters) {
+                    return;
+                }
+                applyFilters(starter.filters);
+                form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                if (starter.action === 'qualifiers') {
+                    var qBtn = document.getElementById('sb-today');
+                    if (qBtn) {
+                        qBtn.click();
+                    }
+                } else {
+                    var runBtn = document.getElementById('sb-run');
+                    if (runBtn) {
+                        form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+                    }
+                }
+            });
+        }
+
+        try {
+            if (localStorage.getItem('fhor_sb_guide_seen') === '1') {
+                var guide = document.getElementById('sb-guide');
+                if (guide) {
+                    guide.open = false;
+                }
+            } else {
+                localStorage.setItem('fhor_sb_guide_seen', '1');
+            }
+        } catch (ignore) {
+            /* storage blocked */
+        }
+
         form.addEventListener('submit', function (event) {
             event.preventDefault();
             var btn = document.getElementById('sb-run');
