@@ -79,6 +79,7 @@ require_once __DIR__ . '/inc/admin-pnl.php';
 require_once __DIR__ . '/inc/points-published-picks.php';
 require_once __DIR__ . '/inc/points-today-picks.php';
 require_once __DIR__ . '/inc/system-builder.php';
+require_once __DIR__ . '/inc/system-builder-qa.php';
 require_once __DIR__ . '/inc/bet-tracker.php';
 
 

@@ -1460,6 +1460,25 @@ if (!function_exists('fhor_sb_attach_dosage')) {
     }
 }
 
+if (!function_exists('fhor_sb_dosage_di_cd_from_row')) {
+    /**
+     * @param object $row
+     * @return array{di:?string,cd:?string}
+     */
+    function fhor_sb_dosage_di_cd_from_row($row) {
+        return [
+            'di' => !empty($row->_dosage_di_infinite)
+                ? 'Inf'
+                : ((isset($row->_dosage_di) && is_numeric($row->_dosage_di))
+                    ? number_format((float) $row->_dosage_di, 2, '.', '')
+                    : null),
+            'cd' => (isset($row->_dosage_cd) && is_numeric($row->_dosage_cd))
+                ? number_format((float) $row->_dosage_cd, 2, '.', '')
+                : null,
+        ];
+    }
+}
+
 if (!function_exists('fhor_sb_annotate_and_filter')) {
     function fhor_sb_annotate_and_filter(array $rows, array $filters) {
         if (fhor_sb_needs_dosage($filters)) {
@@ -1660,6 +1679,7 @@ if (!function_exists('fhor_sb_run_backtest')) {
                     'scotland' => 'Scotland',
                     'wales' => 'Wales',
                 ];
+                $dosage = fhor_sb_dosage_di_cd_from_row($row);
                 $samples[] = [
                     'horse' => (string) ($row->horse_name ?? ''),
                     'course' => (string) ($row->course ?? ''),
@@ -1670,6 +1690,8 @@ if (!function_exists('fhor_sb_run_backtest')) {
                     'isp' => $isp_settle['odds'],
                     'bsp' => $bsp_odds,
                     'fsr' => is_numeric($row->fsr ?? null) ? round(floatval($row->fsr), 1) : null,
+                    'di' => $dosage['di'],
+                    'cd' => $dosage['cd'],
                     'pos' => (string) ($row->finish_position ?? ''),
                     'profit' => $isp_settle['profit'],
                     'race_id' => intval($row->race_id ?? 0),
@@ -1697,6 +1719,7 @@ if (!function_exists('fhor_sb_run_backtest')) {
             'has_bsp' => $bsp['bets'] > 0,
             'samples' => $samples,
             'pace_live_only' => fhor_sb_needs_pace($filters),
+            'dosage_filtered' => fhor_sb_needs_dosage($filters),
         ];
     }
 }
@@ -1711,6 +1734,9 @@ if (!function_exists('fhor_sb_today_qualifiers')) {
             $rows = fhor_sb_attach_pace($rows);
         }
         $qualified = fhor_sb_annotate_and_filter($rows, $filters);
+        if (!empty($qualified) && !fhor_sb_needs_dosage($filters)) {
+            $qualified = fhor_sb_attach_dosage($qualified);
+        }
         usort($qualified, function ($a, $b) {
             $ta = (string) ($a->scheduled_time ?? '');
             $tb = (string) ($b->scheduled_time ?? '');
@@ -1725,6 +1751,7 @@ if (!function_exists('fhor_sb_today_qualifiers')) {
             if (($fc === null || $fc === '') && !empty($row->forecast_price) && function_exists('bricks_points_parse_decimal_odds')) {
                 $fc = bricks_points_parse_decimal_odds(null, $row->forecast_price);
             }
+            $dosage_out = fhor_sb_dosage_di_cd_from_row($row);
             $out[] = [
                 'horse' => (string) ($row->horse_name ?? ''),
                 'course' => function_exists('bricks_track_format_display_name')
@@ -1737,14 +1764,8 @@ if (!function_exists('fhor_sb_today_qualifiers')) {
                 'pts' => isset($row->_pts) ? round(floatval($row->_pts), 1) : null,
                 'pace_zone' => isset($row->zone) ? intval($row->zone) : null,
                 'forecast' => $row->forecast_price ?? ($fc ? (string) $fc : ''),
-                'di' => !empty($row->_dosage_di_infinite)
-                    ? 'Inf'
-                    : ((isset($row->_dosage_di) && is_numeric($row->_dosage_di))
-                        ? number_format((float) $row->_dosage_di, 2, '.', '')
-                        : null),
-                'cd' => (isset($row->_dosage_cd) && is_numeric($row->_dosage_cd))
-                    ? number_format((float) $row->_dosage_cd, 2, '.', '')
-                    : null,
+                'di' => $dosage_out['di'],
+                'cd' => $dosage_out['cd'],
                 'race_id' => intval($row->race_id ?? 0),
                 'race_url' => function_exists('bricks_race_url') ? bricks_race_url(intval($row->race_id ?? 0)) : '',
             ];
@@ -2039,7 +2060,8 @@ add_action('init', 'fhor_sb_schedule_cron', 40);
 
 if (!function_exists('fhor_sb_enqueue')) {
     function fhor_sb_enqueue() {
-        if (!fhor_sb_is_request() && !(function_exists('bricks_current_post_has_shortcode') && bricks_current_post_has_shortcode(['system_builder']))) {
+        $qa = function_exists('fhor_sb_qa_is_active') && fhor_sb_qa_is_active();
+        if (!$qa && !fhor_sb_is_request() && !(function_exists('bricks_current_post_has_shortcode') && bricks_current_post_has_shortcode(['system_builder', 'system_builder_qa']))) {
             return;
         }
         $js = get_stylesheet_directory() . '/system-builder.js';
@@ -2152,6 +2174,8 @@ if (!function_exists('fhor_sb_shortcode')) {
                         <div class="sb-grid">
                             <div class="sb-field"><label for="sb-days">Lookback</label>
                                 <select id="sb-days" name="days">
+                                    <option value="7">Last 7 days</option>
+                                    <option value="14">Last 14 days</option>
                                     <option value="30">Last 30 days</option>
                                     <option value="90" selected>Last 90 days</option>
                                     <option value="180">Last 6 months</option>
@@ -2280,7 +2304,11 @@ if (!function_exists('fhor_sb_shortcode')) {
                             <div class="sb-field"><label for="sb-cdmin">CD min</label><input id="sb-cdmin" name="cd_min" type="number" step="0.01" placeholder="e.g. 0.00"></div>
                             <div class="sb-field"><label for="sb-cdmax">CD max</label><input id="sb-cdmax" name="cd_max" type="number" step="0.01" placeholder="e.g. 0.80"></div>
                         </div>
-                        <p class="sb-note">Dosage Index and Center of Distribution use the same 4-generation Chefs-de-Race male line as the race card. Higher figures mean more speed influence. Set a minimum, a maximum, or both. A horse with no dosage figure is left out once a level is set. The rule applies to historic results and to today’s qualifiers. A long lookback takes longer, because each horse is scored from its pedigree.</p>
+                        <p class="sb-dosage-presets" style="margin-top:.65rem;display:flex;flex-wrap:wrap;gap:.45rem;">
+                            <button type="button" class="sb-btn sb-dosage-preset" data-preset="sprinter">Sprint speed (≤6f)</button>
+                            <button type="button" class="sb-btn sb-dosage-preset" data-preset="stamina">Staying stamina (≥12f)</button>
+                        </p>
+                        <p class="sb-note">Dosage Index and Center of Distribution use the same 4-generation Chefs-de-Race male line as the race card. Higher DI/CD means more speed influence; lower values suit stamina types. Set a minimum, a maximum, or both. A horse with no dosage figure is left out once a level is set. The rule applies to historic results and to today’s qualifiers. Qualifier lists always show DI/CD for review. A long lookback takes longer, because each horse is scored from its pedigree.</p>
                     </details>
                     <details class="sb-group">
                         <summary>Draw, fitness, connections</summary>
@@ -2386,9 +2414,10 @@ if (!function_exists('fhor_sb_shortcode')) {
                             </div>
                             <p class="sb-note" id="sb-range"></p>
                             <p class="sb-note" id="sb-pace-note" hidden></p>
+                            <p class="sb-note" id="sb-dosage-note" hidden></p>
                             <div style="overflow-x:auto;margin-top:.75rem;">
                                 <table class="sb-table" id="sb-sample-table">
-                                    <thead><tr><th>Horse</th><th>Race</th><th>ISP</th><th>BSP</th><th>Pos</th><th>P/L</th></tr></thead>
+                                    <thead><tr><th>Horse</th><th>Race</th><th id="sb-sample-di-th" hidden>DI</th><th id="sb-sample-cd-th" hidden>CD</th><th>ISP</th><th>BSP</th><th>Pos</th><th>P/L</th></tr></thead>
                                     <tbody></tbody>
                                 </table>
                             </div>

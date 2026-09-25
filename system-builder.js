@@ -196,6 +196,25 @@
                     paceNote.textContent = '';
                 }
             }
+            var dosageNote = document.getElementById('sb-dosage-note');
+            var showDosage = !!data.dosage_filtered;
+            if (dosageNote) {
+                if (showDosage) {
+                    dosageNote.hidden = false;
+                    dosageNote.textContent = 'Historic ROI includes only horses whose Chefs-de-Race DI/CD fall inside your dosage band. Sample rows show the figures that passed.';
+                } else {
+                    dosageNote.hidden = true;
+                    dosageNote.textContent = '';
+                }
+            }
+            var diTh = document.getElementById('sb-sample-di-th');
+            var cdTh = document.getElementById('sb-sample-cd-th');
+            if (diTh) {
+                diTh.hidden = !showDosage;
+            }
+            if (cdTh) {
+                cdTh.hidden = !showDosage;
+            }
             var tb = document.querySelector('#sb-sample-table tbody');
             tb.innerHTML = '';
             (data.samples || []).forEach(function (row) {
@@ -207,7 +226,10 @@
                     + (row.country ? ' · ' + escapeHtml(row.country) : '')
                     + ' · ' + escapeHtml(row.date)
                     + (row.field ? ' · ' + escapeHtml(row.field) + ' ran' : '');
-                tr.innerHTML = '<td>' + escapeHtml(row.horse) + '</td><td>' + race + '</td><td>' + escapeHtml(isp) + '</td><td>' + escapeHtml(bsp) + '</td><td>' + escapeHtml(row.pos) + '</td><td>' + pl + '</td>';
+                var dosageCells = showDosage
+                    ? '<td>' + (row.di == null ? '–' : escapeHtml(row.di)) + '</td><td>' + (row.cd == null ? '–' : escapeHtml(row.cd)) + '</td>'
+                    : '';
+                tr.innerHTML = '<td>' + escapeHtml(row.horse) + '</td><td>' + race + '</td>' + dosageCells + '<td>' + escapeHtml(isp) + '</td><td>' + escapeHtml(bsp) + '</td><td>' + escapeHtml(row.pos) + '</td><td>' + pl + '</td>';
                 tb.appendChild(tr);
             });
             reveal('sb-results');
@@ -281,6 +303,37 @@
                 btn.disabled = false;
             });
         }
+
+        var dosagePresets = {
+            sprinter: {
+                di_min: '2.00',
+                di_max: '',
+                cd_min: '0.50',
+                cd_max: '',
+                dist_f_min: '',
+                dist_f_max: '6'
+            },
+            stamina: {
+                di_min: '',
+                di_max: '1.40',
+                cd_min: '',
+                cd_max: '0.50',
+                dist_f_min: '12',
+                dist_f_max: ''
+            }
+        };
+
+        Array.prototype.forEach.call(document.querySelectorAll('.sb-dosage-preset'), function (btn) {
+            btn.addEventListener('click', function () {
+                var preset = dosagePresets[btn.getAttribute('data-preset')];
+                if (!preset) {
+                    return;
+                }
+                Object.keys(preset).forEach(function (key) {
+                    setVal(key, preset[key]);
+                });
+            });
+        });
 
         form.addEventListener('submit', function (event) {
             event.preventDefault();
@@ -381,6 +434,9 @@
                 });
             }
         });
+
+        window.fhorSbApplyFilters = applyFilters;
+        window.fhorSbCollectFilters = collectFilters;
     }
 
     if (document.readyState === 'loading') {

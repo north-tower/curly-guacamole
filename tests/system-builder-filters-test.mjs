@@ -91,6 +91,31 @@ function speedFigure(row) {
     return null;
 }
 
+function between(value, min, max) {
+    if ((min || '') === '' && (max || '') === '') return true;
+    if (value === null || value === undefined || value === '') return false;
+    const v = Number(value);
+    if (min !== '' && min !== undefined && v < Number(min)) return false;
+    if (max !== '' && max !== undefined && v > Number(max)) return false;
+    return true;
+}
+
+function dosagePasses(row, filters) {
+    const diMin = filters.di_min ?? '';
+    const diMax = filters.di_max ?? '';
+    if (diMin !== '' || diMax !== '') {
+        if (row._dosage_di_infinite) {
+            if (diMax !== '') return false;
+        } else if (!between(row._dosage_di ?? null, diMin, diMax)) {
+            return false;
+        }
+    }
+    if (!between(row._dosage_cd ?? null, filters.cd_min ?? '', filters.cd_max ?? '')) {
+        return false;
+    }
+    return true;
+}
+
 function passes(row, filters) {
     if (!countryMatches(row.course, row.country, filters.country || [])) return false;
     if (!raceTypeMatches(row.race_type, filters.race_type || [])) return false;
@@ -104,6 +129,7 @@ function passes(row, filters) {
         if (filters.field_min !== '' && field < Number(filters.field_min)) return false;
         if (filters.field_max !== '' && field > Number(filters.field_max)) return false;
     }
+    if (!dosagePasses(row, filters)) return false;
     return true;
 }
 
@@ -186,6 +212,23 @@ assert(handicapState(1) === true && handicapState(0) === false && handicapState(
 assert(raceTypeMatches('NH Flat', ['Flat']) === false, 'NH Flat is not Flat');
 assert(raceTypeMatches('Hurdles', ['Hurdle']) === true, 'Hurdles');
 assert(raceTypeMatches('', ['Hurdle']) === false, 'blank race type');
+
+const dosageRow = (di, cd, inf) => ({
+    race_id: 99,
+    course: 'Ascot',
+    country: 'England',
+    race_type: 'Flat',
+    handicap: 0,
+    speed_rating: 80,
+    _dosage_di: di,
+    _dosage_cd: cd,
+    _dosage_di_infinite: !!inf
+});
+
+assert(dosagePasses(dosageRow(2.5, 0.6, false), { di_min: '2', cd_min: '0.5' }), 'dosage sprinter band');
+assert(!dosagePasses(dosageRow(1.8, 0.6, false), { di_min: '2', cd_min: '0.5' }), 'dosage low DI');
+assert(dosagePasses(dosageRow(null, 0.8, true), { di_min: '2' }), 'dosage Inf passes di_min only');
+assert(!dosagePasses(dosageRow(null, 0.8, true), { di_max: '1.4' }), 'dosage Inf fails di_max');
 
 if (!process.exitCode) {
     console.log('ok ' + names.join(' | '));
