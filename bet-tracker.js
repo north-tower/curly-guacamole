@@ -173,6 +173,180 @@
         return state;
     }
 
+    function filterScope() {
+        var sel = document.getElementById('bt-system-filter');
+        return sel ? String(sel.value || '') : '';
+    }
+
+    function systemLabel(systemId) {
+        var id = String(systemId || '').replace(/\D/g, '');
+        if (!id) {
+            return 'General';
+        }
+        var list = state.saved_systems || fhorBt.savedSystems || [];
+        for (var i = 0; i < list.length; i += 1) {
+            if (String(list[i].id) === id) {
+                return list[i].name || ('System ' + id);
+            }
+        }
+        var bets = state.bets || [];
+        for (var j = 0; j < bets.length; j += 1) {
+            if (String(bets[j].system_id || '').replace(/\D/g, '') === id && bets[j].system_name) {
+                return bets[j].system_name;
+            }
+        }
+        return 'System ' + id;
+    }
+
+    function bookMetaForScope(scope) {
+        if (showingDemo && state.demo) {
+            return state.demo;
+        }
+        var books = state.books || {};
+        if (scope === '__general__') {
+            if (books['']) {
+                return books[''];
+            }
+            return {
+                bankroll: (state.settings && state.settings.starting_bankroll) || 100,
+                today_opening: (state.settings && state.settings.starting_bankroll) || 100,
+                today_budget: state.today_budget,
+                flat_line: state.flat_line,
+                settings: state.settings || {},
+                actual_label: state.actual_label,
+                shadow_label: state.shadow_label
+            };
+        }
+        if (scope === '') {
+            return {
+                bankroll: Number(state.bankroll) || 0,
+                settings: state.settings || {},
+                actual_label: state.actual_label,
+                shadow_label: state.shadow_label,
+                today_opening: null,
+                today_budget: null,
+                flat_line: null
+            };
+        }
+        if (books[scope]) {
+            return books[scope];
+        }
+        var sysMap = state.system_settings || {};
+        var settings = sysMap[scope] || {
+            mode: 'percentage',
+            starting_bankroll: 100,
+            percentage: 5,
+            point_value: 1,
+            points_per_bet: 1
+        };
+        var opening = Number(settings.starting_bankroll) || 100;
+        var pct = Number(settings.percentage) || 5;
+        return {
+            bankroll: opening,
+            today_opening: opening,
+            today_budget: Math.round(opening * (pct / 100) * 100) / 100,
+            flat_line: (Number(settings.points_per_bet) || 1) * (Number(settings.point_value) || 1),
+            settings: settings,
+            actual_label: settings.mode === 'flat' ? 'Flat staking' : 'Dynamic ' + pct + '%',
+            shadow_label: settings.mode === 'flat' ? 'Dynamic' : 'Flat'
+        };
+    }
+
+    function viewContext() {
+        var base = book();
+        var meta = bookMetaForScope(filterScope());
+        return Object.assign({}, base, {
+            bankroll: meta.bankroll,
+            today_opening: meta.today_opening,
+            today_budget: meta.today_budget,
+            flat_line: meta.flat_line,
+            settings: meta.settings || base.settings,
+            actual_label: meta.actual_label || base.actual_label,
+            shadow_label: meta.shadow_label || base.shadow_label
+        });
+    }
+
+    function prefillFromFilter() {
+        var scope = filterScope();
+        if (!scope || scope === '__general__') {
+            return {};
+        }
+        return {
+            system_id: scope,
+            system_name: systemLabel(scope)
+        };
+    }
+
+    function applyBookQueryParam() {
+        var params = new URLSearchParams(window.location.search);
+        var book = String(params.get('book') || '').replace(/\D/g, '');
+        if (!book) {
+            return;
+        }
+        var sel = document.getElementById('bt-system-filter');
+        if (!sel) {
+            return;
+        }
+        var found = false;
+        var opts = sel.querySelectorAll('option');
+        for (var i = 0; i < opts.length; i += 1) {
+            if (opts[i].value === book) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            var opt = document.createElement('option');
+            opt.value = book;
+            opt.textContent = systemLabel(book);
+            sel.appendChild(opt);
+        }
+        sel.value = book;
+        if (window.history && window.history.replaceState) {
+            params.delete('book');
+            var qs = params.toString();
+            window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+        }
+        var panel = document.getElementById('bt-settings-form');
+        if (panel && panel.scrollIntoView) {
+            window.setTimeout(function () {
+                panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 120);
+        }
+    }
+
+    function syncStakingForm() {
+        var scope = filterScope();
+        var meta = bookMetaForScope(scope);
+        fillSettings(meta.settings || state.settings || {});
+        var note = document.getElementById('bt-staking-scope');
+        var saveBtn = document.getElementById('bt-save-settings');
+        var form = document.getElementById('bt-settings-form');
+        var combined = scope === '';
+        if (form) {
+            Array.prototype.forEach.call(form.querySelectorAll('input, select, button'), function (el) {
+                if (el.id === 'bt-save-settings') {
+                    el.disabled = combined;
+                    return;
+                }
+                el.disabled = combined;
+            });
+        }
+        if (!note) {
+            return;
+        }
+        if (combined) {
+            note.textContent = 'Combined view: bankroll is the sum of every separate book. Choose General or a saved system above to edit its starting balance and staking.';
+        } else if (scope === '__general__') {
+            note.textContent = 'Staking for bets logged without a System Builder system tag.';
+        } else {
+            note.textContent = 'Staking for “' + systemLabel(scope) + '”. Each saved system has its own bankroll (default £100 until you change it here).';
+        }
+        if (saveBtn) {
+            saveBtn.disabled = combined;
+        }
+    }
+
     function inRange(date) {
         if (range === 'all') {
             return true;
@@ -400,7 +574,8 @@
             bet_type: document.getElementById('bt-type').value,
             each_way: document.getElementById('bt-ew').checked ? '1' : '',
             leg_count: String(readLegs().length),
-            exclude_id: document.getElementById('bt-id').value || '0'
+            exclude_id: document.getElementById('bt-id').value || '0',
+            system_id: document.getElementById('bt-system-id').value || ''
         }).then(function (json) {
             var hint = document.getElementById('bt-stake-hint');
             if (!hint || !json || !json.success) {
@@ -535,7 +710,11 @@
 
     function bindApp() {
         document.getElementById('bt-add').addEventListener('click', function () {
-            openModal({ when: fhorBt.now, stake_mode: 'auto', bet_type: 'single' });
+            openModal(Object.assign({
+                when: fhorBt.now,
+                stake_mode: 'auto',
+                bet_type: 'single'
+            }, prefillFromFilter()));
         });
         document.getElementById('bt-ranges').addEventListener('click', function (event) {
             var tab = event.target.closest ? event.target.closest('.bt-tab') : null;
@@ -548,7 +727,10 @@
             });
             render();
         });
-        document.getElementById('bt-system-filter').addEventListener('change', render);
+        document.getElementById('bt-system-filter').addEventListener('change', function () {
+            syncStakingForm();
+            render();
+        });
         [document.getElementById('bt-demo-toggle'), document.getElementById('bt-demo-peek')].forEach(function (demoToggle) {
             if (!demoToggle) {
                 return;
@@ -589,7 +771,8 @@
             starting_bankroll: document.getElementById('bt-bankroll').value,
             percentage: document.getElementById('bt-percentage').value,
             point_value: document.getElementById('bt-point-value').value,
-            points_per_bet: document.getElementById('bt-points').value
+            points_per_bet: document.getElementById('bt-points').value,
+            book_scope: filterScope()
         }).then(function (json) {
             button.disabled = false;
             if (!json || !json.success) {
@@ -625,8 +808,9 @@
             showingDemo = false;
             preferSample = false;
         }
-        fillSettings(state.settings || {});
         fillSystems(book().bets || []);
+        applyBookQueryParam();
+        syncStakingForm();
         syncDemo();
         render();
     }
@@ -713,28 +897,69 @@
             return;
         }
         var current = sel.value;
-        var names = [];
-        bets.forEach(function (bet) {
-            if (bet.system_name && names.indexOf(bet.system_name) === -1) {
-                names.push(bet.system_name);
+        var byId = {};
+        (state.saved_systems || fhorBt.savedSystems || []).forEach(function (sys) {
+            var id = String(sys.id || '').replace(/\D/g, '');
+            if (id) {
+                byId[id] = sys.name || ('System ' + id);
             }
         });
-        names.sort();
-        sel.innerHTML = '<option value="">All systems</option>' + names.map(function (name) {
-            return '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
-        }).join('');
-        sel.value = current;
+        bets.forEach(function (bet) {
+            var id = String(bet.system_id || '').replace(/\D/g, '');
+            if (id && !byId[id] && bet.system_name) {
+                byId[id] = bet.system_name;
+            }
+        });
+        var ids = Object.keys(byId).sort(function (a, b) {
+            return byId[a].localeCompare(byId[b]);
+        });
+        var html = '<option value="">All books (combined)</option>'
+            + '<option value="__general__">General (no system tag)</option>';
+        ids.forEach(function (id) {
+            html += '<option value="' + escapeHtml(id) + '">' + escapeHtml(byId[id]) + '</option>';
+        });
+        sel.innerHTML = html;
+        if (current) {
+            var opts = sel.querySelectorAll('option');
+            for (var o = 0; o < opts.length; o += 1) {
+                if (opts[o].value === current) {
+                    sel.value = current;
+                    break;
+                }
+            }
+        }
+    }
+
+    function normSystemName(name) {
+        return String(name || '').toLowerCase().replace(/[\s\/\-_]+/g, '');
+    }
+
+    function betBookId(bet) {
+        return String(bet.system_id || '').replace(/\D/g, '');
+    }
+
+    function betMatchesScope(bet, scope) {
+        var bid = betBookId(bet);
+        if (scope === '__general__') {
+            return !bid;
+        }
+        if (!scope) {
+            return true;
+        }
+        if (bid === scope) {
+            return true;
+        }
+        if (!bid && normSystemName(bet.system_name) === normSystemName(systemLabel(scope))) {
+            return true;
+        }
+        return false;
     }
 
     function visibleBets() {
-        var system = '';
-        var sel = document.getElementById('bt-system-filter');
-        if (sel) {
-            system = sel.value;
-        }
+        var scope = filterScope();
         return (book().bets || []).filter(function (bet) {
             var date = bet.date || String(bet.placed_at || '').slice(0, 10);
-            if (system && bet.system_name !== system) {
+            if (!betMatchesScope(bet, scope)) {
                 return false;
             }
             return inRange(date);
@@ -742,7 +967,7 @@
     }
 
     function render() {
-        var view = book();
+        var view = viewContext();
         var bets = visibleBets();
         var settings = view.settings || state.settings || {};
         var profit = 0;
@@ -750,10 +975,12 @@
         var staked = 0;
         var hits = 0;
         var decided = 0;
+        var pending = 0;
         var byDay = {};
         var days = [];
         bets.forEach(function (bet) {
             if (bet.result === 'pending') {
+                pending += 1;
                 return;
             }
             profit += Number(bet.profit) || 0;
@@ -786,25 +1013,37 @@
             actualSeries.push(Math.round(cumA * 100) / 100);
             shadowSeries.push(Math.round(cumS * 100) / 100);
         });
-        paintStats(profit, shadow, staked, hits, decided, settings);
-        paintWhatIf(profit, shadow, decided);
+        paintStats(profit, shadow, staked, hits, decided, settings, pending, bets.length);
+        paintWhatIf(profit, shadow, decided, pending, bets.length);
         drawChart(labels, actualSeries, shadowSeries, view.actual_label || 'Your staking', view.shadow_label || 'Shadow');
         paintTable(bets);
     }
 
-    function paintStats(profit, shadow, staked, hits, decided, settings) {
+    function paintStats(profit, shadow, staked, hits, decided, settings, pending, totalInView) {
+        pending = pending || 0;
+        totalInView = totalInView || 0;
         var bank = document.getElementById('bt-bankroll-stat');
         if (!bank) {
             return;
         }
-        var view = book();
+        var view = viewContext();
+        var scope = filterScope();
         bank.textContent = money(view.bankroll);
-        document.getElementById('bt-bankroll-sub').textContent = showingDemo
-            ? 'Sample book, opened at ' + money(settings.starting_bankroll)
-            : 'Opened at ' + money(settings.starting_bankroll);
+        if (scope === '') {
+            document.getElementById('bt-bankroll-sub').textContent = showingDemo
+                ? 'Sample book'
+                : 'Sum of all separate books';
+        } else {
+            document.getElementById('bt-bankroll-sub').textContent = showingDemo
+                ? 'Sample book, opened at ' + money(settings.starting_bankroll)
+                : 'Opened at ' + money(settings.starting_bankroll);
+        }
         var today = document.getElementById('bt-today-stat');
         var todaySub = document.getElementById('bt-today-sub');
-        if (settings.mode === 'flat') {
+        if (scope === '') {
+            today.textContent = '—';
+            todaySub.textContent = 'Pick a book to see today’s stake';
+        } else if (settings.mode === 'flat') {
             today.textContent = money(view.flat_line) + ' / line';
             todaySub.textContent = String(settings.points_per_bet) + ' pt × ' + money(settings.point_value);
         } else {
@@ -832,19 +1071,30 @@
         yieldEl.className = yieldPct > 0 ? 'bt-pos' : (yieldPct < 0 ? 'bt-neg' : '');
         var rate = decided ? (hits / decided) * 100 : 0;
         document.getElementById('bt-view-strike').textContent = (Math.round(rate * 10) / 10).toFixed(1) + '%';
-        document.getElementById('bt-view-count').textContent = hits + ' of ' + decided + ' settled';
+        var countEl = document.getElementById('bt-view-count');
+        if (pending > 0) {
+            countEl.textContent = hits + ' of ' + decided + ' settled · ' + pending + ' pending';
+        } else {
+            countEl.textContent = hits + ' of ' + decided + ' settled';
+        }
     }
 
-    function paintWhatIf(profit, shadow, decided) {
+    function paintWhatIf(profit, shadow, decided, pending, totalInView) {
+        pending = pending || 0;
+        totalInView = totalInView || 0;
         var box = document.getElementById('bt-whatif');
         if (!box) {
             return;
         }
-        var view = book();
+        var view = viewContext();
         var actualLabel = view.actual_label || 'your staking';
         var shadowLabel = view.shadow_label || 'the other method';
         var text;
-        if (!decided) {
+        if (totalInView === 0 && filterScope()) {
+            text = 'No bets in this book yet. Open “All books (combined)” to see everything, or “General (no system tag)” for older wagers logged before systems were linked.';
+        } else if (!decided && pending > 0) {
+            text = pending + ' bet' + (pending === 1 ? '' : 's') + ' still pending here — the chart fills in once results are in.';
+        } else if (!decided) {
             text = 'Settle a bet in this view to compare staking methods.';
         } else {
             var diff = Math.round((profit - shadow) * 100) / 100;

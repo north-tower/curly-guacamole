@@ -187,6 +187,235 @@ if (!function_exists('fhor_bt_get_settings')) {
     }
 }
 
+if (!function_exists('fhor_bt_system_settings_key')) {
+    function fhor_bt_system_settings_key() {
+        return 'fhor_bet_tracker_system_settings';
+    }
+}
+
+if (!function_exists('fhor_bt_get_system_settings_map')) {
+    function fhor_bt_get_system_settings_map($user_id = 0) {
+        $user_id = $user_id ? intval($user_id) : get_current_user_id();
+        if ($user_id <= 0) {
+            return [];
+        }
+        $stored = get_user_meta($user_id, fhor_bt_system_settings_key(), true);
+        if (!is_array($stored)) {
+            return [];
+        }
+        $out = [];
+        foreach ($stored as $id => $row) {
+            $id = preg_replace('/\D/', '', (string) $id);
+            if ($id === '') {
+                continue;
+            }
+            if (!is_array($row)) {
+                continue;
+            }
+            $out[$id] = fhor_bt_normalize_settings($row);
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('fhor_bt_save_system_settings')) {
+    function fhor_bt_save_system_settings($user_id, $system_id, array $settings) {
+        $user_id = intval($user_id);
+        $system_id = preg_replace('/\D/', '', (string) $system_id);
+        if ($user_id <= 0 || $system_id === '') {
+            return false;
+        }
+        $map = fhor_bt_get_system_settings_map($user_id);
+        $map[$system_id] = fhor_bt_normalize_settings($settings);
+        update_user_meta($user_id, fhor_bt_system_settings_key(), $map);
+        return true;
+    }
+}
+
+if (!function_exists('fhor_bt_get_settings_for_book')) {
+    /**
+     * Staking for a book: empty system_id = general (untagged) bets; otherwise per saved system.
+     * New systems default to £100 / 5% until you save staking for that system.
+     */
+    function fhor_bt_get_settings_for_book($user_id, $system_id) {
+        $system_id = preg_replace('/\D/', '', (string) $system_id);
+        if ($system_id === '') {
+            return fhor_bt_get_settings($user_id);
+        }
+        $map = fhor_bt_get_system_settings_map($user_id);
+        if (isset($map[$system_id])) {
+            return $map[$system_id];
+        }
+        return fhor_bt_normalize_settings([]);
+    }
+}
+
+if (!function_exists('fhor_bt_norm_system_name')) {
+    function fhor_bt_norm_system_name($name) {
+        $name = strtolower(trim((string) $name));
+        return preg_replace('/[\s\/\-_]+/', '', $name);
+    }
+}
+
+if (!function_exists('fhor_bt_saved_system_index')) {
+    function fhor_bt_saved_system_index($user_id = 0) {
+        $user_id = $user_id ? intval($user_id) : get_current_user_id();
+        $systems = function_exists('fhor_sb_get_saved') ? fhor_sb_get_saved($user_id) : [];
+        $by_id = [];
+        $by_norm = [];
+        foreach ($systems as $sys) {
+            $id = preg_replace('/\D/', '', (string) ($sys['id'] ?? ''));
+            if ($id === '') {
+                continue;
+            }
+            $name = (string) ($sys['name'] ?? '');
+            $by_id[$id] = [
+                'name' => $name,
+                'norm' => fhor_bt_norm_system_name($name),
+            ];
+            $norm = fhor_bt_norm_system_name($name);
+            if ($norm !== '') {
+                $by_norm[$norm] = $id;
+            }
+        }
+        return ['by_id' => $by_id, 'by_norm' => $by_norm];
+    }
+}
+
+if (!function_exists('fhor_bt_canonical_system_fields')) {
+    /**
+     * Prefer saved System Builder name/id pairs so bets land in the right book.
+     */
+    function fhor_bt_canonical_system_fields($user_id, $name, $id) {
+        $idx = fhor_bt_saved_system_index($user_id);
+        $id = preg_replace('/\D/', '', (string) $id);
+        $name = trim((string) $name);
+        $norm = fhor_bt_norm_system_name($name);
+        if ($norm !== '' && isset($idx['by_norm'][$norm])) {
+            $cid = $idx['by_norm'][$norm];
+            return [
+                'system_id' => $cid,
+                'system_name' => $idx['by_id'][$cid]['name'],
+            ];
+        }
+        if ($id !== '' && isset($idx['by_id'][$id])) {
+            return [
+                'system_id' => $id,
+                'system_name' => $idx['by_id'][$id]['name'],
+            ];
+        }
+        return [
+            'system_id' => $id,
+            'system_name' => $name,
+        ];
+    }
+}
+
+if (!function_exists('fhor_bt_repair_system_links')) {
+    function fhor_bt_repair_system_links($user_id, array $bets) {
+        global $wpdb;
+        $user_id = intval($user_id);
+        $table = fhor_bt_bets_table();
+        foreach ($bets as $i => $bet) {
+            $linked = fhor_bt_canonical_system_fields(
+                $user_id,
+                isset($bet['system_name']) ? $bet['system_name'] : '',
+                isset($bet['system_id']) ? $bet['system_id'] : ''
+            );
+            $cur_id = preg_replace('/\D/', '', (string) ($bet['system_id'] ?? ''));
+            $cur_name = trim((string) ($bet['system_name'] ?? ''));
+            if ($linked['system_id'] === $cur_id && $linked['system_name'] === $cur_name) {
+                continue;
+            }
+            $bet_id = (int) ($bet['id'] ?? 0);
+            if ($bet_id > 0) {
+                $wpdb->update(
+                    $table,
+                    [
+                        'system_id' => substr($linked['system_id'], 0, 64),
+                        'system_name' => substr($linked['system_name'], 0, 190),
+                    ],
+                    ['id' => $bet_id, 'user_id' => $user_id],
+                    ['%s', '%s'],
+                    ['%d', '%d']
+                );
+            }
+            $bets[$i]['system_id'] = $linked['system_id'];
+            $bets[$i]['system_name'] = $linked['system_name'];
+        }
+        return $bets;
+    }
+}
+
+if (!function_exists('fhor_bt_group_bets_by_book')) {
+    function fhor_bt_group_bets_by_book(array $bets) {
+        $groups = [];
+        foreach ($bets as $bet) {
+            $key = preg_replace('/\D/', '', (string) ($bet['system_id'] ?? ''));
+            if (!isset($groups[$key])) {
+                $groups[$key] = [];
+            }
+            $groups[$key][] = $bet;
+        }
+        return $groups;
+    }
+}
+
+if (!function_exists('fhor_bt_filter_bets_for_book')) {
+    function fhor_bt_filter_bets_for_book(array $bets, $system_id) {
+        $system_id = preg_replace('/\D/', '', (string) $system_id);
+        return array_values(array_filter($bets, function ($bet) use ($system_id) {
+            $sid = preg_replace('/\D/', '', (string) ($bet['system_id'] ?? ''));
+            return $sid === $system_id;
+        }));
+    }
+}
+
+if (!function_exists('fhor_bt_recalculate_books')) {
+    function fhor_bt_recalculate_books($user_id, array $all_bets, $today) {
+        $user_id = intval($user_id);
+        $groups = fhor_bt_group_bets_by_book($all_bets);
+        $projected_by_id = [];
+        $books = [];
+        $total_bankroll = 0.0;
+
+        foreach ($groups as $system_id => $group_bets) {
+            $settings = fhor_bt_get_settings_for_book($user_id, $system_id);
+            $cmp = fhor_bt_compare($group_bets, $settings, $today);
+            foreach ($cmp['bets'] as $bet) {
+                $projected_by_id[(int) ($bet['id'] ?? 0)] = $bet;
+            }
+            $books[$system_id] = [
+                'system_id' => $system_id,
+                'bankroll' => $cmp['bankroll'],
+                'today' => $cmp['today'],
+                'today_opening' => $cmp['today_opening'],
+                'today_budget' => $cmp['today_budget'],
+                'flat_line' => $cmp['flat_line'],
+                'actual_mode' => $cmp['actual_mode'],
+                'shadow_mode' => $cmp['shadow_mode'],
+                'actual_label' => $cmp['actual_label'],
+                'shadow_label' => $cmp['shadow_label'],
+                'settings' => $settings,
+            ];
+            $total_bankroll += (float) $cmp['bankroll'];
+        }
+
+        $merged = [];
+        foreach ($all_bets as $bet) {
+            $id = (int) ($bet['id'] ?? 0);
+            $merged[] = isset($projected_by_id[$id]) ? $projected_by_id[$id] : $bet;
+        }
+
+        return [
+            'bets' => $merged,
+            'books' => $books,
+            'bankroll' => round($total_bankroll, 2),
+            'system_settings' => fhor_bt_get_system_settings_map($user_id),
+        ];
+    }
+}
+
 if (!function_exists('fhor_bt_today')) {
     function fhor_bt_today() {
         return function_exists('wp_date') ? wp_date('Y-m-d') : gmdate('Y-m-d');
@@ -302,21 +531,50 @@ if (!function_exists('fhor_bt_recalculate')) {
         $user_id = intval($user_id);
         $settings = fhor_bt_get_settings($user_id);
         $today = fhor_bt_today();
-        $cmp = fhor_bt_compare(fhor_bt_load_bets($user_id), $settings, $today);
-        fhor_bt_persist_projection($user_id, $cmp['bets']);
+        $all_bets = fhor_bt_repair_system_links($user_id, fhor_bt_load_bets($user_id));
+        $multi = fhor_bt_recalculate_books($user_id, $all_bets, $today);
+        fhor_bt_persist_projection($user_id, $multi['bets']);
+
+        $general = isset($multi['books']['']) ? $multi['books'][''] : null;
+        $ledger_bankroll = $general ? (float) $general['bankroll'] : (float) $multi['bankroll'];
+        $ledger_opening = $general ? (float) $general['today_opening'] : 0.0;
+        $ledger_budget = $general ? (float) $general['today_budget'] : 0.0;
+        $ledger_flat = $general ? (float) $general['flat_line'] : 0.0;
         $stake_label = $settings['mode'] === 'flat'
-            ? fhor_bt_trim_num($cmp['flat_line'])
-            : fhor_bt_trim_num($cmp['today_budget']);
+            ? fhor_bt_trim_num($ledger_flat)
+            : fhor_bt_trim_num($ledger_budget);
         update_user_meta($user_id, 'fhor_bt_ledger', [
             'as_of' => $today,
-            'bankroll' => $cmp['bankroll'],
-            'today_opening' => $cmp['today_opening'],
-            'today_stake' => $settings['mode'] === 'flat' ? $cmp['flat_line'] : $cmp['today_budget'],
+            'bankroll' => $ledger_bankroll,
+            'today_opening' => $ledger_opening,
+            'today_stake' => $settings['mode'] === 'flat' ? $ledger_flat : $ledger_budget,
             'mode' => $settings['mode'],
             'settled_at' => current_time('mysql'),
             'summary' => $stake_label,
         ]);
-        $cmp['bets'] = fhor_bt_annotate_bets($cmp['bets']);
+
+        $cmp = [
+            'bets' => fhor_bt_annotate_bets($multi['bets']),
+            'books' => $multi['books'],
+            'bankroll' => $multi['bankroll'],
+            'today' => $today,
+            'settings' => $settings,
+            'system_settings' => $multi['system_settings'],
+        ];
+        if ($general) {
+            $cmp['today_opening'] = $general['today_opening'];
+            $cmp['today_budget'] = $general['today_budget'];
+            $cmp['flat_line'] = $general['flat_line'];
+            $cmp['actual_mode'] = $general['actual_mode'];
+            $cmp['shadow_mode'] = $general['shadow_mode'];
+            $cmp['actual_label'] = $general['actual_label'];
+            $cmp['shadow_label'] = $general['shadow_label'];
+        }
+        if (function_exists('fhor_sb_get_saved')) {
+            $cmp['saved_systems'] = fhor_sb_get_saved($user_id);
+        } else {
+            $cmp['saved_systems'] = [];
+        }
         try {
             $demo = fhor_bt_compare(fhor_bt_demo_bets(), $settings, '2026-09-17');
             $demo['bets'] = fhor_bt_annotate_bets($demo['bets']);
@@ -398,6 +656,9 @@ if (!function_exists('fhor_bt_parse_bet_input')) {
         }
         $system = sanitize_text_field(isset($raw['system_name']) ? $raw['system_name'] : '');
         $system_id = sanitize_text_field(isset($raw['system_id']) ? $raw['system_id'] : '');
+        $linked = fhor_bt_canonical_system_fields(get_current_user_id(), $system, $system_id);
+        $system = $linked['system_name'];
+        $system_id = $linked['system_id'];
         $note = sanitize_textarea_field(isset($raw['note']) ? $raw['note'] : '');
         $selection = implode(' / ', $horses);
         if (strlen($selection) > 255) {
@@ -529,6 +790,7 @@ add_action('wp_ajax_nopriv_fhor_bt_bootstrap', 'fhor_bt_ajax_denied');
 if (!function_exists('fhor_bt_ajax_save_settings')) {
     function fhor_bt_ajax_save_settings() {
         fhor_bt_guard('fhor_bt_save_settings');
+        $user_id = get_current_user_id();
         $settings = fhor_bt_normalize_settings([
             'mode' => isset($_POST['mode']) ? sanitize_text_field(wp_unslash($_POST['mode'])) : 'percentage',
             'starting_bankroll' => isset($_POST['starting_bankroll']) ? wp_unslash($_POST['starting_bankroll']) : 100,
@@ -536,8 +798,14 @@ if (!function_exists('fhor_bt_ajax_save_settings')) {
             'point_value' => isset($_POST['point_value']) ? wp_unslash($_POST['point_value']) : 1,
             'points_per_bet' => isset($_POST['points_per_bet']) ? wp_unslash($_POST['points_per_bet']) : 1,
         ]);
-        update_user_meta(get_current_user_id(), fhor_bt_settings_key(), $settings);
-        fhor_bt_send_book(get_current_user_id());
+        $scope = isset($_POST['book_scope']) ? sanitize_text_field(wp_unslash($_POST['book_scope'])) : '';
+        $system_id = preg_replace('/\D/', '', $scope);
+        if ($system_id !== '') {
+            fhor_bt_save_system_settings($user_id, $system_id, $settings);
+        } else {
+            update_user_meta($user_id, fhor_bt_settings_key(), $settings);
+        }
+        fhor_bt_send_book($user_id);
     }
 }
 add_action('wp_ajax_fhor_bt_save_settings', 'fhor_bt_ajax_save_settings');
@@ -547,16 +815,19 @@ if (!function_exists('fhor_bt_ajax_quote')) {
     function fhor_bt_ajax_quote() {
         fhor_bt_guard('fhor_bt_quote');
         $user_id = get_current_user_id();
-        $bets = fhor_bt_load_bets($user_id);
+        $bets = fhor_bt_repair_system_links($user_id, fhor_bt_load_bets($user_id));
         $exclude = isset($_POST['exclude_id']) ? (int) $_POST['exclude_id'] : 0;
         if ($exclude > 0) {
             $bets = array_values(array_filter($bets, function ($bet) use ($exclude) {
                 return (int) $bet['id'] !== $exclude;
             }));
         }
+        $system_id = isset($_POST['system_id']) ? sanitize_text_field(wp_unslash($_POST['system_id'])) : '';
+        $system_id = preg_replace('/\D/', '', $system_id);
+        $bets = fhor_bt_filter_bets_for_book($bets, $system_id);
         $quote = fhor_bt_quote(
             $bets,
-            fhor_bt_get_settings($user_id),
+            fhor_bt_get_settings_for_book($user_id, $system_id),
             isset($_POST['placed_at']) ? wp_unslash($_POST['placed_at']) : '',
             sanitize_key(isset($_POST['bet_type']) ? wp_unslash($_POST['bet_type']) : 'single'),
             !empty($_POST['each_way']),
@@ -796,6 +1067,10 @@ if (!function_exists('fhor_bt_enqueue')) {
                 'odds' => isset($_GET['odds']) ? sanitize_text_field(wp_unslash($_GET['odds'])) : '',
             ];
         }
+        $saved_systems = [];
+        if (is_user_logged_in() && function_exists('fhor_sb_get_saved')) {
+            $saved_systems = fhor_sb_get_saved(get_current_user_id());
+        }
         wp_localize_script('fhor-bet-tracker', 'fhorBt', [
             'ajax' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('fhor_bet_tracker'),
@@ -805,6 +1080,7 @@ if (!function_exists('fhor_bt_enqueue')) {
             'signup' => function_exists('fhor_get_membership_signup_url') ? fhor_get_membership_signup_url() : home_url('/register/'),
             'now' => current_time('Y-m-d') . 'T' . current_time('H:i'),
             'prefill' => $prefill,
+            'savedSystems' => $saved_systems,
         ]);
     }
 }
@@ -1071,6 +1347,7 @@ if (!function_exists('fhor_bt_app_html')) {
             </section>
             <section class="bt-panel">
                 <h2>Staking setup</h2>
+                <p class="bt-note" id="bt-staking-scope" style="margin:0 0 .65rem;">Each saved System Builder system has its own bankroll. Choose a system above to set its starting balance and staking. General bets (no system tag) use the settings below.</p>
                 <form id="bt-settings-form">
                     <div class="bt-grid">
                         <div class="bt-field"><label for="bt-mode">Method</label>
@@ -1087,7 +1364,7 @@ if (!function_exists('fhor_bt_app_html')) {
                     <div class="bt-actions" style="margin-top:.75rem">
                         <button type="submit" class="bt-btn bt-btn-primary" id="bt-save-settings">Save staking</button>
                     </div>
-                    <p class="bt-note" id="bt-settings-note">Dynamic mode risks the same total stake on every bet that day: morning bankroll × your percentage. Flat mode prices each line at your point size, so each-way and full-covers cost more. Saving rebuilds automatic stakes. A stake you typed yourself stays as you entered it.</p>
+                    <p class="bt-note" id="bt-settings-note">Dynamic mode risks the same total stake on every bet that day: morning bankroll × your percentage. Flat mode prices each line at your point size, so each-way and full-covers cost more. Saving rebuilds automatic stakes for this book only. A stake you typed yourself stays as you entered it.</p>
                 </form>
             </section>
             <section class="bt-panel">

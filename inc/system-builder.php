@@ -2146,6 +2146,8 @@ if (!function_exists('fhor_sb_enqueue')) {
                 'canAlert' => fhor_sb_can_email_alerts() ? 1 : 0,
                 'maxSaved' => fhor_sb_max_saved(),
                 'qualifiersUrl' => fhor_sb_qualifiers_url(),
+                'betTrackerUrl' => function_exists('fhor_bt_url') ? fhor_bt_url() : '',
+                'betTrackerPremium' => (function_exists('fhor_bt_is_premium') && fhor_bt_is_premium()) ? 1 : 0,
                 'starters' => fhor_sb_starter_systems(),
             ]);
         }
@@ -2261,6 +2263,9 @@ if (!function_exists('fhor_sb_shortcode')) {
                             <li><strong>Find qualifiers</strong> — applies the same rules to <em>today’s and tomorrow’s</em> cards. DI/CD always shows for review when pedigree is available.</li>
                             <li><strong>Save</strong> — name the system and optionally turn on email alerts (Premium). <a href="<?php echo esc_url(fhor_sb_qualifiers_url()); ?>">My Daily Qualifiers</a> lists all saved systems.</li>
                         </ol>
+                        <?php if (function_exists('fhor_bt_url')): ?>
+                        <p class="sb-note" style="margin:0 0 .5rem;">Each saved system has its own starting bankroll in the <a href="<?php echo esc_url(fhor_bt_url()); ?>">Bet Tracker</a><?php echo function_exists('fhor_bt_is_premium') && !fhor_bt_is_premium() ? ' (Premium)' : ''; ?>: choose that system in the dropdown and set £100, £200, or whatever you paper-trade from.</p>
+                        <?php endif; ?>
                         <p class="sb-note" style="margin:0 0 .5rem;"><strong>DI/CD</strong> (Dosage Index / Center of Distribution) uses the same Chefs-de-Race pedigree as the race card: higher = more speed influence, lower = stamina. Use sprint or stayer starters below, or the presets under Dosage (DI / CD).</p>
                         <h3 style="margin:.6rem 0 .35rem;font-size:.82rem;text-transform:uppercase;letter-spacing:.04em;color:#64748b;">Starter systems</h3>
                         <div class="sb-starters" id="sb-starters"></div>

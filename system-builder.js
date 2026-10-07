@@ -417,13 +417,45 @@
             });
         });
 
+        function betTrackerBookUrl(systemId) {
+            var base = fhorSb.betTrackerUrl || '';
+            if (!base || !systemId) {
+                return '';
+            }
+            var id = String(systemId).replace(/\D/g, '');
+            if (!id) {
+                return '';
+            }
+            return base + (base.indexOf('?') === -1 ? '?' : '&') + 'book=' + encodeURIComponent(id);
+        }
+
+        function afterSystemSaved(newId, wasFirstSave) {
+            if (!newId || !Number(fhorSb.betTrackerPremium) || !fhorSb.betTrackerUrl) {
+                return;
+            }
+            var url = betTrackerBookUrl(newId);
+            if (!url) {
+                return;
+            }
+            if (wasFirstSave) {
+                window.location.href = url;
+                return;
+            }
+            if (window.confirm('System saved. Open Bet Tracker to set this system’s starting bankroll and staking?')) {
+                window.location.href = url;
+            }
+        }
+
         function saveSystem(alerts, btn) {
             var nameEl = document.getElementById('sb-name');
             var name = nameEl ? nameEl.value.trim() : '';
+            var wasFirstSave = saved.length === 0;
             withBusy(btn, function () {
                 return post('fhor_sb_save', { name: name, alerts: alerts ? '1' : '' }).then(function (json) {
                     if (json && json.success) {
+                        var newId = json.data && json.data.id;
                         renderSaved(json.data.systems);
+                        afterSystemSaved(newId, wasFirstSave);
                     } else {
                         window.alert((json && json.data && json.data.message) || 'Could not save.');
                     }
