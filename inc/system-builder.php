@@ -574,8 +574,7 @@ if (!function_exists('fhor_sb_fetch_historic')) {
             $params[] = '%' . $wpdb->esc_like($filters['class']) . '%';
         }
         if ($track_col && $filters['track_type'] !== '') {
-            $where[] = "hracb.`$track_col` LIKE %s";
-            $params[] = '%' . $wpdb->esc_like($filters['track_type']) . '%';
+            fhor_sb_apply_track_type_where("hracb.`$track_col`", $filters['track_type'], $where, $params);
         }
         if ($hcap_col && $filters['handicap'] !== '') {
             fhor_sb_apply_handicap_where("hracb.`$hcap_col`", $filters['handicap'], $where, $params);
@@ -751,8 +750,7 @@ if (!function_exists('fhor_sb_fetch_live')) {
             $params[] = '%' . $wpdb->esc_like($filters['class']) . '%';
         }
         if ($filters['track_type'] !== '' && !empty($used_alias['track_type'])) {
-            $where[] = 'sp.track_type LIKE %s';
-            $params[] = '%' . $wpdb->esc_like($filters['track_type']) . '%';
+            fhor_sb_apply_track_type_where('sp.track_type', $filters['track_type'], $where, $params);
         }
         if ($filters['trainer'] !== '' && !empty($used_alias['trainer_name'])) {
             $where[] = 'sp.trainer_name LIKE %s';
@@ -1052,6 +1050,80 @@ if (!function_exists('fhor_sb_apply_race_type_where')) {
     }
 }
 
+if (!function_exists('fhor_sb_is_all_weather_track')) {
+    function fhor_sb_is_all_weather_track($track_type) {
+        if (function_exists('bricks_seo_is_all_weather_surface')) {
+            return bricks_seo_is_all_weather_surface($track_type);
+        }
+        $t = strtolower(trim((string) $track_type));
+        if ($t === '' || $t === 'turf') {
+            return false;
+        }
+        return $t !== 'turf';
+    }
+}
+
+if (!function_exists('fhor_sb_is_turf_track')) {
+    function fhor_sb_is_turf_track($track_type) {
+        $t = strtolower(trim((string) $track_type));
+        return $t === '' || $t === 'turf';
+    }
+}
+
+if (!function_exists('fhor_sb_track_type_filter_key')) {
+    function fhor_sb_track_type_filter_key($filter) {
+        $f = strtolower(trim((string) $filter));
+        if ($f === '' || $f === 'any') {
+            return '';
+        }
+        if ($f === 'aw' || $f === 'all-weather' || $f === 'all weather') {
+            return 'aw';
+        }
+        if ($f === 'turf') {
+            return 'turf';
+        }
+        return $f;
+    }
+}
+
+if (!function_exists('fhor_sb_track_type_matches')) {
+    function fhor_sb_track_type_matches($track_type, $filter) {
+        $key = fhor_sb_track_type_filter_key($filter);
+        if ($key === '') {
+            return true;
+        }
+        if ($key === 'aw') {
+            return fhor_sb_is_all_weather_track($track_type);
+        }
+        if ($key === 'turf') {
+            return fhor_sb_is_turf_track($track_type);
+        }
+        return stripos((string) $track_type, $filter) !== false;
+    }
+}
+
+if (!function_exists('fhor_sb_apply_track_type_where')) {
+    function fhor_sb_apply_track_type_where($expr, $filter, array &$where, array &$params) {
+        global $wpdb;
+        $key = fhor_sb_track_type_filter_key($filter);
+        if ($key === '') {
+            return;
+        }
+        if ($key === 'aw') {
+            $where[] = "($expr IS NOT NULL AND $expr != '' AND $expr NOT LIKE %s)";
+            $params[] = '%Turf%';
+            return;
+        }
+        if ($key === 'turf') {
+            $where[] = "$expr LIKE %s";
+            $params[] = '%Turf%';
+            return;
+        }
+        $where[] = "$expr LIKE %s";
+        $params[] = '%' . $wpdb->esc_like($filter) . '%';
+    }
+}
+
 if (!function_exists('fhor_sb_speed_figure')) {
     function fhor_sb_speed_figure($row) {
         foreach (['wt_speed_rating', 'speed_rating', 'sr_lto', 'SR_LTO'] as $key) {
@@ -1096,7 +1168,7 @@ if (!function_exists('fhor_sb_row_passes_runner_filters')) {
         if ($filters['class'] !== '' && stripos((string) ($row->class ?? ''), $filters['class']) === false) {
             return false;
         }
-        if ($filters['track_type'] !== '' && stripos((string) ($row->track_type ?? ''), $filters['track_type']) === false) {
+        if (!fhor_sb_track_type_matches($row->track_type ?? '', $filters['track_type'])) {
             return false;
         }
         if ($filters['age_range'] !== '' && stripos((string) ($row->age_range ?? ''), $filters['age_range']) === false) {
@@ -2077,6 +2149,25 @@ if (!function_exists('fhor_sb_starter_systems')) {
                     'pick_mode' => 'top_fsr',
                     'country' => ['England'],
                     'race_type' => ['Flat'],
+                    'fsr_rank_max' => '3',
+                ],
+            ],
+            'aw_winter_flat' => [
+                'title' => 'All-Weather flat (winter)',
+                'summary' => 'England & Scotland AW handicaps, 5f–1m2f, top 3 FSr. Use Standard going only (not Firm/Good). Start with 21-day lookback, then widen.',
+                'cta' => 'Load AW example',
+                'action' => 'run',
+                'filters' => [
+                    'days' => '21',
+                    'bet' => 'win',
+                    'pick_mode' => 'top_fsr',
+                    'country' => ['England', 'Scotland'],
+                    'race_type' => ['Flat'],
+                    'track_type' => 'AW',
+                    'handicap' => 'yes',
+                    'going' => ['Standard'],
+                    'dist_f_min' => '5',
+                    'dist_f_max' => '10',
                     'fsr_rank_max' => '3',
                 ],
             ],

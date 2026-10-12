@@ -67,6 +67,24 @@ function handicapState(value) {
     return null;
 }
 
+function isAllWeatherTrack(trackType) {
+    const t = String(trackType || '').toLowerCase().trim();
+    if (!t || t === 'turf') return false;
+    if (/all[\s_-]*weather|(^|\s)aw(\s|$)/i.test(t)) return true;
+    return ['polytrack', 'tapeta', 'fibresand', 'fiber sand', 'synthetic', 'equitrack'].includes(t);
+}
+
+function trackTypeMatches(trackType, filter) {
+    const f = String(filter || '').toLowerCase().trim();
+    if (!f) return true;
+    if (f === 'aw' || f === 'all-weather' || f === 'all weather') return isAllWeatherTrack(trackType);
+    if (f === 'turf') {
+        const t = String(trackType || '').toLowerCase().trim();
+        return t === '' || t === 'turf';
+    }
+    return String(trackType || '').toLowerCase().includes(f);
+}
+
 function raceTypeMatches(raceType, wanted) {
     wanted = (wanted || []).filter((v) => v !== '');
     if (!wanted.length) return true;
@@ -119,6 +137,7 @@ function dosagePasses(row, filters) {
 function passes(row, filters) {
     if (!countryMatches(row.course, row.country, filters.country || [])) return false;
     if (!raceTypeMatches(row.race_type, filters.race_type || [])) return false;
+    if (!trackTypeMatches(row.track_type, filters.track_type || '')) return false;
     if (filters.handicap === 'yes' || filters.handicap === 'no') {
         const state = handicapState(row.handicap);
         if (state === null || state !== (filters.handicap === 'yes')) return false;
@@ -212,6 +231,11 @@ assert(handicapState(1) === true && handicapState(0) === false && handicapState(
 assert(raceTypeMatches('NH Flat', ['Flat']) === false, 'NH Flat is not Flat');
 assert(raceTypeMatches('Hurdles', ['Hurdle']) === true, 'Hurdles');
 assert(raceTypeMatches('', ['Hurdle']) === false, 'blank race type');
+assert(trackTypeMatches('Polytrack', 'AW') === true, 'Polytrack is AW');
+assert(trackTypeMatches('Tapeta', 'AW') === true, 'Tapeta is AW');
+assert(trackTypeMatches('Turf', 'AW') === false, 'Turf is not AW');
+assert(trackTypeMatches('Polytrack', 'AW') === true && trackTypeMatches('Polytrack', 'Turf') === false, 'AW vs Turf');
+assert(isAllWeatherTrack('AllWeather') === true, 'AllWeather label');
 
 const dosageRow = (di, cd, inf) => ({
     race_id: 99,
