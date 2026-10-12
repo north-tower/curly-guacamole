@@ -391,17 +391,24 @@
             });
         }
 
-        try {
-            if (localStorage.getItem('fhor_sb_guide_seen') === '1') {
-                var guide = document.getElementById('sb-guide');
-                if (guide) {
+        var guide = document.getElementById('sb-guide');
+        if (guide) {
+            try {
+                if (localStorage.getItem('fhor_sb_guide_seen') === '1') {
                     guide.open = false;
                 }
-            } else {
-                localStorage.setItem('fhor_sb_guide_seen', '1');
+            } catch (ignore) {
+                /* storage blocked */
             }
-        } catch (ignore) {
-            /* storage blocked */
+            guide.addEventListener('toggle', function () {
+                if (!guide.open) {
+                    try {
+                        localStorage.setItem('fhor_sb_guide_seen', '1');
+                    } catch (ignore2) {
+                        /* storage blocked */
+                    }
+                }
+            });
         }
 
         form.addEventListener('submit', function (event) {

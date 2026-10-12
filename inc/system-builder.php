@@ -2340,7 +2340,7 @@ if (!function_exists('fhor_sb_starter_systems')) {
         return [
             'top_fsr' => [
                 'title' => 'Top FSr in a race',
-                'summary' => 'England Flat, top 3 FSr in the field, one pick per race. Use Run System to see how that shortlist would have performed recently.',
+                'summary' => 'England flat, one selection per race = highest FSr. FSr rank Any so Run System can show ROI (same pattern as the AW and turf winter examples).',
                 'cta' => 'Load & run backtest',
                 'action' => 'run',
                 'filters' => [
@@ -2349,7 +2349,7 @@ if (!function_exists('fhor_sb_starter_systems')) {
                     'pick_mode' => 'top_fsr',
                     'country' => ['England'],
                     'race_type' => ['Flat'],
-                    'fsr_rank_max' => '3',
+                    'fsr_rank_max' => '',
                 ],
             ],
             'aw_winter_flat' => [
@@ -2368,6 +2368,39 @@ if (!function_exists('fhor_sb_starter_systems')) {
                     'dist_f_min' => '5',
                     'dist_f_max' => '10',
                     'fsr_rank_max' => '',
+                ],
+            ],
+            'flat_winter_turf' => [
+                'title' => 'Flat turf (winter)',
+                'summary' => 'England turf flat, 5f–1m4f — same idea as the AW starter when jumps are quiet. Top FSr in race with FSr rank Any so Run System can show ROI. Saved systems with FSr rank (e.g. top-3 in field) still work on Find qualifiers / Bet Tracker.',
+                'cta' => 'Load turf example',
+                'action' => 'run',
+                'filters' => [
+                    'days' => '14',
+                    'bet' => 'win',
+                    'pick_mode' => 'top_fsr',
+                    'country' => ['England'],
+                    'race_type' => ['Flat'],
+                    'track_type' => 'Turf',
+                    'handicap' => '',
+                    'dist_f_min' => '5',
+                    'dist_f_max' => '14',
+                    'fsr_rank_max' => '',
+                ],
+            ],
+            'flat_fsr_shortlist_live' => [
+                'title' => 'Flat FSr shortlist (live card)',
+                'summary' => 'England flat: FSr rank top 3 and speed rank top 3 — close to a typical saved FSr/speed system. Use Find qualifiers (not Run System) so FSr rank uses today’s race card.',
+                'cta' => 'Load & find qualifiers',
+                'action' => 'qualifiers',
+                'filters' => [
+                    'days' => '90',
+                    'bet' => 'win',
+                    'pick_mode' => 'all',
+                    'country' => ['England'],
+                    'race_type' => ['Flat'],
+                    'fsr_rank_max' => '3',
+                    'sr_rank_max' => '3',
                 ],
             ],
             'sprint_pedigree' => [
@@ -2513,10 +2546,26 @@ if (!function_exists('fhor_sb_shortcode')) {
         .sb-empty{color:#64748b;font-size:.9rem;padding:.85rem .9rem;margin:0;border:1px dashed #cbd5e1;border-radius:10px;background:#f8fafc;line-height:1.45}
         .sb-note{font-size:.78rem;color:#64748b;margin:.4rem 0 0;line-height:1.45}
         .sb-note.is-warn{color:#b45309;font-weight:600}
-        .sb-guide{margin:0 0 1.1rem;padding:.85rem .95rem;border:1px solid #bbf7d0;border-radius:12px;background:linear-gradient(180deg,#f0fdf4,#fff 55%)}
-        .sb-guide summary{cursor:pointer;font-weight:800;font-size:.88rem;color:#14532d;list-style:none}
-        .sb-guide summary::-webkit-details-marker{display:none}
-        .sb-guide-body{margin-top:.65rem;font-size:.82rem;color:#334155;line-height:1.55}
+        .sb-guide{margin:0 0 1.1rem;border:1px solid #86efac;border-radius:12px;background:linear-gradient(180deg,#f0fdf4,#fff 55%);box-shadow:0 1px 0 rgba(21,128,61,.06)}
+        .sb-guide:not([open]){background:linear-gradient(180deg,#ecfdf5,#f0fdf4)}
+        .sb-guide:not([open]) .sb-guide-toggle{border-radius:12px}
+        .sb-guide-toggle{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.85rem .95rem;margin:0;border-radius:12px 12px 0 0}
+        .sb-guide:not([open]) .sb-guide-toggle{border-radius:12px}
+        .sb-guide-toggle::-webkit-details-marker{display:none}
+        .sb-guide-toggle:focus-visible{outline:2px solid #16a34a;outline-offset:2px}
+        .sb-guide-toggle-text{flex:1;min-width:0}
+        .sb-guide-toggle-title{display:block;font-weight:800;font-size:.92rem;color:#14532d;line-height:1.25}
+        .sb-guide-toggle-hint{display:block;margin-top:.25rem;font-size:.76rem;font-weight:600;color:#166534;line-height:1.35}
+        .sb-guide-when-open{display:none}
+        .sb-guide[open] .sb-guide-when-closed{display:none}
+        .sb-guide[open] .sb-guide-when-open{display:block}
+        .sb-guide-badges{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.45rem}
+        .sb-guide-badge{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#14532d;background:#fff;border:1px solid #bbf7d0;border-radius:999px;padding:.2rem .5rem}
+        .sb-guide-chevron{flex-shrink:0;width:2rem;height:2rem;border-radius:999px;background:#fff;border:1px solid #86efac;display:flex;align-items:center;justify-content:center;transition:transform .2s ease,color .2s ease}
+        .sb-guide-chevron svg{width:1rem;height:1rem;color:#15803d;transition:transform .2s ease}
+        .sb-guide[open] .sb-guide-chevron svg{transform:rotate(180deg)}
+        .sb-guide-body{margin:0;padding:0 .95rem .95rem;font-size:.82rem;color:#334155;line-height:1.55;border-top:1px solid #bbf7d0}
+        .sb-guide[open] .sb-guide-body{padding-top:.75rem}
         .sb-guide-steps{margin:.5rem 0 .85rem;padding-left:1.15rem}
         .sb-guide-steps li{margin:.35rem 0}
         .sb-guide-steps strong{color:#0f172a}
@@ -2546,7 +2595,19 @@ if (!function_exists('fhor_sb_shortcode')) {
                     <p class="sb-tier is-free">Free · 1-year history · 1 saved system · dashboard qualifiers only. <a href="<?php echo esc_url($signup); ?>">Upgrade for alerts</a></p>
                 <?php endif; ?>
                 <details class="sb-guide" id="sb-guide" open>
-                    <summary>How System Builder works (start here)</summary>
+                    <summary class="sb-guide-toggle">
+                        <span class="sb-guide-toggle-text">
+                            <span class="sb-guide-toggle-title">How System Builder works (start here)</span>
+                            <span class="sb-guide-toggle-hint sb-guide-when-closed">Click to expand — 4-step walkthrough, one-click starter systems (AW &amp; flat turf), and a short glossary.</span>
+                            <span class="sb-guide-toggle-hint sb-guide-when-open">Click to collapse this guide.</span>
+                            <span class="sb-guide-badges sb-guide-when-closed" aria-hidden="true">
+                                <span class="sb-guide-badge">Steps</span>
+                                <span class="sb-guide-badge">Starter examples</span>
+                                <span class="sb-guide-badge">Glossary</span>
+                            </span>
+                        </span>
+                        <span class="sb-guide-chevron" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    </summary>
                     <div class="sb-guide-body">
                         <ol class="sb-guide-steps">
                             <li><strong>Set rules</strong> on the left — race type, distance, FSr rank, dosage (DI/CD), etc. Empty fields mean “no limit”.</li>
