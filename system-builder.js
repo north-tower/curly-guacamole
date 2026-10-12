@@ -111,7 +111,7 @@
             var rank = val('fsr_rank_max');
             if (rank !== '') {
                 note.hidden = false;
-                note.textContent = 'Backtest may show 0 until CR backtest data is loaded — Find qualifiers still uses live FSr rank.';
+                note.textContent = 'Run System skips FSr rank on historic data until CR backtest is loaded; ROI uses your other rules. Find qualifiers still uses your saved FSr rank.';
             } else {
                 note.hidden = true;
                 note.textContent = '';
@@ -208,7 +208,10 @@
                 ' runners scanned' + fsrNote + ' · ISP place rate ' + (data.isp && data.isp.place_rate != null ? data.isp.place_rate : data.place_rate) + '%' + extra;
             var zeroHint = document.getElementById('sb-zero-hint');
             if (zeroHint) {
-                if (data.zero_hint && (data.qualifiers === 0 || !data.qualifiers)) {
+                if (data.fsr_rank_backtest_skipped && data.fsr_rank_backtest_note) {
+                    zeroHint.hidden = false;
+                    zeroHint.textContent = data.fsr_rank_backtest_note;
+                } else if (data.zero_hint && (data.qualifiers === 0 || !data.qualifiers)) {
                     zeroHint.hidden = false;
                     zeroHint.textContent = data.zero_hint;
                 } else {

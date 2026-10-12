@@ -1922,11 +1922,33 @@ if (!function_exists('fhor_sb_backtest_zero_hint')) {
     }
 }
 
-if (!function_exists('fhor_sb_run_backtest')) {
-    function fhor_sb_run_backtest(array $filters) {
-        list($from, $to) = fhor_sb_resolve_dates($filters);
-        $rows = fhor_sb_fetch_historic($filters);
-        $qualified = fhor_sb_annotate_and_filter($rows, $filters);
+if (!function_exists('fhor_sb_count_historic_fsr_runners')) {
+    function fhor_sb_count_historic_fsr_runners(array $rows) {
+        $n = 0;
+        foreach ($rows as $row) {
+            if (is_numeric($row->fsr ?? null)) {
+                $n++;
+            }
+        }
+        return $n;
+    }
+}
+
+if (!function_exists('fhor_sb_backtest_fsr_rank_skipped_note')) {
+    function fhor_sb_backtest_fsr_rank_skipped_note(array $filters) {
+        $rank = trim((string) ($filters['fsr_rank_max'] ?? ''));
+        if ($rank === '') {
+            return '';
+        }
+        return 'Historic FSr rank (≤ ' . $rank . ') was skipped — point-in-time CR data is not loaded for this period. ROI below uses your other saved rules; Find qualifiers still applies FSr rank on the live card.';
+    }
+}
+
+if (!function_exists('fhor_sb_backtest_settle_qualified')) {
+    /**
+     * @return array{isp:array,bsp:array,samples:array<int,array<string,mixed>>}
+     */
+    function fhor_sb_backtest_settle_qualified(array $qualified, array $filters) {
         $isp = fhor_sb_empty_book();
         $bsp = fhor_sb_empty_book();
         $samples = [];
@@ -1966,18 +1988,54 @@ if (!function_exists('fhor_sb_run_backtest')) {
                 ];
             }
         }
-        $isp = fhor_sb_finalise_book($isp);
-        $bsp = fhor_sb_finalise_book($bsp);
+        return [
+            'isp' => fhor_sb_finalise_book($isp),
+            'bsp' => fhor_sb_finalise_book($bsp),
+            'samples' => $samples,
+        ];
+    }
+}
+
+if (!function_exists('fhor_sb_run_backtest')) {
+    function fhor_sb_run_backtest(array $filters) {
+        list($from, $to) = fhor_sb_resolve_dates($filters);
+        $rows = fhor_sb_fetch_historic($filters);
+        $qualified = fhor_sb_annotate_and_filter($rows, $filters);
+        $fsr_rank_backtest_skipped = false;
+        $rows_n = count($rows);
+        $with_fsr = fhor_sb_count_historic_fsr_runners($rows);
+        $sparse_fsr = $rows_n > 0 && $with_fsr < $rows_n * 0.05;
+        $fsr_rank_requested = ($filters['fsr_rank_max'] ?? '') !== '';
+        if (!$qualified && $fsr_rank_requested && ($with_fsr === 0 || $sparse_fsr)) {
+            $relaxed = $filters;
+            $relaxed['fsr_rank_max'] = '';
+            $relaxed_qualified = fhor_sb_annotate_and_filter($rows, $relaxed);
+            if ($relaxed_qualified) {
+                $qualified = $relaxed_qualified;
+                $fsr_rank_backtest_skipped = true;
+            }
+        }
+        $books = fhor_sb_backtest_settle_qualified($qualified, $filters);
+        $isp = $books['isp'];
+        $bsp = $books['bsp'];
+        $samples = $books['samples'];
+        $zero_hint = fhor_sb_backtest_zero_hint($rows, $filters, $qualified);
+        $fsr_rank_backtest_note = $fsr_rank_backtest_skipped
+            ? fhor_sb_backtest_fsr_rank_skipped_note($filters)
+            : '';
+        if ($fsr_rank_backtest_skipped) {
+            $zero_hint = '';
+        }
         return [
             'from' => $from,
             'to' => $to,
-            'runners_scanned' => count($rows),
+            'runners_scanned' => $rows_n,
             'qualifiers' => count($qualified),
-            'zero_hint' => fhor_sb_backtest_zero_hint($rows, $filters, $qualified),
-            'historic_fsr_runners' => count(array_filter($rows, function ($row) {
-                return is_numeric($row->fsr ?? null);
-            })),
-            'capped' => count($rows) >= (fhor_sb_is_premium() ? 28000 : 12000),
+            'zero_hint' => $zero_hint,
+            'fsr_rank_backtest_skipped' => $fsr_rank_backtest_skipped,
+            'fsr_rank_backtest_note' => $fsr_rank_backtest_note,
+            'historic_fsr_runners' => $with_fsr,
+            'capped' => $rows_n >= (fhor_sb_is_premium() ? 28000 : 12000),
             'bets' => $isp['bets'],
             'wins' => $isp['wins'],
             'places' => $isp['places'],
@@ -2803,7 +2861,7 @@ if (!function_exists('fhor_sb_shortcode')) {
                                     <option value="2">Top 2</option>
                                     <option value="3">Top 3</option>
                                 </select>
-                                <p class="sb-note" style="margin:.3rem 0 0;">Historic <strong>Run System</strong>: FSr rank needs a FSr figure on each runner (backtest table). If you get 0 qualifiers, leave this as <strong>Any</strong> and use pick mode <strong>Top FSr in race</strong>, or use <strong>Find qualifiers</strong> on today’s card.</p>
+                                <p class="sb-note" style="margin:.3rem 0 0;">Historic <strong>Run System</strong>: FSr rank needs point-in-time CR data on each runner. Until that is loaded, Run System shows ROI from your other rules and skips FSr rank (saved rules for <strong>Find qualifiers</strong> are unchanged).</p>
                             </div>
                             <div class="sb-field"><label for="sb-ptsrank">Pts rank ≤</label>
                                 <select id="sb-ptsrank" name="pts_rank_max">
