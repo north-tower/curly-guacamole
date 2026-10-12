@@ -2847,6 +2847,7 @@ if (!function_exists('fhor_sb_shortcode')) {
                         </div>
                         <p class="sb-note">Forecast odds are the pre-race price used for live alerts. Settled SP is for historic research only. FSr uses point-in-time backtest comment ratings where available. Points rank uses the same engine as the race card.</p>
                     </details>
+                    <p class="sb-note is-warn" id="sb-saved-fsr-note" hidden></p>
                     <div class="sb-actions sb-actions-sticky">
                         <button type="submit" class="sb-btn sb-btn-primary" id="sb-run">Run System</button>
                         <button type="button" class="sb-btn" id="sb-today">Find qualifiers</button>

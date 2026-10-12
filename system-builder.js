@@ -103,6 +103,21 @@
             };
         }
 
+        function syncFsrRankLoadNote() {
+            var note = document.getElementById('sb-saved-fsr-note');
+            if (!note) {
+                return;
+            }
+            var rank = val('fsr_rank_max');
+            if (rank !== '') {
+                note.hidden = false;
+                note.textContent = 'Backtest may show 0 until CR backtest data is loaded — Find qualifiers still uses live FSr rank.';
+            } else {
+                note.hidden = true;
+                note.textContent = '';
+            }
+        }
+
         function applyFilters(filters) {
             if (!filters) {
                 return;
@@ -123,6 +138,7 @@
             setChecked('race_type[]', filters.race_type);
             setChecked('going[]', filters.going);
             setChecked('flags[]', filters.flags);
+            syncFsrRankLoadNote();
         }
 
         function post(action, extra) {
@@ -411,6 +427,12 @@
             });
         }
 
+        form.addEventListener('change', function (event) {
+            if (event.target && event.target.getAttribute('name') === 'fsr_rank_max') {
+                syncFsrRankLoadNote();
+            }
+        });
+
         form.addEventListener('submit', function (event) {
             event.preventDefault();
             var btn = document.getElementById('sb-run');
@@ -525,6 +547,10 @@
                 applyFilters(sys.filters || {});
                 document.getElementById('sb-name').value = sys.name || '';
                 document.getElementById('sb-alerts').checked = !!sys.alerts;
+                var sticky = form.querySelector('.sb-actions-sticky');
+                if (sticky && sticky.scrollIntoView) {
+                    sticky.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
             }
             if (event.target.classList.contains('sb-del') && id) {
                 post('fhor_sb_delete', { id: id }).then(function (json) {
