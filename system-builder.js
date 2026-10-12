@@ -183,9 +183,23 @@
             if (data.capped) {
                 extra += ' · sample hit the scan cap — add more race filters or shorten lookback';
             }
+            var fsrNote = '';
+            if (data.historic_fsr_runners != null && data.runners_scanned > 0) {
+                fsrNote = ' · historic FSr on ' + data.historic_fsr_runners + ' / ' + data.runners_scanned + ' runners';
+            }
             document.getElementById('sb-range').textContent =
                 data.from + ' – ' + data.to + ' · ' + data.qualifiers + ' qualifiers from ' + data.runners_scanned +
-                ' runners scanned · ISP place rate ' + (data.isp && data.isp.place_rate != null ? data.isp.place_rate : data.place_rate) + '%' + extra;
+                ' runners scanned' + fsrNote + ' · ISP place rate ' + (data.isp && data.isp.place_rate != null ? data.isp.place_rate : data.place_rate) + '%' + extra;
+            var zeroHint = document.getElementById('sb-zero-hint');
+            if (zeroHint) {
+                if (data.zero_hint && (data.qualifiers === 0 || !data.qualifiers)) {
+                    zeroHint.hidden = false;
+                    zeroHint.textContent = data.zero_hint;
+                } else {
+                    zeroHint.hidden = true;
+                    zeroHint.textContent = '';
+                }
+            }
             var paceNote = document.getElementById('sb-pace-note');
             if (paceNote) {
                 if (data.pace_live_only) {

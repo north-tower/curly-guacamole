@@ -766,7 +766,15 @@ if (!function_exists('fhor_sb_fetch_live')) {
             $params[] = '%' . $wpdb->esc_like($filters['class']) . '%';
         }
         if ($filters['track_type'] !== '' && !empty($used_alias['track_type'])) {
-            fhor_sb_apply_track_type_where('sp.track_type', $filters['track_type'], $where, $params);
+            fhor_sb_apply_track_type_where(
+                'sp.track_type',
+                $filters['track_type'],
+                $where,
+                $params,
+                'sp.course',
+                !empty($used_alias['going']) ? 'sp.going' : '',
+                'sp.race_type'
+            );
         }
         if ($filters['trainer'] !== '' && !empty($used_alias['trainer_name'])) {
             $where[] = 'sp.trainer_name LIKE %s';
@@ -977,21 +985,36 @@ if (!function_exists('fhor_sb_handicap_state')) {
 }
 
 if (!function_exists('fhor_sb_apply_handicap_where')) {
-    function fhor_sb_apply_handicap_where($expr, $mode, array &$where, array &$params) {
+    function fhor_sb_apply_handicap_where($expr, $mode, array &$where, array &$params, $title_expr = '') {
         $mode = strtolower((string) $mode);
+        $title_expr = trim((string) $title_expr);
         if ($mode === 'yes') {
-            $where[] = "(
-                $expr IN (1,'1','Y','Yes','y','yes','HCap','Handicap')
-                OR (
-                    LOWER(CAST($expr AS CHAR)) LIKE %s
-                    AND LOWER(CAST($expr AS CHAR)) NOT LIKE %s
-                )
-            )";
-            $params[] = '%handicap%';
-            $params[] = '%non%';
+            $parts = [];
+            if ($expr !== '') {
+                $parts[] = "(
+                    $expr IN (1,'1','Y','Yes','y','yes','HCap','Handicap')
+                    OR (
+                        LOWER(CAST($expr AS CHAR)) LIKE %s
+                        AND LOWER(CAST($expr AS CHAR)) NOT LIKE %s
+                    )
+                )";
+                $params[] = '%handicap%';
+                $params[] = '%non%';
+            }
+            if ($title_expr !== '') {
+                $parts[] = "(
+                    LOWER(CAST($title_expr AS CHAR)) LIKE %s
+                    AND LOWER(CAST($title_expr AS CHAR)) NOT LIKE %s
+                )";
+                $params[] = '%handicap%';
+                $params[] = '%non%';
+            }
+            if ($parts) {
+                $where[] = '(' . implode(' OR ', $parts) . ')';
+            }
             return;
         }
-        if ($mode === 'no') {
+        if ($mode === 'no' && $expr !== '') {
             $where[] = "$expr IN (0,'0','N','No','n','no','Non-Handicap','Non Handicap','Non-handicap')";
         }
     }
@@ -1066,6 +1089,106 @@ if (!function_exists('fhor_sb_apply_race_type_where')) {
     }
 }
 
+if (!function_exists('fhor_sb_aw_course_names')) {
+    /**
+     * @return array<int, string>
+     */
+    function fhor_sb_aw_course_names() {
+        return [
+            'Wolverhampton',
+            'Kempton',
+            'Lingfield',
+            'Southwell',
+            'Newcastle',
+            'Chelmsford City',
+            'Chelmsford',
+            'Dundalk',
+            'Laytown',
+        ];
+    }
+}
+
+if (!function_exists('fhor_sb_aw_going_sql_tokens')) {
+    /**
+     * @return array<int, string>
+     */
+    function fhor_sb_aw_going_sql_tokens() {
+        return ['Slow', 'Standard', 'Standard to Slow', 'Standard to Fast', 'Fast'];
+    }
+}
+
+if (!function_exists('fhor_sb_expand_going_filter_tokens')) {
+    /**
+     * @param array<int, string> $selected
+     * @return array<int, string>
+     */
+    function fhor_sb_expand_going_filter_tokens(array $selected) {
+        $out = [];
+        foreach ($selected as $g) {
+            $g = trim((string) $g);
+            if ($g === '') {
+                continue;
+            }
+            $out[] = $g;
+            if (strcasecmp($g, 'Standard') === 0) {
+                foreach (fhor_sb_aw_going_sql_tokens() as $token) {
+                    $out[] = $token;
+                }
+            }
+        }
+        return array_values(array_unique($out));
+    }
+}
+
+if (!function_exists('fhor_sb_runner_is_aw')) {
+    function fhor_sb_runner_is_aw($row) {
+        if (fhor_sb_is_all_weather_track($row->track_type ?? '')) {
+            return true;
+        }
+        $course = strtolower(trim((string) ($row->course ?? '')));
+        foreach (fhor_sb_aw_course_names() as $name) {
+            if ($course !== '' && strpos($course, strtolower($name)) !== false) {
+                return true;
+            }
+        }
+        $going = trim((string) ($row->going ?? ''));
+        if ($going !== '') {
+            foreach (fhor_sb_aw_going_sql_tokens() as $token) {
+                if (stripos($going, $token) !== false) {
+                    return true;
+                }
+            }
+        }
+        $rt = strtolower(trim((string) ($row->race_type ?? '')));
+        return strpos($rt, 'all weather') !== false;
+    }
+}
+
+if (!function_exists('fhor_sb_going_filter_matches')) {
+    function fhor_sb_going_filter_matches($row, array $selected) {
+        $selected = array_values(array_filter($selected, function ($g) {
+            return trim((string) $g) !== '';
+        }));
+        if (!$selected) {
+            return true;
+        }
+        $going = (string) ($row->going ?? '');
+        foreach (fhor_sb_expand_going_filter_tokens($selected) as $g) {
+            if (stripos($going, $g) !== false) {
+                return true;
+            }
+        }
+        if (trim($going) === '' && fhor_sb_runner_is_aw($row)) {
+            foreach ($selected as $g) {
+                if (strcasecmp(trim((string) $g), 'Standard') === 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+}
+
 if (!function_exists('fhor_sb_is_all_weather_track')) {
     function fhor_sb_is_all_weather_track($track_type) {
         if (function_exists('bricks_seo_is_all_weather_surface')) {
@@ -1103,15 +1226,21 @@ if (!function_exists('fhor_sb_track_type_filter_key')) {
 }
 
 if (!function_exists('fhor_sb_track_type_matches')) {
-    function fhor_sb_track_type_matches($track_type, $filter) {
+    function fhor_sb_track_type_matches($track_type, $filter, $row = null) {
         $key = fhor_sb_track_type_filter_key($filter);
         if ($key === '') {
             return true;
         }
         if ($key === 'aw') {
+            if ($row !== null && fhor_sb_runner_is_aw($row)) {
+                return true;
+            }
             return fhor_sb_is_all_weather_track($track_type);
         }
         if ($key === 'turf') {
+            if ($row !== null && fhor_sb_runner_is_aw($row)) {
+                return false;
+            }
             return fhor_sb_is_turf_track($track_type);
         }
         return stripos((string) $track_type, $filter) !== false;
@@ -1119,15 +1248,32 @@ if (!function_exists('fhor_sb_track_type_matches')) {
 }
 
 if (!function_exists('fhor_sb_apply_track_type_where')) {
-    function fhor_sb_apply_track_type_where($expr, $filter, array &$where, array &$params) {
+    function fhor_sb_apply_track_type_where($expr, $filter, array &$where, array &$params, $course_expr = '', $going_expr = '', $race_type_expr = '') {
         global $wpdb;
         $key = fhor_sb_track_type_filter_key($filter);
         if ($key === '') {
             return;
         }
         if ($key === 'aw') {
-            $where[] = "($expr IS NOT NULL AND $expr != '' AND $expr NOT LIKE %s)";
+            $parts = ["($expr IS NOT NULL AND $expr != '' AND $expr NOT LIKE %s)"];
             $params[] = '%Turf%';
+            if ($race_type_expr !== '') {
+                $parts[] = "LOWER($race_type_expr) LIKE %s";
+                $params[] = '%all weather%';
+            }
+            if ($going_expr !== '') {
+                foreach (fhor_sb_aw_going_sql_tokens() as $token) {
+                    $parts[] = "$going_expr LIKE %s";
+                    $params[] = '%' . $wpdb->esc_like($token) . '%';
+                }
+            }
+            if ($course_expr !== '') {
+                foreach (fhor_sb_aw_course_names() as $course) {
+                    $parts[] = "LOWER($course_expr) LIKE %s";
+                    $params[] = '%' . $wpdb->esc_like(strtolower($course)) . '%';
+                }
+            }
+            $where[] = '(' . implode(' OR ', $parts) . ')';
             return;
         }
         if ($key === 'turf') {
@@ -1184,26 +1330,20 @@ if (!function_exists('fhor_sb_row_passes_runner_filters')) {
         if ($filters['class'] !== '' && stripos((string) ($row->class ?? ''), $filters['class']) === false) {
             return false;
         }
-        if (!fhor_sb_track_type_matches($row->track_type ?? '', $filters['track_type'])) {
+        if (!fhor_sb_track_type_matches($row->track_type ?? '', $filters['track_type'], $row)) {
             return false;
         }
         if ($filters['age_range'] !== '' && stripos((string) ($row->age_range ?? ''), $filters['age_range']) === false) {
             return false;
         }
-        if (!empty($filters['going'])) {
-            $ok = false;
-            foreach ($filters['going'] as $g) {
-                if ($g !== '' && stripos((string) ($row->going ?? ''), $g) !== false) {
-                    $ok = true;
-                    break;
-                }
-            }
-            if (!$ok) {
-                return false;
-            }
+        if (!fhor_sb_going_filter_matches($row, $filters['going'] ?? [])) {
+            return false;
         }
         if (($filters['handicap'] ?? '') === 'yes' || ($filters['handicap'] ?? '') === 'no') {
             $handicap = fhor_sb_handicap_state($row->handicap ?? null);
+            if ($handicap === null && !empty($row->race_title)) {
+                $handicap = fhor_sb_handicap_state($row->race_title);
+            }
             $want_handicap = $filters['handicap'] === 'yes';
             if ($handicap === null || $handicap !== $want_handicap) {
                 return false;
@@ -1344,8 +1484,13 @@ if (!function_exists('fhor_sb_row_passes_runner_filters')) {
                 return false;
             }
         }
-        if ($filters['fsr_rank_max'] !== '' && (intval($row->_fsr_rank ?? 999) > intval($filters['fsr_rank_max']) || intval($row->_fsr_rank ?? 0) < 1)) {
-            return false;
+        if ($filters['fsr_rank_max'] !== '') {
+            if (!is_numeric($row->fsr ?? null)) {
+                return false;
+            }
+            if (intval($row->_fsr_rank ?? 999) > intval($filters['fsr_rank_max']) || intval($row->_fsr_rank ?? 0) < 1) {
+                return false;
+            }
         }
         if ($filters['sr_rank_max'] !== '' && (intval($row->_sr_rank ?? 999) > intval($filters['sr_rank_max']) || intval($row->_sr_rank ?? 0) < 1)) {
             return false;
@@ -1587,7 +1732,9 @@ if (!function_exists('fhor_sb_annotate_and_filter')) {
         $qualified = [];
         foreach ($by_race as $race_rows) {
             $field = count($race_rows);
-            $fsr_sorted = $race_rows;
+            $fsr_sorted = array_values(array_filter($race_rows, function ($r) {
+                return is_numeric($r->fsr ?? null);
+            }));
             usort($fsr_sorted, function ($a, $b) {
                 return floatval($b->fsr ?? -9999) <=> floatval($a->fsr ?? -9999);
             });
@@ -1742,6 +1889,39 @@ if (!function_exists('fhor_sb_finalise_book')) {
     }
 }
 
+if (!function_exists('fhor_sb_backtest_zero_hint')) {
+    function fhor_sb_backtest_zero_hint(array $rows, array $filters, array $qualified) {
+        if ($qualified) {
+            return '';
+        }
+        if (!fhor_sb_table_exists('historic_runners_beta') || !fhor_sb_table_exists('historic_races_beta')) {
+            return 'Historic race tables are not available on this server — contact support.';
+        }
+        if (count($rows) === 0) {
+            return 'No runners matched your race filters in this date range. Try Track: Any, clear Going, set Handicap: Any, and use a 14-day lookback.';
+        }
+        $with_fsr = 0;
+        foreach ($rows as $row) {
+            if (is_numeric($row->fsr ?? null)) {
+                $with_fsr++;
+            }
+        }
+        if (($filters['fsr_rank_max'] ?? '') !== '' && $with_fsr === 0) {
+            return 'FSr rank is set but historic FSr is missing on these runners (backtest_cr_data not filled for this period). Set FSr rank to Any and pick mode to Top FSr in race — or use Find qualifiers on the live card where FSr is always present.';
+        }
+        if (($filters['fsr_rank_max'] ?? '') !== '' && $with_fsr > 0 && $with_fsr < count($rows) * 0.05) {
+            return 'Only a few runners in this sample have historic FSr — FSr rank may show 0 qualifiers. Set FSr rank to Any for ROI, or shorten lookback to recent days with full ratings.';
+        }
+        if (!empty($filters['going'])) {
+            return 'Runners loaded but Going rules removed every match. For AW, leave Going blank or tick Standard only.';
+        }
+        if (($filters['handicap'] ?? '') === 'yes') {
+            return 'Runners loaded but none passed as handicaps. Try Handicap: Any, or widen distance / country.';
+        }
+        return 'Runners loaded but no horse passed every rule. Widen FSr rank, clear optional filters, then tighten one step at a time.';
+    }
+}
+
 if (!function_exists('fhor_sb_run_backtest')) {
     function fhor_sb_run_backtest(array $filters) {
         list($from, $to) = fhor_sb_resolve_dates($filters);
@@ -1793,6 +1973,10 @@ if (!function_exists('fhor_sb_run_backtest')) {
             'to' => $to,
             'runners_scanned' => count($rows),
             'qualifiers' => count($qualified),
+            'zero_hint' => fhor_sb_backtest_zero_hint($rows, $filters, $qualified),
+            'historic_fsr_runners' => count(array_filter($rows, function ($row) {
+                return is_numeric($row->fsr ?? null);
+            })),
             'capped' => count($rows) >= (fhor_sb_is_premium() ? 28000 : 12000),
             'bets' => $isp['bets'],
             'wins' => $isp['wins'],
@@ -2170,21 +2354,20 @@ if (!function_exists('fhor_sb_starter_systems')) {
             ],
             'aw_winter_flat' => [
                 'title' => 'All-Weather flat (winter)',
-                'summary' => 'England & Scotland AW handicaps, 5f–1m2f, top 3 FSr. Use Standard going only (not Firm/Good). Start with 21-day lookback, then widen.',
+                'summary' => 'England AW flat, 5f–1m2f. Pick mode = Top FSr in race (one selection per race). Leave FSr rank as Any for historic ROI — rank needs backtest FSr on every runner.',
                 'cta' => 'Load AW example',
                 'action' => 'run',
                 'filters' => [
-                    'days' => '21',
+                    'days' => '14',
                     'bet' => 'win',
                     'pick_mode' => 'top_fsr',
-                    'country' => ['England', 'Scotland'],
+                    'country' => ['England'],
                     'race_type' => ['Flat'],
                     'track_type' => 'AW',
-                    'handicap' => 'yes',
-                    'going' => ['Standard'],
+                    'handicap' => '',
                     'dist_f_min' => '5',
                     'dist_f_max' => '10',
-                    'fsr_rank_max' => '3',
+                    'fsr_rank_max' => '',
                 ],
             ],
             'sprint_pedigree' => [
@@ -2329,6 +2512,7 @@ if (!function_exists('fhor_sb_shortcode')) {
         .sb-saved-item .is-on{border-color:#16a34a;color:#15803d;background:#f0fdf4}
         .sb-empty{color:#64748b;font-size:.9rem;padding:.85rem .9rem;margin:0;border:1px dashed #cbd5e1;border-radius:10px;background:#f8fafc;line-height:1.45}
         .sb-note{font-size:.78rem;color:#64748b;margin:.4rem 0 0;line-height:1.45}
+        .sb-note.is-warn{color:#b45309;font-weight:600}
         .sb-guide{margin:0 0 1.1rem;padding:.85rem .95rem;border:1px solid #bbf7d0;border-radius:12px;background:linear-gradient(180deg,#f0fdf4,#fff 55%)}
         .sb-guide summary{cursor:pointer;font-weight:800;font-size:.88rem;color:#14532d;list-style:none}
         .sb-guide summary::-webkit-details-marker{display:none}
@@ -2472,6 +2656,7 @@ if (!function_exists('fhor_sb_shortcode')) {
                                     <label><input type="checkbox" name="going[]" value="Heavy"> Heavy</label>
                                     <label><input type="checkbox" name="going[]" value="Standard"> Standard</label>
                                 </div>
+                                <p class="sb-note" style="margin:.35rem 0 0;">All-Weather: leave Going blank, or Standard only — not Firm/Good/Soft.</p>
                             </div>
                             <div class="sb-field"><label for="sb-dfmin">Min furlongs</label><input id="sb-dfmin" name="dist_f_min" type="number" min="0" step="0.5"></div>
                             <div class="sb-field"><label for="sb-dfmax">Max furlongs</label><input id="sb-dfmax" name="dist_f_max" type="number" min="0" step="0.5"></div>
@@ -2484,13 +2669,14 @@ if (!function_exists('fhor_sb_shortcode')) {
                         <div class="sb-grid">
                             <div class="sb-field"><label for="sb-fsrmin">FSr min</label><input id="sb-fsrmin" name="fsr_min" type="number" step="0.1"></div>
                             <div class="sb-field"><label for="sb-fsrmax">FSr max</label><input id="sb-fsrmax" name="fsr_max" type="number" step="0.1"></div>
-                            <div class="sb-field"><label for="sb-fsrrank">FSr rank ≤</label>
+                            <div class="sb-field span2"><label for="sb-fsrrank">FSr rank ≤</label>
                                 <select id="sb-fsrrank" name="fsr_rank_max">
                                     <option value="">Any</option>
                                     <option value="1">Top-rated</option>
                                     <option value="2">Top 2</option>
                                     <option value="3">Top 3</option>
                                 </select>
+                                <p class="sb-note" style="margin:.3rem 0 0;">Historic <strong>Run System</strong>: FSr rank needs a FSr figure on each runner (backtest table). If you get 0 qualifiers, leave this as <strong>Any</strong> and use pick mode <strong>Top FSr in race</strong>, or use <strong>Find qualifiers</strong> on today’s card.</p>
                             </div>
                             <div class="sb-field"><label for="sb-ptsrank">Pts rank ≤</label>
                                 <select id="sb-ptsrank" name="pts_rank_max">
@@ -2637,6 +2823,7 @@ if (!function_exists('fhor_sb_shortcode')) {
                                 </div>
                             </div>
                             <p class="sb-note" id="sb-range"></p>
+                            <p class="sb-note is-warn" id="sb-zero-hint" hidden></p>
                             <p class="sb-note" id="sb-pace-note" hidden></p>
                             <p class="sb-note" id="sb-dosage-note" hidden></p>
                             <div style="overflow-x:auto;margin-top:.75rem;">
@@ -2746,6 +2933,7 @@ if (!function_exists('fhor_sb_qualifiers_shortcode')) {
         .sb-table a{color:#15803d;font-weight:700;text-decoration:none}
         .sb-empty{color:#64748b;font-size:.9rem;padding:.85rem .9rem;margin:0;border:1px dashed #cbd5e1;border-radius:10px;background:#f8fafc}
         .sb-note{font-size:.78rem;color:#64748b;margin:.4rem 0 0;line-height:1.45}
+        .sb-note.is-warn{color:#b45309;font-weight:600}
         .sb-gate{max-width:640px;margin:2rem auto;padding:1.5rem;background:#fff;border:1px solid #e2e8f0;border-radius:14px}
         </style>
         <div class="sb-page">
