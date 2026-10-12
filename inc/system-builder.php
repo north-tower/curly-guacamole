@@ -540,7 +540,11 @@ if (!function_exists('fhor_sb_fetch_historic')) {
 
         if (fhor_sb_table_exists('backtest_cr_data')) {
             $joins .= ' LEFT JOIN backtest_cr_data bcr ON bcr.race_id = hrunb.race_id AND bcr.runner_id = hrunb.runner_id';
-            $select[] = 'bcr.CR AS fsr';
+            $fsr_parts = ['bcr.CR'];
+            if (fhor_sb_col($hr, ['fhorsite_rating'])) {
+                $fsr_parts[] = 'hrunb.fhorsite_rating';
+            }
+            $select[] = 'COALESCE(' . implode(', ', $fsr_parts) . ') AS fsr';
         } elseif (fhor_sb_col($hr, ['fhorsite_rating'])) {
             $select[] = 'hrunb.fhorsite_rating AS fsr';
         } else {
@@ -574,10 +578,22 @@ if (!function_exists('fhor_sb_fetch_historic')) {
             $params[] = '%' . $wpdb->esc_like($filters['class']) . '%';
         }
         if ($track_col && $filters['track_type'] !== '') {
-            fhor_sb_apply_track_type_where("hracb.`$track_col`", $filters['track_type'], $where, $params);
+            fhor_sb_apply_track_type_where(
+                "hracb.`$track_col`",
+                $filters['track_type'],
+                $where,
+                $params,
+                'hracb.course',
+                $going_col ? "hracb.`$going_col`" : '',
+                'hracb.race_type'
+            );
         }
-        if ($hcap_col && $filters['handicap'] !== '') {
-            fhor_sb_apply_handicap_where("hracb.`$hcap_col`", $filters['handicap'], $where, $params);
+        if ($filters['handicap'] !== '') {
+            $hcap_expr = $hcap_col ? "hracb.`$hcap_col`" : '';
+            $title_expr = $title_col ? "hracb.`$title_col`" : '';
+            if ($hcap_expr !== '' || $title_expr !== '') {
+                fhor_sb_apply_handicap_where($hcap_expr, $filters['handicap'], $where, $params, $title_expr);
+            }
         }
         if ($age_col && $filters['age_range'] !== '') {
             $where[] = "hracb.`$age_col` LIKE %s";
@@ -585,7 +601,7 @@ if (!function_exists('fhor_sb_fetch_historic')) {
         }
         if ($going_col && !empty($filters['going'])) {
             $likes = [];
-            foreach ($filters['going'] as $g) {
+            foreach (fhor_sb_expand_going_filter_tokens($filters['going']) as $g) {
                 $likes[] = "hracb.`$going_col` LIKE %s";
                 $params[] = '%' . $wpdb->esc_like($g) . '%';
             }
