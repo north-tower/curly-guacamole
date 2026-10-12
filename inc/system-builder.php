@@ -2082,6 +2082,53 @@ if (!function_exists('fhor_sb_maybe_migrate_meta')) {
     }
 }
 
+if (!function_exists('fhor_sb_user_is_site_admin')) {
+    function fhor_sb_user_is_site_admin($user_id = 0) {
+        $user_id = $user_id ? intval($user_id) : get_current_user_id();
+        return $user_id > 0 && user_can($user_id, 'manage_options');
+    }
+}
+
+if (!function_exists('fhor_sb_row_to_admin_system')) {
+    function fhor_sb_row_to_admin_system($row) {
+        $sys = fhor_sb_row_to_system($row);
+        $sys['user_id'] = (string) intval($row->user_id ?? 0);
+        $sys['user_login'] = (string) ($row->user_login ?? '');
+        $sys['user_email'] = (string) ($row->user_email ?? '');
+        $sys['owner_label'] = (string) ($row->display_name ?? '');
+        if ($sys['owner_label'] === '' && $sys['user_login'] !== '') {
+            $sys['owner_label'] = $sys['user_login'];
+        }
+        return $sys;
+    }
+}
+
+if (!function_exists('fhor_sb_get_all_saved_systems')) {
+    /**
+     * Every saved system site-wide (admin-only callers should gate before exposing).
+     */
+    function fhor_sb_get_all_saved_systems($limit = 400) {
+        global $wpdb;
+        fhor_sb_install_table();
+        $table = fhor_sb_systems_table();
+        $users = $wpdb->users;
+        $limit = max(1, min(1000, intval($limit)));
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT s.*, u.user_login, u.user_email, u.display_name
+             FROM `$table` s
+             INNER JOIN `$users` u ON u.ID = s.user_id
+             ORDER BY s.updated_at DESC, s.id DESC
+             LIMIT %d",
+            $limit
+        ));
+        $out = [];
+        foreach ((array) $rows as $row) {
+            $out[] = fhor_sb_row_to_admin_system($row);
+        }
+        return $out;
+    }
+}
+
 if (!function_exists('fhor_sb_get_saved')) {
     function fhor_sb_get_saved($user_id = 0) {
         global $wpdb;
@@ -2237,6 +2284,17 @@ if (!function_exists('fhor_sb_ajax_delete')) {
     }
 }
 add_action('wp_ajax_fhor_sb_delete', 'fhor_sb_ajax_delete');
+
+if (!function_exists('fhor_sb_ajax_admin_systems')) {
+    function fhor_sb_ajax_admin_systems() {
+        if (!fhor_sb_user_is_site_admin()) {
+            wp_send_json_error(['message' => 'Forbidden.'], 403);
+        }
+        check_ajax_referer('fhor_system_builder', 'nonce');
+        wp_send_json_success(['systems' => fhor_sb_get_all_saved_systems()]);
+    }
+}
+add_action('wp_ajax_fhor_sb_admin_systems', 'fhor_sb_ajax_admin_systems');
 
 if (!function_exists('fhor_sb_ajax_toggle_alerts')) {
     function fhor_sb_ajax_toggle_alerts() {
@@ -2472,6 +2530,7 @@ if (!function_exists('fhor_sb_enqueue')) {
                 'betTrackerUrl' => function_exists('fhor_bt_url') ? fhor_bt_url() : '',
                 'betTrackerPremium' => (function_exists('fhor_bt_is_premium') && fhor_bt_is_premium()) ? 1 : 0,
                 'starters' => fhor_sb_starter_systems(),
+                'isAdmin' => fhor_sb_user_is_site_admin() ? 1 : 0,
             ]);
         }
     }
@@ -2488,6 +2547,7 @@ if (!function_exists('fhor_sb_shortcode')) {
         $premium = fhor_sb_is_premium();
         $signup = function_exists('fhor_get_membership_signup_url') ? fhor_get_membership_signup_url() : home_url('/register/');
         $saved = fhor_sb_get_saved();
+        $admin_systems = fhor_sb_user_is_site_admin() ? fhor_sb_get_all_saved_systems() : [];
         $max_days = fhor_sb_max_lookback_days();
         ob_start();
         ?>
@@ -2543,6 +2603,12 @@ if (!function_exists('fhor_sb_shortcode')) {
         .sb-saved-item{display:flex;flex-wrap:wrap;gap:.45rem;align-items:center;padding:.6rem .7rem;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc}
         .sb-saved-item b{flex:1}
         .sb-saved-item .is-on{border-color:#16a34a;color:#15803d;background:#f0fdf4}
+        .sb-saved-item .sb-saved-meta{display:flex;flex-direction:column;gap:.15rem;flex:1;min-width:8rem}
+        .sb-saved-item .sb-saved-meta small{font-size:.72rem;font-weight:600;color:#64748b;line-height:1.35}
+        .sb-admin-systems-panel{border-color:#cbd5e1;background:linear-gradient(180deg,#f8fafc,#fff 40%)}
+        .sb-admin-systems-panel h2{display:flex;align-items:center;gap:.45rem}
+        .sb-admin-badge{font-size:.62rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:.2rem .45rem;border-radius:999px;background:#0f172a;color:#fff}
+        .sb-admin-search{width:100%;margin:0 0 .65rem;padding:.45rem .55rem;border:1px solid #e2e8f0;border-radius:8px;font-size:.85rem}
         .sb-empty{color:#64748b;font-size:.9rem;padding:.85rem .9rem;margin:0;border:1px dashed #cbd5e1;border-radius:10px;background:#f8fafc;line-height:1.45}
         .sb-note{font-size:.78rem;color:#64748b;margin:.4rem 0 0;line-height:1.45}
         .sb-note.is-warn{color:#b45309;font-weight:600}
@@ -2935,10 +3001,21 @@ if (!function_exists('fhor_sb_shortcode')) {
                             <?php endif; ?>
                         </div>
                     </div>
+                    <?php if (fhor_sb_user_is_site_admin()): ?>
+                    <div class="sb-panel sb-admin-systems-panel" id="sb-admin-systems-panel">
+                        <h2><span class="sb-admin-badge">Admin</span> All member systems</h2>
+                        <p class="sb-note" style="margin:0 0 .65rem;">Load any member’s saved filters into this builder, then use <strong>Run System</strong> or <strong>Find qualifiers</strong>. You cannot change another user’s save from here.</p>
+                        <input type="search" class="sb-admin-search" id="sb-admin-systems-search" placeholder="Filter by system name, username, or email…" autocomplete="off">
+                        <div class="sb-saved" id="sb-admin-systems"></div>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
         <script type="application/json" id="sb-saved-json"><?php echo wp_json_encode($saved); ?></script>
+        <?php if (fhor_sb_user_is_site_admin()): ?>
+        <script type="application/json" id="sb-admin-systems-json"><?php echo wp_json_encode($admin_systems); ?></script>
+        <?php endif; ?>
         <?php
         return ob_get_clean();
     }

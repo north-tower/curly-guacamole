@@ -536,6 +536,102 @@
             });
         }
 
+        function loadSystemIntoBuilder(sys) {
+            if (!sys) {
+                return;
+            }
+            applyFilters(sys.filters || {});
+            var nameEl = document.getElementById('sb-name');
+            if (nameEl) {
+                nameEl.value = sys.name || '';
+            }
+            var alertsEl = document.getElementById('sb-alerts');
+            if (alertsEl) {
+                alertsEl.checked = !!sys.alerts;
+            }
+            var sticky = form.querySelector('.sb-actions-sticky');
+            if (sticky && sticky.scrollIntoView) {
+                sticky.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        var adminSystems = [];
+        var adminSearch = '';
+
+        function adminHaystack(sys) {
+            return [
+                sys.name,
+                sys.owner_label,
+                sys.user_login,
+                sys.user_email,
+                sys.user_id,
+                sys.saved_at
+            ].join(' ').toLowerCase();
+        }
+
+        function renderAdminSystems(list) {
+            adminSystems = list || [];
+            var wrap = document.getElementById('sb-admin-systems');
+            if (!wrap || !fhorSb.isAdmin) {
+                return;
+            }
+            var q = (adminSearch || '').trim().toLowerCase();
+            var visible = adminSystems.filter(function (sys) {
+                return !q || adminHaystack(sys).indexOf(q) !== -1;
+            });
+            if (!adminSystems.length) {
+                wrap.innerHTML = '<p class="sb-empty">No member systems in the database yet.</p>';
+                return;
+            }
+            if (!visible.length) {
+                wrap.innerHTML = '<p class="sb-empty">No systems match this filter.</p>';
+                return;
+            }
+            wrap.innerHTML = visible.map(function (sys) {
+                var owner = escapeHtml(sys.owner_label || sys.user_login || 'User #' + sys.user_id);
+                var login = sys.user_login && sys.user_login !== sys.owner_label
+                    ? ' · @' + escapeHtml(sys.user_login)
+                    : '';
+                var when = sys.saved_at ? escapeHtml(sys.saved_at) : '';
+                var alertTag = sys.alerts ? ' · alerts on' : '';
+                return '<div class="sb-saved-item sb-admin-item" data-id="' + escapeHtml(sys.id) + '">' +
+                    '<div class="sb-saved-meta"><b>' + escapeHtml(sys.name) + '</b>' +
+                    '<small>' + owner + login + alertTag + (when ? ' · ' + when : '') + '</small></div>' +
+                    '<button type="button" class="sb-btn sb-admin-load">Load</button></div>';
+            }).join('');
+        }
+
+        if (fhorSb.isAdmin) {
+            var adminJson = document.getElementById('sb-admin-systems-json');
+            try {
+                renderAdminSystems(adminJson ? JSON.parse(adminJson.textContent || '[]') : []);
+            } catch (eAdmin) {
+                renderAdminSystems([]);
+            }
+            var adminSearchEl = document.getElementById('sb-admin-systems-search');
+            if (adminSearchEl) {
+                adminSearchEl.addEventListener('input', function () {
+                    adminSearch = adminSearchEl.value || '';
+                    renderAdminSystems(adminSystems);
+                });
+            }
+            var adminWrap = document.getElementById('sb-admin-systems');
+            if (adminWrap) {
+                adminWrap.addEventListener('click', function (event) {
+                    if (!event.target.classList.contains('sb-admin-load')) {
+                        return;
+                    }
+                    var item = event.target.closest('.sb-admin-item');
+                    if (!item) {
+                        return;
+                    }
+                    var id = item.getAttribute('data-id');
+                    var sys = adminSystems.filter(function (s) { return s.id === id; })[0];
+                    loadSystemIntoBuilder(sys);
+                });
+            }
+        }
+
         document.getElementById('sb-saved').addEventListener('click', function (event) {
             var item = event.target.closest('.sb-saved-item');
             if (!item) {
@@ -544,13 +640,7 @@
             var id = item.getAttribute('data-id');
             var sys = saved.filter(function (s) { return s.id === id; })[0];
             if (event.target.classList.contains('sb-load') && sys) {
-                applyFilters(sys.filters || {});
-                document.getElementById('sb-name').value = sys.name || '';
-                document.getElementById('sb-alerts').checked = !!sys.alerts;
-                var sticky = form.querySelector('.sb-actions-sticky');
-                if (sticky && sticky.scrollIntoView) {
-                    sticky.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                }
+                loadSystemIntoBuilder(sys);
             }
             if (event.target.classList.contains('sb-del') && id) {
                 post('fhor_sb_delete', { id: id }).then(function (json) {
