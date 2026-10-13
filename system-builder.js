@@ -109,13 +109,21 @@
                 return;
             }
             var rank = val('fsr_rank_max');
+            var banner = document.getElementById('sb-fsr-backtest-banner');
             if (rank !== '') {
                 note.hidden = false;
                 note.textContent = 'Run System skips FSr rank on historic data until CR backtest is loaded; ROI uses your other rules. Find qualifiers still uses your saved FSr rank.';
+                if (banner) {
+                    banner.hidden = false;
+                }
             } else {
                 note.hidden = true;
                 note.textContent = '';
+                if (banner) {
+                    banner.hidden = true;
+                }
             }
+            syncChips();
         }
 
         function applyFilters(filters) {
@@ -139,6 +147,7 @@
             setChecked('going[]', filters.going);
             setChecked('flags[]', filters.flags);
             syncFsrRankLoadNote();
+            syncChips();
         }
 
         function post(action, extra) {
@@ -162,10 +171,131 @@
             return n > 0 ? 'is-pos' : (n < 0 ? 'is-neg' : '');
         }
 
+        function toast(msg) {
+            var t = document.getElementById('sb-toast');
+            if (!t) {
+                return;
+            }
+            t.textContent = msg;
+            t.classList.add('on');
+            clearTimeout(toast._tm);
+            toast._tm = setTimeout(function () {
+                t.classList.remove('on');
+            }, 2200);
+        }
+
+        function setMobileView(view) {
+            if (!root) {
+                return;
+            }
+            root.setAttribute('data-view', view);
+            Array.prototype.forEach.call(root.querySelectorAll('.sb-seg button'), function (btn) {
+                btn.setAttribute('aria-pressed', btn.getAttribute('data-sb-view') === view ? 'true' : 'false');
+            });
+            if (view === 'results') {
+                window.scrollTo(0, 0);
+            }
+        }
+
+        function switchMainPane(pane) {
+            var tabs = document.getElementById('sb-main-tabs');
+            if (!tabs) {
+                return;
+            }
+            Array.prototype.forEach.call(tabs.querySelectorAll('button'), function (btn) {
+                var on = btn.getAttribute('data-pane') === pane;
+                btn.setAttribute('aria-selected', on ? 'true' : 'false');
+                btn.classList.toggle('is-on', on);
+            });
+            Array.prototype.forEach.call(root.querySelectorAll('.sb-pane[data-pane]'), function (el) {
+                el.hidden = el.getAttribute('data-pane') !== pane;
+            });
+        }
+
         function reveal(id) {
-            var el = document.getElementById(id);
-            if (el && window.matchMedia('(max-width: 980px)').matches) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setMobileView('results');
+            if (window.matchMedia('(max-width: 900px)').matches) {
+                var col = root.querySelector('.sb-results-col');
+                if (col && col.scrollIntoView) {
+                    col.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+        }
+
+        function selectLabel(el) {
+            if (!el || el.tagName !== 'SELECT') {
+                return '';
+            }
+            var opt = el.options[el.selectedIndex];
+            return opt ? opt.textContent : '';
+        }
+
+        function syncChips() {
+            var chipsEl = document.getElementById('sb-chips');
+            if (!chipsEl || !form) {
+                return;
+            }
+            var chips = [];
+            var daysEl = form.querySelector('[name="days"]');
+            var betEl = form.querySelector('[name="bet"]');
+            if (daysEl) {
+                chips.push(selectLabel(daysEl));
+            }
+            if (betEl) {
+                chips.push(selectLabel(betEl));
+            }
+            checked('country[]').forEach(function (c) { chips.push(c); });
+            checked('race_type[]').forEach(function (c) { chips.push(c); });
+            if (val('course')) {
+                chips.push(val('course'));
+            }
+            if (val('class')) {
+                chips.push('Class ' + val('class'));
+            }
+            if (val('track_type')) {
+                chips.push(val('track_type') === 'AW' ? 'All-weather' : val('track_type'));
+            }
+            checked('going[]').forEach(function (g) { chips.push(g); });
+            if (val('dist_f_min') || val('dist_f_max')) {
+                chips.push((val('dist_f_min') || '0') + '–' + (val('dist_f_max') || '+') + 'f');
+            }
+            if (val('field_min') || val('field_max')) {
+                chips.push('Field ' + (val('field_min') || '0') + '–' + (val('field_max') || '+'));
+            }
+            if (val('handicap') === 'yes') {
+                chips.push('Handicaps');
+            } else if (val('handicap') === 'no') {
+                chips.push('Non-handicaps');
+            }
+            if (val('pts_rank_max')) {
+                chips.push('Points rank ≤ ' + val('pts_rank_max'));
+            }
+            if (val('sr_rank_max')) {
+                chips.push('Speed rank ≤ ' + val('sr_rank_max'));
+            }
+            chipsEl.innerHTML = chips.length
+                ? chips.map(function (x) { return '<span class="sb-chip">' + escapeHtml(x) + '</span>'; }).join('')
+                : '<span class="sb-none">No rules set</span>';
+            var sampleSum = root.querySelector('[data-sum="sample"]');
+            if (sampleSum) {
+                sampleSum.textContent = selectLabel(daysEl) + ' · ' + selectLabel(betEl) + ' · ' + selectLabel(form.querySelector('[name="pick_mode"]'));
+            }
+            var raceSum = root.querySelector('[data-sum="race"]');
+            if (raceSum) {
+                var countries = checked('country[]');
+                var types = checked('race_type[]');
+                var going = checked('going[]');
+                raceSum.textContent = [
+                    countries.length ? countries.join(', ') : 'Any country',
+                    types.length ? types.join(', ') : 'Any type',
+                    (val('dist_f_min') || '0') + '–' + (val('dist_f_max') || '+') + 'f',
+                    going.length ? going.join('/') : 'Any going'
+                ].join(' · ');
+            }
+            var rateSum = root.querySelector('[data-sum="rate"]');
+            if (rateSum) {
+                var spd = form.querySelector('[name="sr_rank_max"]');
+                rateSum.textContent = 'Speed rank ' + (selectLabel(spd) || 'any').toLowerCase() + ' · FSR rank applies to live card';
             }
         }
 
@@ -180,13 +310,54 @@
             }
             roi.textContent = (book.roi != null ? book.roi : 0) + '%';
             roi.className = cls(book.roi || 0);
+            var roiStat = roi.closest('.sb-stat');
+            if (roiStat) {
+                roiStat.classList.toggle('good', (book.roi || 0) > 0);
+            }
             profit.textContent = ((book.profit || 0) >= 0 ? '+' : '') + (book.profit || 0) + ' pts';
             profit.className = cls(book.profit || 0);
+            var profitStat = profit.closest('.sb-stat');
+            if (profitStat) {
+                profitStat.classList.toggle('good', (book.profit || 0) > 0);
+            }
             bets.textContent = String(book.bets || 0);
             wr.textContent = (book.win_rate || 0) + '%';
         }
 
+        function profitCurveSvg(samples, totalBets) {
+            samples = samples || [];
+            if (!samples.length) {
+                return '';
+            }
+            var t = 0;
+            var pts = [0];
+            samples.slice().reverse().forEach(function (row) {
+                t += row.profit || 0;
+                pts.push(t);
+            });
+            var mn = Math.min.apply(null, pts);
+            var mx = Math.max.apply(null, pts);
+            var W = 600;
+            var H = 120;
+            var p = 8;
+            var x = function (i) { return p + i * (W - 2 * p) / (pts.length - 1); };
+            var y = function (v) { return H - p - (v - mn) * (H - 2 * p) / ((mx - mn) || 1); };
+            var d = pts.map(function (v, i) { return (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); }).join(' ');
+            var n = samples.length;
+            var label = 'Profit over the latest ' + n + ' bet' + (n === 1 ? '' : 's');
+            return '<h3><span>' + label + '</span><span style="color:var(--sb-mute,#5d6659);font-weight:500">of ' + (totalBets || n) + ' total</span></h3>' +
+                '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="Cumulative profit and loss">' +
+                '<line x1="0" x2="' + W + '" y1="' + y(0) + '" y2="' + y(0) + '" stroke="currentColor" stroke-opacity=".25" stroke-dasharray="4 4"/>' +
+                '<path d="' + d + ' L' + x(pts.length - 1) + ' ' + (H - p) + ' L' + x(0) + ' ' + (H - p) + 'Z" fill="#a4e51c" fill-opacity=".25"/>' +
+                '<path d="' + d + '" fill="none" stroke="#17703a" stroke-width="2.5" vector-effect="non-scaling-stroke"/></svg>';
+        }
+
+        function fmtPl(n) {
+            return (n > 0 ? '+' : '') + (Math.round(n * 10) / 10);
+        }
+
         function renderBacktest(data) {
+            switchMainPane('back');
             document.getElementById('sb-results-empty').hidden = true;
             document.getElementById('sb-results-body').hidden = false;
             fillBook('sb', data.isp || data);
@@ -240,29 +411,42 @@
                     dosageNote.textContent = '';
                 }
             }
-            var diTh = document.getElementById('sb-sample-di-th');
-            var cdTh = document.getElementById('sb-sample-cd-th');
-            if (diTh) {
-                diTh.hidden = !showDosage;
+            var curveWrap = document.getElementById('sb-curve-wrap');
+            if (curveWrap) {
+                if ((data.samples || []).length) {
+                    curveWrap.hidden = false;
+                    curveWrap.innerHTML = profitCurveSvg(data.samples, data.isp && data.isp.bets != null ? data.isp.bets : data.bets);
+                } else {
+                    curveWrap.hidden = true;
+                    curveWrap.innerHTML = '';
+                }
             }
-            if (cdTh) {
-                cdTh.hidden = !showDosage;
+            var foot = document.getElementById('sb-sample-footnote');
+            if (foot) {
+                var sampleN = (data.samples || []).length;
+                var totalN = data.isp && data.isp.bets != null ? data.isp.bets : data.bets;
+                if (sampleN && totalN > sampleN) {
+                    foot.hidden = false;
+                    foot.textContent = 'Showing the latest ' + sampleN + ' of ' + totalN + ' bets. A sample this small can swing a long way, so treat ROI with care.';
+                } else {
+                    foot.hidden = true;
+                    foot.textContent = '';
+                }
             }
             var tb = document.querySelector('#sb-sample-table tbody');
             tb.innerHTML = '';
             (data.samples || []).forEach(function (row) {
                 var tr = document.createElement('tr');
-                var pl = (row.profit >= 0 ? '+' : '') + row.profit;
+                var win = (row.profit || 0) > 0;
                 var isp = row.isp != null ? Number(row.isp).toFixed(2) : (row.sp || '–');
-                var bsp = row.bsp != null ? Number(row.bsp).toFixed(2) : '–';
-                var race = escapeHtml(row.course)
-                    + (row.country ? ' · ' + escapeHtml(row.country) : '')
-                    + ' · ' + escapeHtml(row.date)
+                var raceMeta = escapeHtml(row.course) + ' · ' + escapeHtml(row.date)
                     + (row.field ? ' · ' + escapeHtml(row.field) + ' ran' : '');
-                var dosageCells = showDosage
-                    ? '<td>' + (row.di == null ? '–' : escapeHtml(row.di)) + '</td><td>' + (row.cd == null ? '–' : escapeHtml(row.cd)) + '</td>'
-                    : '';
-                tr.innerHTML = '<td>' + escapeHtml(row.horse) + '</td><td>' + race + '</td>' + dosageCells + '<td>' + escapeHtml(isp) + '</td><td>' + escapeHtml(bsp) + '</td><td>' + escapeHtml(row.pos) + '</td><td>' + pl + '</td>';
+                var posNum = parseInt(row.pos, 10);
+                var posClass = 'sb-pos' + (posNum === 1 ? ' first' : '');
+                tr.innerHTML = '<td>' + escapeHtml(row.horse) + '<small>' + raceMeta + '</small></td>' +
+                    '<td class="sb-n">' + escapeHtml(isp) + '</td>' +
+                    '<td class="sb-n"><span class="' + posClass + '">' + escapeHtml(row.pos) + '</span></td>' +
+                    '<td class="sb-n"><span class="sb-pill ' + (win ? 'w' : 'l') + '">' + fmtPl(row.profit || 0) + '</span></td>';
                 tb.appendChild(tr);
             });
             reveal('sb-results');
@@ -289,6 +473,7 @@
         }
 
         function renderToday(data) {
+            switchMainPane('qual');
             qualifierSets.today = data.today || data;
             qualifierSets.tomorrow = data.tomorrow || null;
             var day = qualifierSets.tomorrow ? 'tomorrow' : 'today';
@@ -314,16 +499,16 @@
                 return;
             }
             wrap.innerHTML = saved.map(function (sys) {
-                var alertBtn = '';
+                var alertSw = '';
                 if (fhorSb.canAlert) {
-                    var alertClass = sys.alerts ? 'sb-btn sb-alert is-on' : 'sb-btn sb-alert';
-                    var alertLabel = sys.alerts ? 'Alerts on' : 'Alerts off';
-                    alertBtn = '<button type="button" class="' + alertClass + '">' + alertLabel + '</button>';
+                    alertSw = '<label class="sb-sw sb-alert-wrap"><input type="checkbox" class="sb-alert-toggle"' +
+                        (sys.alerts ? ' checked' : '') + '><i></i>Email alerts</label>';
                 }
-                return '<div class="sb-saved-item" data-id="' + escapeHtml(sys.id) + '"><b>' + escapeHtml(sys.name) + '</b>' +
-                    alertBtn +
-                    '<button type="button" class="sb-btn sb-load">Load</button>' +
-                    '<button type="button" class="sb-btn sb-del">Delete</button></div>';
+                return '<div class="sb-saved-item" data-id="' + escapeHtml(sys.id) + '">' +
+                    '<div class="sb-saved-t"><b>' + escapeHtml(sys.name) + '</b><small>Saved system</small></div>' +
+                    alertSw +
+                    '<button type="button" class="sb-btn sb-btn-sm sb-load">Load</button>' +
+                    '<button type="button" class="sb-btn sb-btn-sm sb-del sb-btn-del">Delete</button></div>';
             }).join('');
         }
 
@@ -430,20 +615,68 @@
             });
         }
 
+        form.addEventListener('input', syncChips);
         form.addEventListener('change', function (event) {
+            syncChips();
             if (event.target && event.target.getAttribute('name') === 'fsr_rank_max') {
                 syncFsrRankLoadNote();
             }
         });
+        syncChips();
+
+        var mainTabs = document.getElementById('sb-main-tabs');
+        if (mainTabs) {
+            mainTabs.addEventListener('click', function (event) {
+                var btn = event.target.closest('button[data-pane]');
+                if (!btn) {
+                    return;
+                }
+                switchMainPane(btn.getAttribute('data-pane'));
+            });
+        }
+
+        Array.prototype.forEach.call(root.querySelectorAll('.sb-seg button'), function (btn) {
+            btn.addEventListener('click', function () {
+                setMobileView(btn.getAttribute('data-sb-view') || 'rules');
+            });
+        });
+
+        var findEmpty = document.getElementById('sb-today-empty-find');
+        if (findEmpty) {
+            findEmpty.addEventListener('click', function () {
+                var q = document.getElementById('sb-today');
+                if (q) {
+                    q.click();
+                }
+            });
+        }
 
         form.addEventListener('submit', function (event) {
             event.preventDefault();
             var btn = document.getElementById('sb-run');
+            var empty = document.getElementById('sb-results-empty');
+            var body = document.getElementById('sb-results-body');
+            if (empty) {
+                empty.innerHTML = '<b>Running…</b>Testing your rules on past races.';
+                empty.hidden = false;
+            }
+            if (body) {
+                body.hidden = true;
+            }
+            switchMainPane('back');
+            setMobileView('results');
             withBusy(btn, function () {
                 return post('fhor_sb_backtest').then(function (json) {
                     if (json && json.success) {
                         renderBacktest(json.data);
                     } else {
+                        if (empty) {
+                            empty.innerHTML = '<b>Run your system</b>See how these rules would have performed on past races.';
+                            empty.hidden = false;
+                        }
+                        if (body) {
+                            body.hidden = true;
+                        }
                         window.alert((json && json.data && json.data.message) || 'Backtest failed.');
                     }
                 });
@@ -495,12 +728,22 @@
         function saveSystem(alerts, btn) {
             var nameEl = document.getElementById('sb-name');
             var name = nameEl ? nameEl.value.trim() : '';
+            if (!name) {
+                if (nameEl) {
+                    nameEl.focus();
+                }
+                toast('Name your system first');
+                return;
+            }
             var wasFirstSave = saved.length === 0;
             withBusy(btn, function () {
                 return post('fhor_sb_save', { name: name, alerts: alerts ? '1' : '' }).then(function (json) {
                     if (json && json.success) {
                         var newId = json.data && json.data.id;
                         renderSaved(json.data.systems);
+                        toast(alerts ? 'Saved with alerts: ' + name : 'Saved: ' + name);
+                        switchMainPane('saved');
+                        setMobileView('results');
                         afterSystemSaved(newId, wasFirstSave);
                     } else {
                         window.alert((json && json.data && json.data.message) || 'Could not save.');
@@ -552,10 +795,12 @@
             if (alertsEl) {
                 alertsEl.checked = !!sys.alerts;
             }
-            var sticky = form.querySelector('.sb-actions-sticky');
-            if (sticky && sticky.scrollIntoView) {
-                sticky.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            setMobileView('rules');
+            var bar = root.querySelector('.sb-bar');
+            if (bar && bar.scrollIntoView) {
+                bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
+            toast('Loaded into the builder');
         }
 
         var adminSystems = [];
@@ -646,20 +891,49 @@
                 loadSystemIntoBuilder(sys);
             }
             if (event.target.classList.contains('sb-del') && id) {
+                var delBtn = event.target;
+                if (!delBtn.classList.contains('arm')) {
+                    delBtn.classList.add('arm');
+                    delBtn.textContent = 'Confirm delete';
+                    setTimeout(function () {
+                        delBtn.classList.remove('arm');
+                        delBtn.textContent = 'Delete';
+                    }, 3000);
+                    return;
+                }
                 post('fhor_sb_delete', { id: id }).then(function (json) {
                     if (json && json.success) {
                         renderSaved(json.data.systems);
+                        toast('Deleted');
                     }
                 });
             }
-            if (event.target.classList.contains('sb-alert') && id && sys) {
-                var on = sys.alerts ? '' : '1';
-                post('fhor_sb_toggle_alerts', { id: id, alerts: on }).then(function (json) {
-                    if (json && json.success) {
-                        renderSaved(json.data.systems);
-                    }
-                });
+        });
+
+        document.getElementById('sb-saved').addEventListener('change', function (event) {
+            if (!event.target.classList.contains('sb-alert-toggle')) {
+                return;
             }
+            var item = event.target.closest('.sb-saved-item');
+            if (!item) {
+                return;
+            }
+            var id = item.getAttribute('data-id');
+            var sys = saved.filter(function (s) { return s.id === id; })[0];
+            if (!id || !sys) {
+                return;
+            }
+            var wantOn = event.target.checked;
+            if (!!sys.alerts === wantOn) {
+                return;
+            }
+            post('fhor_sb_toggle_alerts', { id: id, alerts: wantOn ? '1' : '' }).then(function (json) {
+                if (json && json.success) {
+                    renderSaved(json.data.systems);
+                } else {
+                    event.target.checked = !!sys.alerts;
+                }
+            });
         });
 
         window.fhorSbApplyFilters = applyFilters;

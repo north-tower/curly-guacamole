@@ -2574,6 +2574,21 @@ if (!function_exists('fhor_sb_enqueue')) {
         if (!$qa && !fhor_sb_is_request() && !(function_exists('bricks_current_post_has_shortcode') && bricks_current_post_has_shortcode(['system_builder', 'system_builder_qa']))) {
             return;
         }
+        $css = get_stylesheet_directory() . '/system-builder.css';
+        if (file_exists($css)) {
+            wp_enqueue_style(
+                'fhor-system-builder',
+                get_stylesheet_directory_uri() . '/system-builder.css',
+                [],
+                filemtime($css)
+            );
+            wp_enqueue_style(
+                'fhor-system-builder-fonts',
+                'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap',
+                [],
+                null
+            );
+        }
         $js = get_stylesheet_directory() . '/system-builder.js';
         if (file_exists($js)) {
             wp_enqueue_script('fhor-system-builder', get_stylesheet_directory_uri() . '/system-builder.js', [], filemtime($js), true);
@@ -2609,128 +2624,20 @@ if (!function_exists('fhor_sb_shortcode')) {
         $max_days = fhor_sb_max_lookback_days();
         ob_start();
         ?>
-        <style>
-        .sb-page{--sb-green:#16a34a;--sb-ink:#0f172a;box-sizing:border-box;max-width:1320px;margin:0 auto;color:var(--sb-ink);padding-bottom:2rem}
-        .sb-page *{box-sizing:border-box}
-        .sb-hero{margin:0 0 1.15rem;padding:.15rem 0 .2rem}
-        .sb-title{margin:0 0 .35rem;font-size:clamp(1.55rem,2.6vw,2.05rem);letter-spacing:-.02em}
-        .sb-lead{margin:0;color:#475569;max-width:46rem;line-height:1.55}
-        .sb-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.92fr);gap:1.35rem;align-items:start}
-        .sb-panel{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:1rem 1.05rem 1.1rem;box-shadow:0 1px 4px rgba(15,23,42,.05)}
-        .sb-panel h2{margin:0 0 .7rem;font-size:1.02rem}
-        .sb-form{min-width:0}
-        .sb-group{margin:0 0 .65rem;padding:.7rem .8rem .8rem;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc}
-        .sb-group[open]{background:#fff}
-        .sb-group summary{cursor:pointer;font-size:.72rem;letter-spacing:.05em;text-transform:uppercase;color:#475569;font-weight:800;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:.5rem}
-        .sb-group summary::-webkit-details-marker{display:none}
-        .sb-group summary::after{content:'+';font-size:1rem;line-height:1;color:#94a3b8}
-        .sb-group[open] summary::after{content:'–'}
-        .sb-group .sb-grid,.sb-group .sb-note,.sb-group .sb-checks{margin-top:.65rem}
-        .sb-grid{display:grid;grid-template-columns:1fr 1fr;gap:.55rem .6rem}
-        .sb-field{display:flex;flex-direction:column;gap:.25rem;min-width:0}
-        .sb-field.span2{grid-column:1 / -1}
-        .sb-field label{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#64748b}
-        .sb-field input,.sb-field select{width:100%;max-width:100%;padding:.42rem .5rem;border:1px solid #e2e8f0;border-radius:8px;font-size:.85rem;background:#fff}
-        .sb-page select{width:100%}
-        .sb-checks{display:flex;flex-wrap:wrap;gap:.3rem .65rem}
-        .sb-checks label{font-size:.82rem;font-weight:600;color:#334155;display:flex;gap:.3rem;align-items:center}
-        .sb-actions{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
-        .sb-actions-sticky{position:sticky;bottom:0;z-index:3;margin:.85rem -1.05rem -1.1rem;padding:.75rem 1.05rem;background:linear-gradient(180deg,rgba(255,255,255,.7),#fff 28%);border-top:1px solid #e2e8f0;border-radius:0 0 14px 14px}
-        .sb-btn{display:inline-flex;align-items:center;justify-content:center;padding:.55rem .9rem;border-radius:8px;border:1px solid #e2e8f0;background:#fff;font-weight:700;cursor:pointer;font-size:.88rem;color:#0f172a;text-decoration:none}
-        .sb-btn-primary{background:var(--sb-green);border-color:var(--sb-green);color:#fff}
-        .sb-btn:disabled{opacity:.55;cursor:wait}
-        .sb-results-col{position:sticky;top:calc(var(--wp-admin--admin-bar-height,32px) + 10px);display:flex;flex-direction:column;gap:1rem;min-width:0;max-height:calc(100vh - 72px);overflow:auto;padding-bottom:.25rem}
-        .sb-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.6rem;margin-bottom:1rem}
-        .sb-stat{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:.7rem .8rem}
-        .sb-stat span{display:block;font-size:.68rem;font-weight:700;text-transform:uppercase;color:#64748b}
-        .sb-stat b{font-size:1.15rem}
-        .sb-stat b.is-pos{color:#15803d}
-        .sb-stat b.is-neg{color:#b91c1c}
-        .sb-book{margin:0 0 .85rem}
-        .sb-book h3{margin:0 0 .45rem;font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;color:#64748b}
-        .sb-tier{display:inline-flex;align-items:center;gap:.4rem;margin:.45rem 0 0;padding:.28rem .6rem;border-radius:999px;font-size:.75rem;font-weight:700;background:#ecfdf5;color:#047857}
-        .sb-tier.is-free{background:#fff7ed;color:#c2410c}
-        .sb-tabs{display:flex;gap:.4rem;margin:0 0 .7rem}
-        .sb-tab{border:1px solid #e2e8f0;background:#fff;border-radius:999px;padding:.3rem .7rem;font-size:.8rem;font-weight:700;cursor:pointer}
-        .sb-tab.is-on{background:#0f172a;border-color:#0f172a;color:#fff}
-        .sb-table{width:100%;border-collapse:collapse;font-size:.82rem}
-        .sb-table th{text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:#64748b;padding:.4rem;border-bottom:1px solid #e2e8f0}
-        .sb-table td{padding:.45rem .4rem;border-bottom:1px solid #f1f5f9}
-        .sb-table a{color:#15803d;font-weight:700;text-decoration:none}
-        .sb-saved{display:flex;flex-direction:column;gap:.5rem}
-        .sb-saved-item{display:flex;flex-wrap:wrap;gap:.45rem;align-items:center;padding:.6rem .7rem;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc}
-        .sb-saved-item b{flex:1}
-        .sb-saved-item .is-on{border-color:#16a34a;color:#15803d;background:#f0fdf4}
-        .sb-saved-item .sb-saved-meta{display:flex;flex-direction:column;gap:.15rem;flex:1;min-width:8rem}
-        .sb-saved-item .sb-saved-meta small{font-size:.72rem;font-weight:600;color:#64748b;line-height:1.35}
-        .sb-admin-systems-panel{border-color:#cbd5e1;background:linear-gradient(180deg,#f8fafc,#fff 40%)}
-        .sb-admin-systems-panel h2{display:flex;align-items:center;gap:.45rem}
-        .sb-admin-badge{font-size:.62rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:.2rem .45rem;border-radius:999px;background:#0f172a;color:#fff}
-        .sb-admin-search{width:100%;margin:0 0 .65rem;padding:.45rem .55rem;border:1px solid #e2e8f0;border-radius:8px;font-size:.85rem}
-        .sb-empty{color:#64748b;font-size:.9rem;padding:.85rem .9rem;margin:0;border:1px dashed #cbd5e1;border-radius:10px;background:#f8fafc;line-height:1.45}
-        .sb-note{font-size:.78rem;color:#64748b;margin:.4rem 0 0;line-height:1.45}
-        .sb-note.is-warn{color:#b45309;font-weight:600}
-        .sb-guide{margin:0 0 1.1rem;border:1px solid #86efac;border-radius:12px;background:linear-gradient(180deg,#f0fdf4,#fff 55%);box-shadow:0 1px 0 rgba(21,128,61,.06)}
-        .sb-guide:not([open]){background:linear-gradient(180deg,#ecfdf5,#f0fdf4)}
-        .sb-guide:not([open]) .sb-guide-toggle{border-radius:12px}
-        .sb-guide-toggle{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.85rem .95rem;margin:0;border-radius:12px 12px 0 0}
-        .sb-guide:not([open]) .sb-guide-toggle{border-radius:12px}
-        .sb-guide-toggle::-webkit-details-marker{display:none}
-        .sb-guide-toggle:focus-visible{outline:2px solid #16a34a;outline-offset:2px}
-        .sb-guide-toggle-text{flex:1;min-width:0}
-        .sb-guide-toggle-title{display:block;font-weight:800;font-size:.92rem;color:#14532d;line-height:1.25}
-        .sb-guide-toggle-hint{display:block;margin-top:.25rem;font-size:.76rem;font-weight:600;color:#166534;line-height:1.35}
-        .sb-guide-when-open{display:none}
-        .sb-guide[open] .sb-guide-when-closed{display:none}
-        .sb-guide[open] .sb-guide-when-open{display:block}
-        .sb-guide-badges{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.45rem}
-        .sb-guide-badge{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#14532d;background:#fff;border:1px solid #bbf7d0;border-radius:999px;padding:.2rem .5rem}
-        .sb-guide-chevron{flex-shrink:0;width:2rem;height:2rem;border-radius:999px;background:#fff;border:1px solid #86efac;display:flex;align-items:center;justify-content:center;transition:transform .2s ease,color .2s ease}
-        .sb-guide-chevron svg{width:1rem;height:1rem;color:#15803d;transition:transform .2s ease}
-        .sb-guide[open] .sb-guide-chevron svg{transform:rotate(180deg)}
-        .sb-guide-body{margin:0;padding:0 .95rem .95rem;font-size:.82rem;color:#334155;line-height:1.55;border-top:1px solid #bbf7d0}
-        .sb-guide[open] .sb-guide-body{padding-top:.75rem}
-        .sb-guide-steps{margin:.5rem 0 .85rem;padding-left:1.15rem}
-        .sb-guide-steps li{margin:.35rem 0}
-        .sb-guide-steps strong{color:#0f172a}
-        .sb-starters{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.6rem;margin-top:.5rem}
-        .sb-starter{border:1px solid #e2e8f0;border-radius:10px;padding:.7rem .75rem;background:#fff}
-        .sb-starter h3{margin:0 0 .3rem;font-size:.86rem;color:#0f172a}
-        .sb-starter p{margin:0 0 .55rem;font-size:.78rem;color:#475569;line-height:1.4}
-        .sb-starter .sb-btn{font-size:.78rem;padding:.42rem .65rem}
-        .sb-glossary{margin:.75rem 0 0;padding:.65rem .75rem;background:#f8fafc;border-radius:8px;font-size:.76rem;color:#475569}
-        .sb-glossary dt{font-weight:800;color:#334155;margin-top:.35rem}
-        .sb-glossary dt:first-child{margin-top:0}
-        .sb-gate{max-width:640px;margin:2rem auto;padding:1.5rem;background:#fff;border:1px solid #e2e8f0;border-radius:14px}
-        @media (max-width:980px){
-          .sb-layout{grid-template-columns:1fr}
-          .sb-results-col{position:static;max-height:none;overflow:visible}
-          .sb-stats{grid-template-columns:1fr 1fr}
-          .sb-actions-sticky{position:static;margin:.75rem 0 0;padding:.75rem 0 0;border-radius:0}
-        }
-        </style>
-        <div class="sb-page" id="fhor-system-builder">
+        <div class="sb-page" id="fhor-system-builder" data-view="rules">
             <header class="sb-hero">
                 <h1 class="sb-title">System Builder</h1>
-                <p class="sb-lead">Chain Fhorsite ratings, ranks, and race rules. Run the system on historic data (Industry SP and Betfair SP), save it, and review daily qualifiers.</p>
+                <p class="sb-lead">Set your rules, test them on up to 5 years of results, then save the system to get email alerts for daily qualifiers.</p>
                 <?php if ($premium): ?>
                     <p class="sb-tier">Premium · 5-year history · unlimited saves · email alerts</p>
                 <?php else: ?>
                     <p class="sb-tier is-free">Free · 1-year history · 1 saved system · dashboard qualifiers only. <a href="<?php echo esc_url($signup); ?>">Upgrade for alerts</a></p>
                 <?php endif; ?>
-                <details class="sb-guide" id="sb-guide" open>
+                <details class="sb-guide" id="sb-guide">
                     <summary class="sb-guide-toggle">
                         <span class="sb-guide-toggle-text">
-                            <span class="sb-guide-toggle-title">How System Builder works (start here)</span>
-                            <span class="sb-guide-toggle-hint sb-guide-when-closed">Click to expand — 4-step walkthrough, one-click starter systems (AW &amp; flat turf), and a short glossary.</span>
-                            <span class="sb-guide-toggle-hint sb-guide-when-open">Click to collapse this guide.</span>
-                            <span class="sb-guide-badges sb-guide-when-closed" aria-hidden="true">
-                                <span class="sb-guide-badge">Steps</span>
-                                <span class="sb-guide-badge">Starter examples</span>
-                                <span class="sb-guide-badge">Glossary</span>
-                            </span>
+                            <span class="sb-guide-toggle-title">How System Builder works</span>
                         </span>
-                        <span class="sb-guide-chevron" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                     </summary>
                     <div class="sb-guide-body">
                         <ol class="sb-guide-steps">
@@ -2758,11 +2665,35 @@ if (!function_exists('fhor_sb_shortcode')) {
                     </div>
                 </details>
             </header>
+            <div class="sb-bar">
+                <div class="sb-bar-inner">
+                    <div class="sb-name-field">
+                        <label for="sb-name">System name</label>
+                        <input type="text" id="sb-name" placeholder="e.g. Flat turf, 6–10f, firm/good" autocomplete="off">
+                    </div>
+                    <div class="sb-actions">
+                        <button type="submit" form="sb-form" class="sb-btn sb-btn-run" id="sb-run">Run system</button>
+                        <button type="button" class="sb-btn" id="sb-today">Find qualifiers</button>
+                        <?php if ($premium): ?>
+                            <button type="button" class="sb-btn sb-btn-save" id="sb-save-alerts">Save + alerts</button>
+                            <button type="button" class="sb-btn sb-btn-ghost" id="sb-save">Save only</button>
+                        <?php else: ?>
+                            <button type="button" class="sb-btn sb-btn-save" id="sb-save">Save system</button>
+                        <?php endif; ?>
+                        <input type="checkbox" id="sb-alerts" hidden <?php echo $premium ? '' : 'disabled'; ?>>
+                    </div>
+                </div>
+            </div>
+            <div class="sb-seg" role="group" aria-label="View">
+                <button type="button" data-sb-view="rules" aria-pressed="true">Rules</button>
+                <button type="button" data-sb-view="results" aria-pressed="false">Results</button>
+            </div>
             <div class="sb-layout">
+                <div class="sb-rules-col">
                 <form class="sb-panel sb-form" id="sb-form">
-                    <h2>Rules</h2>
+                    <div class="sb-chips" id="sb-chips" aria-live="polite"><span class="sb-none">No rules set</span></div>
                     <details class="sb-group" open>
-                        <summary>Sample &amp; staking</summary>
+                        <summary><b>Sample and staking</b><small data-sum="sample"></small></summary>
                         <div class="sb-grid">
                             <div class="sb-field"><label for="sb-days">Lookback</label>
                                 <select id="sb-days" name="days">
@@ -2795,25 +2726,25 @@ if (!function_exists('fhor_sb_shortcode')) {
                                 </select>
                             </div>
                         </div>
-                        <p class="sb-note">Lookback affects <strong>Run System</strong> only. <strong>Find qualifiers</strong> always uses today and tomorrow. Negative ROI on a test does not mean the tool is broken — tighten ranks or add dosage/distance filters.</p>
+                        <p class="sb-note">Lookback changes Run system only. Find qualifiers always checks today and tomorrow.</p>
                     </details>
                     <details class="sb-group" open>
-                        <summary>Race</summary>
+                        <summary><b>Race</b><small data-sum="race"></small></summary>
                         <div class="sb-grid">
-                            <div class="sb-field span2"><label>Country</label>
-                                <div class="sb-checks">
-                                    <label><input type="checkbox" name="country[]" value="England"> England</label>
-                                    <label><input type="checkbox" name="country[]" value="Ireland"> Ireland</label>
-                                    <label><input type="checkbox" name="country[]" value="Scotland"> Scotland</label>
-                                    <label><input type="checkbox" name="country[]" value="Wales"> Wales</label>
+                            <div class="sb-field span2"><span>Country</span>
+                                <div class="sb-opts">
+                                    <label><input type="checkbox" name="country[]" value="England"><span>England</span></label>
+                                    <label><input type="checkbox" name="country[]" value="Ireland"><span>Ireland</span></label>
+                                    <label><input type="checkbox" name="country[]" value="Scotland"><span>Scotland</span></label>
+                                    <label><input type="checkbox" name="country[]" value="Wales"><span>Wales</span></label>
                                 </div>
                             </div>
-                            <div class="sb-field span2"><label>Race type</label>
-                                <div class="sb-checks">
-                                    <label><input type="checkbox" name="race_type[]" value="Flat"> Flat</label>
-                                    <label><input type="checkbox" name="race_type[]" value="Hurdle"> Hurdle</label>
-                                    <label><input type="checkbox" name="race_type[]" value="Chase"> Chase</label>
-                                    <label><input type="checkbox" name="race_type[]" value="NH Flat"> NH Flat</label>
+                            <div class="sb-field span2"><span>Race type</span>
+                                <div class="sb-opts">
+                                    <label><input type="checkbox" name="race_type[]" value="Flat"><span>Flat</span></label>
+                                    <label><input type="checkbox" name="race_type[]" value="Hurdle"><span>Hurdle</span></label>
+                                    <label><input type="checkbox" name="race_type[]" value="Chase"><span>Chase</span></label>
+                                    <label><input type="checkbox" name="race_type[]" value="NH Flat"><span>NH Flat</span></label>
                                 </div>
                             </div>
                             <div class="sb-field"><label for="sb-course">Course contains</label><input id="sb-course" name="course" type="text" placeholder="e.g. York"></div>
@@ -2833,35 +2764,36 @@ if (!function_exists('fhor_sb_shortcode')) {
                                 </select>
                             </div>
                             <div class="sb-field"><label for="sb-age">Age band</label><input id="sb-age" name="age_range" type="text" placeholder="e.g. 3yo+"></div>
-                            <div class="sb-field"><label>Going contains</label>
-                                <div class="sb-checks">
-                                    <label><input type="checkbox" name="going[]" value="Firm"> Firm</label>
-                                    <label><input type="checkbox" name="going[]" value="Good"> Good</label>
-                                    <label><input type="checkbox" name="going[]" value="Soft"> Soft</label>
-                                    <label><input type="checkbox" name="going[]" value="Heavy"> Heavy</label>
-                                    <label><input type="checkbox" name="going[]" value="Standard"> Standard</label>
+                            <div class="sb-field span2"><span>Going</span>
+                                <div class="sb-opts">
+                                    <label><input type="checkbox" name="going[]" value="Firm"><span>Firm</span></label>
+                                    <label><input type="checkbox" name="going[]" value="Good"><span>Good</span></label>
+                                    <label><input type="checkbox" name="going[]" value="Soft"><span>Soft</span></label>
+                                    <label><input type="checkbox" name="going[]" value="Heavy"><span>Heavy</span></label>
+                                    <label><input type="checkbox" name="going[]" value="Standard"><span>Standard</span></label>
                                 </div>
-                                <p class="sb-note" style="margin:.35rem 0 0;">All-Weather: leave Going blank, or Standard only — not Firm/Good/Soft.</p>
+                                <span style="font-weight:400;font-size:13px;color:var(--sb-mute,#5d6659)">For all-weather, leave going blank or pick Standard only.</span>
                             </div>
-                            <div class="sb-field"><label for="sb-dfmin">Min furlongs</label><input id="sb-dfmin" name="dist_f_min" type="number" min="0" step="0.5"></div>
-                            <div class="sb-field"><label for="sb-dfmax">Max furlongs</label><input id="sb-dfmax" name="dist_f_max" type="number" min="0" step="0.5"></div>
-                            <div class="sb-field"><label for="sb-fmin">Min field</label><input id="sb-fmin" name="field_min" type="number" min="2"></div>
-                            <div class="sb-field"><label for="sb-fmax">Max field</label><input id="sb-fmax" name="field_max" type="number" min="2"></div>
+                            <div class="sb-field"><span>Distance (furlongs)</span>
+                                <div class="sb-pair"><input id="sb-dfmin" name="dist_f_min" type="number" min="0" step="0.5" aria-label="Minimum furlongs"><em>to</em><input id="sb-dfmax" name="dist_f_max" type="number" min="0" step="0.5" aria-label="Maximum furlongs"></div>
+                            </div>
+                            <div class="sb-field"><span>Field size</span>
+                                <div class="sb-pair"><input id="sb-fmin" name="field_min" type="number" min="2" aria-label="Minimum runners"><em>to</em><input id="sb-fmax" name="field_max" type="number" min="2" aria-label="Maximum runners"></div>
+                            </div>
                         </div>
                     </details>
-                    <details class="sb-group" open>
-                        <summary>Ratings &amp; ranks</summary>
+                    <details class="sb-group">
+                        <summary><b>Ratings and ranks</b><small data-sum="rate"></small></summary>
                         <div class="sb-grid">
                             <div class="sb-field"><label for="sb-fsrmin">FSr min</label><input id="sb-fsrmin" name="fsr_min" type="number" step="0.1"></div>
                             <div class="sb-field"><label for="sb-fsrmax">FSr max</label><input id="sb-fsrmax" name="fsr_max" type="number" step="0.1"></div>
-                            <div class="sb-field span2"><label for="sb-fsrrank">FSr rank ≤</label>
+                            <div class="sb-field"><label for="sb-fsrrank">FSR rank is within <span class="sb-badge">Live card only</span></label>
                                 <select id="sb-fsrrank" name="fsr_rank_max">
                                     <option value="">Any</option>
                                     <option value="1">Top-rated</option>
                                     <option value="2">Top 2</option>
                                     <option value="3">Top 3</option>
                                 </select>
-                                <p class="sb-note" style="margin:.3rem 0 0;">Historic <strong>Run System</strong>: FSr rank needs point-in-time CR data on each runner. Until that is loaded, Run System shows ROI from your other rules and skips FSr rank (saved rules for <strong>Find qualifiers</strong> are unchanged).</p>
                             </div>
                             <div class="sb-field"><label for="sb-ptsrank">Pts rank ≤</label>
                                 <select id="sb-ptsrank" name="pts_rank_max">
@@ -2892,7 +2824,7 @@ if (!function_exists('fhor_sb_shortcode')) {
                         </div>
                     </details>
                     <details class="sb-group">
-                        <summary>Dosage (DI / CD)</summary>
+                        <summary><b>Dosage (DI / CD)</b><small data-sum="dosage">No filters set</small></summary>
                         <div class="sb-grid">
                             <div class="sb-field"><label for="sb-dimin">DI min</label><input id="sb-dimin" name="di_min" type="number" step="0.01" placeholder="e.g. 1.20"></div>
                             <div class="sb-field"><label for="sb-dimax">DI max</label><input id="sb-dimax" name="di_max" type="number" step="0.01" placeholder="e.g. 3.00"></div>
@@ -2906,7 +2838,7 @@ if (!function_exists('fhor_sb_shortcode')) {
                         <p class="sb-note">Dosage Index and Center of Distribution use the same 4-generation Chefs-de-Race male line as the race card. Higher DI/CD means more speed influence; lower values suit stamina types. Set a minimum, a maximum, or both. A horse with no dosage figure is left out once a level is set. The rule applies to historic results and to today’s qualifiers. Qualifier lists always show DI/CD for review. A long lookback takes longer, because each horse is scored from its pedigree.</p>
                     </details>
                     <details class="sb-group">
-                        <summary>Draw, fitness, connections</summary>
+                        <summary><b>Draw, fitness, connections</b><small>No filters set</small></summary>
                         <div class="sb-grid">
                             <div class="sb-field"><label for="sb-dbmin">Draw bias % min</label><input id="sb-dbmin" name="db_min" type="number" step="0.1"></div>
                             <div class="sb-field"><label for="sb-dbmax">Draw bias % max</label><input id="sb-dbmax" name="db_max" type="number" step="0.1"></div>
@@ -2925,7 +2857,7 @@ if (!function_exists('fhor_sb_shortcode')) {
                         </div>
                     </details>
                     <details class="sb-group">
-                        <summary>Pace &amp; running style</summary>
+                        <summary><b>Pace and running style</b><small>No filters set</small></summary>
                         <div class="sb-grid">
                             <div class="sb-field"><label for="sb-zone">Pace zone</label>
                                 <select id="sb-zone" name="pace_zone">
@@ -2949,52 +2881,46 @@ if (!function_exists('fhor_sb_shortcode')) {
                         <p class="sb-note">Pace zone, PMS, and scenario flags (lone leader / swooper) apply to today’s card and email alerts. Historic ROI uses ratings, ranks, and the other rules above.</p>
                     </details>
                     <details class="sb-group">
-                        <summary>Market &amp; flags</summary>
+                        <summary><b>Market and flags</b><small>No filters set</small></summary>
                         <div class="sb-grid">
                             <div class="sb-field"><label for="sb-odmin">Forecast odds min</label><input id="sb-odmin" name="odds_min" type="number" min="1" step="0.1" placeholder="decimal"></div>
                             <div class="sb-field"><label for="sb-odmax">Forecast odds max</label><input id="sb-odmax" name="odds_max" type="number" min="1" step="0.1"></div>
                             <div class="sb-field"><label for="sb-spmin">Settled SP min</label><input id="sb-spmin" name="sp_min" type="number" min="1" step="0.1"></div>
                             <div class="sb-field"><label for="sb-spmax">Settled SP max</label><input id="sb-spmax" name="sp_max" type="number" min="1" step="0.1"></div>
-                            <div class="sb-field span2"><label>Must have</label>
-                                <div class="sb-checks">
-                                    <label><input type="checkbox" name="flags[]" value="course"> Course winner</label>
-                                    <label><input type="checkbox" name="flags[]" value="distance"> Distance winner</label>
-                                    <label><input type="checkbox" name="flags[]" value="cd"> C&amp;D winner</label>
-                                    <label><input type="checkbox" name="flags[]" value="going"> Going winner</label>
-                                    <label><input type="checkbox" name="flags[]" value="lbf"> Beaten favourite</label>
-                                    <label><input type="checkbox" name="flags[]" value="last_win"> Won last time</label>
-                                    <label><input type="checkbox" name="flags[]" value="last_placed"> Placed last time</label>
-                                    <label><input type="checkbox" name="flags[]" value="lone_leader"> Lone leader (today)</label>
-                                    <label><input type="checkbox" name="flags[]" value="swooper"> Swooper (today)</label>
+                            <div class="sb-field span2"><span>Must have</span>
+                                <div class="sb-opts">
+                                    <label><input type="checkbox" name="flags[]" value="course"><span>Course winner</span></label>
+                                    <label><input type="checkbox" name="flags[]" value="distance"><span>Distance winner</span></label>
+                                    <label><input type="checkbox" name="flags[]" value="cd"><span>C&amp;D winner</span></label>
+                                    <label><input type="checkbox" name="flags[]" value="going"><span>Going winner</span></label>
+                                    <label><input type="checkbox" name="flags[]" value="lbf"><span>Beaten favourite</span></label>
+                                    <label><input type="checkbox" name="flags[]" value="last_win"><span>Won last time</span></label>
+                                    <label><input type="checkbox" name="flags[]" value="last_placed"><span>Placed last time</span></label>
+                                    <label><input type="checkbox" name="flags[]" value="lone_leader"><span>Lone leader (today)</span></label>
+                                    <label><input type="checkbox" name="flags[]" value="swooper"><span>Swooper (today)</span></label>
                                 </div>
                             </div>
                         </div>
                         <p class="sb-note">Forecast odds are the pre-race price used for live alerts. Settled SP is for historic research only. FSr uses point-in-time backtest comment ratings where available. Points rank uses the same engine as the race card.</p>
                     </details>
-                    <p class="sb-note is-warn" id="sb-saved-fsr-note" hidden></p>
-                    <div class="sb-actions sb-actions-sticky">
-                        <button type="submit" class="sb-btn sb-btn-primary" id="sb-run">Run System</button>
-                        <button type="button" class="sb-btn" id="sb-today">Find qualifiers</button>
-                        <input type="text" id="sb-name" placeholder="Name this system" style="flex:1;min-width:140px;padding:.5rem .65rem;border:1px solid #e2e8f0;border-radius:8px;">
-                        <?php if ($premium): ?>
-                            <button type="button" class="sb-btn sb-btn-primary" id="sb-save-alerts">Save System &amp; Enable Alerts</button>
-                            <button type="button" class="sb-btn" id="sb-save">Save without email</button>
-                        <?php else: ?>
-                            <button type="button" class="sb-btn" id="sb-save">Save system</button>
-                        <?php endif; ?>
-                        <input type="checkbox" id="sb-alerts" hidden <?php echo $premium ? '' : 'disabled'; ?>>
-                    </div>
+                    <p class="sb-note is-warn" id="sb-saved-fsr-note" hidden style="margin:12px 16px 0;"></p>
                 </form>
-                <div class="sb-results-col">
-                    <div class="sb-panel" id="sb-results">
-                        <h2>Results</h2>
-                        <p class="sb-empty" id="sb-results-empty">Set your rules and click Run System. Stats use a flat 1-unit stake (2 units each-way) and show Industry SP and Betfair SP separately. The table lists the last 20 historic qualifiers.</p>
+                </div>
+                <div class="sb-panel sb-results-col" aria-live="polite">
+                    <div class="sb-main-tabs" id="sb-main-tabs" role="tablist">
+                        <button type="button" role="tab" id="sb-tab-back" aria-selected="true" data-pane="back">Backtest</button>
+                        <button type="button" role="tab" aria-selected="false" data-pane="qual">Daily qualifiers</button>
+                        <button type="button" role="tab" aria-selected="false" data-pane="saved">Saved systems</button>
+                    </div>
+                    <div class="sb-pane" id="sb-results" data-pane="back">
+                        <p class="sb-note is-warn" id="sb-fsr-backtest-banner" hidden><b>FSR rank is not applied to history.</b> Point-in-time ratings aren't loaded for this period, so this result uses your other rules. Find qualifiers still applies FSR rank.</p>
+                        <p class="sb-empty" id="sb-results-empty"><b>Run your system</b>See how these rules would have performed on past races.</p>
                         <div id="sb-results-body" hidden>
                             <div class="sb-book">
                                 <h3>Industry SP</h3>
                                 <div class="sb-stats">
                                     <div class="sb-stat"><span>ROI</span><b id="sb-roi">–</b></div>
-                                    <div class="sb-stat"><span>P/L</span><b id="sb-profit">–</b></div>
+                                    <div class="sb-stat"><span>Profit</span><b id="sb-profit">–</b></div>
                                     <div class="sb-stat"><span>Bets</span><b id="sb-bets">–</b></div>
                                     <div class="sb-stat"><span>Win rate</span><b id="sb-wr">–</b></div>
                                 </div>
@@ -3012,25 +2938,26 @@ if (!function_exists('fhor_sb_shortcode')) {
                             <p class="sb-note is-warn" id="sb-zero-hint" hidden></p>
                             <p class="sb-note" id="sb-pace-note" hidden></p>
                             <p class="sb-note" id="sb-dosage-note" hidden></p>
-                            <div style="overflow-x:auto;margin-top:.75rem;">
+                            <div class="sb-curve" id="sb-curve-wrap" hidden></div>
+                            <div class="sb-table-wrap">
                                 <table class="sb-table" id="sb-sample-table">
-                                    <thead><tr><th>Horse</th><th>Race</th><th id="sb-sample-di-th" hidden>DI</th><th id="sb-sample-cd-th" hidden>CD</th><th>ISP</th><th>BSP</th><th>Pos</th><th>P/L</th></tr></thead>
+                                    <thead><tr><th>Horse</th><th class="sb-n">SP</th><th class="sb-n">Pos</th><th class="sb-n">Profit</th><th id="sb-sample-extra-th" hidden>Details</th></tr></thead>
                                     <tbody></tbody>
                                 </table>
                             </div>
+                            <p class="sb-note" id="sb-sample-footnote" hidden style="margin-top:12px"></p>
                         </div>
                     </div>
-                    <div class="sb-panel" id="sb-today-panel">
-                        <h2>Daily qualifiers</h2>
-                        <p class="sb-note" style="margin:0 0 .6rem;"><a href="<?php echo esc_url(fhor_sb_qualifiers_url()); ?>">Open My Daily Qualifiers</a></p>
-                        <div class="sb-tabs" id="sb-q-tabs">
+                    <div class="sb-pane" id="sb-today-panel" data-pane="qual" hidden>
+                        <p class="sb-note" style="margin:0 0 12px;"><a href="<?php echo esc_url(fhor_sb_qualifiers_url()); ?>">Open My Daily Qualifiers</a></p>
+                        <div class="sb-dayseg" id="sb-q-tabs" role="group" aria-label="Day">
                             <button type="button" class="sb-tab is-on" data-day="tomorrow">Tomorrow</button>
                             <button type="button" class="sb-tab" data-day="today">Today</button>
                         </div>
-                        <p class="sb-empty" id="sb-today-empty">Run “Find qualifiers” to map these rules onto the live card (tomorrow after declarations, plus today).</p>
+                        <p class="sb-empty" id="sb-today-empty"><b>No qualifiers loaded</b>Match your rules to the live card. Tomorrow's runners appear after declarations.<br><button type="button" class="sb-btn sb-btn-run" id="sb-today-empty-find">Find qualifiers</button></p>
                         <div id="sb-today-body" hidden>
                             <p class="sb-note" id="sb-today-meta"></p>
-                            <div style="overflow-x:auto;">
+                            <div class="sb-table-wrap">
                                 <table class="sb-table" id="sb-today-table">
                                     <thead><tr><th>Time</th><th>Horse</th><th>Course</th><th>FSr</th><th>Rank</th><th>Pts</th><th>DI</th><th>CD</th><th>Price</th><th></th></tr></thead>
                                     <tbody></tbody>
@@ -3038,38 +2965,36 @@ if (!function_exists('fhor_sb_shortcode')) {
                             </div>
                         </div>
                     </div>
-                    <div class="sb-panel" id="sb-saved-panel">
-                        <h2>Saved systems</h2>
+                    <div class="sb-pane" data-pane="saved" hidden>
                         <div class="sb-saved" id="sb-saved">
                             <?php if (empty($saved)): ?>
                                 <p class="sb-empty">No saved systems yet.</p>
                             <?php else: ?>
                                 <?php foreach ($saved as $sys): ?>
                                     <div class="sb-saved-item" data-id="<?php echo esc_attr($sys['id']); ?>">
-                                        <b><?php echo esc_html($sys['name']); ?></b>
-                                        <?php if (!empty($sys['alerts'])): ?>
-                                            <button type="button" class="sb-btn sb-alert is-on">Alerts on</button>
-                                        <?php else: ?>
-                                            <button type="button" class="sb-btn sb-alert">Alerts off</button>
+                                        <div class="sb-saved-t"><b><?php echo esc_html($sys['name']); ?></b><small>Saved system</small></div>
+                                        <?php if (fhor_sb_can_email_alerts()): ?>
+                                        <label class="sb-sw sb-alert-wrap"><input type="checkbox" class="sb-alert-toggle" <?php checked(!empty($sys['alerts'])); ?>><i></i>Email alerts</label>
                                         <?php endif; ?>
-                                        <button type="button" class="sb-btn sb-load">Load</button>
-                                        <button type="button" class="sb-btn sb-del">Delete</button>
+                                        <button type="button" class="sb-btn sb-btn-sm sb-load">Load</button>
+                                        <button type="button" class="sb-btn sb-btn-sm sb-del sb-btn-del">Delete</button>
                                     </div>
                                 <?php endforeach; ?>
                             <?php endif; ?>
                         </div>
+                        <?php if (fhor_sb_user_is_site_admin()): ?>
+                        <div class="sb-admin-systems-panel" id="sb-admin-systems-panel">
+                            <h2 style="font:700 16px var(--sb-disp,inherit);margin:16px 0 8px;display:flex;align-items:center;gap:8px;"><span class="sb-admin-badge">Admin</span> All member systems</h2>
+                            <p class="sb-note" style="margin:0 0 12px;">Load any member’s saved filters into this builder. You cannot change another user’s save from here.</p>
+                            <input type="search" class="sb-admin-search" id="sb-admin-systems-search" placeholder="Filter by system name, username, or email…" autocomplete="off">
+                            <div class="sb-saved" id="sb-admin-systems"></div>
+                        </div>
+                        <?php endif; ?>
                     </div>
-                    <?php if (fhor_sb_user_is_site_admin()): ?>
-                    <div class="sb-panel sb-admin-systems-panel" id="sb-admin-systems-panel">
-                        <h2><span class="sb-admin-badge">Admin</span> All member systems</h2>
-                        <p class="sb-note" style="margin:0 0 .65rem;">Load any member’s saved filters into this builder, then use <strong>Run System</strong> or <strong>Find qualifiers</strong>. You cannot change another user’s save from here.</p>
-                        <input type="search" class="sb-admin-search" id="sb-admin-systems-search" placeholder="Filter by system name, username, or email…" autocomplete="off">
-                        <div class="sb-saved" id="sb-admin-systems"></div>
-                    </div>
-                    <?php endif; ?>
                 </div>
             </div>
         </div>
+        <div class="sb-toast" id="sb-toast" role="status" aria-live="polite"></div>
         <script type="application/json" id="sb-saved-json"><?php echo wp_json_encode($saved); ?></script>
         <?php if (fhor_sb_user_is_site_admin()): ?>
         <script type="application/json" id="sb-admin-systems-json"><?php echo wp_json_encode($admin_systems); ?></script>
