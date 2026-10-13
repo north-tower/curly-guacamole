@@ -1017,16 +1017,19 @@ if (!function_exists('fhor_bt_should_enqueue')) {
         if (fhor_bt_is_request()) {
             return true;
         }
+        if (get_query_var('race_id')) {
+            return true;
+        }
         if (function_exists('fhor_sb_is_request') && fhor_sb_is_request()) {
             return true;
         }
         if (function_exists('fhor_sb_is_qualifiers_request') && fhor_sb_is_qualifiers_request()) {
             return true;
         }
-        if (function_exists('bricks_request_uri_contains') && bricks_request_uri_contains(['/bet-tracker', '/my-qualifiers', '/system-builder'])) {
+        if (function_exists('bricks_request_uri_contains') && bricks_request_uri_contains(['/bet-tracker', '/my-qualifiers', '/system-builder', '/race/'])) {
             return true;
         }
-        if (function_exists('bricks_current_post_has_shortcode') && bricks_current_post_has_shortcode(['bet_tracker', 'system_builder', 'system_builder_qualifiers'])) {
+        if (function_exists('bricks_current_post_has_shortcode') && bricks_current_post_has_shortcode(['bet_tracker', 'system_builder', 'system_builder_qualifiers', 'race_detail'])) {
             return true;
         }
         return false;
@@ -1153,6 +1156,9 @@ if (!function_exists('fhor_bt_styles')) {
         .bt-leg input,.bt-leg select{width:100%;min-width:0;padding:.45rem .55rem;border:1px solid #e2e8f0;border-radius:8px;font-size:.88rem;background:#fff;color:#0f172a}
         .bt-check{display:flex;align-items:center;gap:.4rem;font-size:.86rem;font-weight:600}
         .fhor-bt-log{white-space:nowrap;font-size:.75rem;padding:.32rem .55rem}
+        .fhor-bt-log.fhor-bt-log--race{font-size:12px;font-weight:600;padding:6px 10px;border:1px solid #bbf7d0;border-radius:6px;background:#f0fdf4;color:#166534;cursor:pointer}
+        .fhor-bt-log.fhor-bt-log--race:hover{border-color:#15803d;background:#dcfce7;color:#14532d}
+        .tracker-inline-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px}
         .bt-filters select{max-width:100%}
         .bt-chart-wrap{min-width:0}
         @media (max-width:900px){
@@ -1400,7 +1406,12 @@ add_shortcode('bet_tracker', 'fhor_bt_shortcode');
 if (!function_exists('fhor_bt_log_button_html')) {
     function fhor_bt_log_button_html($args) {
         $args = is_array($args) ? $args : [];
-        return '<button type="button" class="sb-btn fhor-bt-log"'
+        $label = isset($args['label']) && $args['label'] !== '' ? (string) $args['label'] : '⚡ Log Bet';
+        $class = 'sb-btn fhor-bt-log';
+        if (!empty($args['class'])) {
+            $class .= ' ' . preg_replace('/[^a-z0-9_\-\s]/i', '', (string) $args['class']);
+        }
+        return '<button type="button" class="' . esc_attr(trim($class)) . '"'
             . ' data-horse="' . esc_attr(isset($args['horse']) ? $args['horse'] : '') . '"'
             . ' data-course="' . esc_attr(isset($args['course']) ? $args['course'] : '') . '"'
             . ' data-time="' . esc_attr(isset($args['time']) ? $args['time'] : '') . '"'
@@ -1408,7 +1419,7 @@ if (!function_exists('fhor_bt_log_button_html')) {
             . ' data-odds="' . esc_attr(isset($args['odds']) ? $args['odds'] : '') . '"'
             . ' data-system="' . esc_attr(isset($args['system']) ? $args['system'] : '') . '"'
             . ' data-system-id="' . esc_attr(isset($args['system_id']) ? $args['system_id'] : '') . '"'
-            . '>⚡ Log Bet</button>';
+            . '>' . esc_html($label) . '</button>';
     }
 }
 

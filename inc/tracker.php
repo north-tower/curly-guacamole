@@ -266,6 +266,7 @@ if (!function_exists('bricks_tracker_render_horse_widget')) {
 
         $args = wp_parse_args($args, [
             'show_latest_flag' => false,
+            'show_bet_tracker' => false,
             'wrapper_class' => '',
             'compact' => false
         ]);
@@ -311,7 +312,20 @@ if (!function_exists('bricks_tracker_render_horse_widget')) {
             return $widget_html;
         }
 
-        $widget_html .= '<button type="button" class="tracker-toggle-btn tracker-compact-btn" data-target="#' . esc_attr($panel_id) . '">' . esc_html($button_text) . '</button>
+        $action_buttons = '<button type="button" class="tracker-toggle-btn tracker-compact-btn" data-target="#' . esc_attr($panel_id) . '">' . esc_html($button_text) . '</button>';
+        if (!empty($args['show_bet_tracker']) && function_exists('fhor_bt_log_button_html')) {
+            $forecast_odds = isset($race_meta['forecast_odds']) ? $race_meta['forecast_odds'] : '';
+            $action_buttons .= fhor_bt_log_button_html([
+                'horse' => $horse_name,
+                'course' => $race_meta['course'] ?? '',
+                'time' => $race_meta['race_time'] ?? '',
+                'date' => $race_meta['race_date'] ?? '',
+                'odds' => $forecast_odds,
+                'label' => 'Add to Bet Tracker',
+                'class' => 'fhor-bt-log--race',
+            ]);
+        }
+        $widget_html .= '<div class="tracker-inline-actions">' . $action_buttons . '</div>
             <div id="' . esc_attr($panel_id) . '" class="tracker-panel" style="display:none;">
                 <div class="tracker-notes-list">' . $notes_html . '</div>
                 <textarea class="tracker-note-input" rows="3" placeholder="Add your note about this horse..."></textarea>

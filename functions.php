@@ -4500,10 +4500,12 @@ if ($speed_data) {
                                     'race_id' => $race_id,
                                     'race_date' => $race_date,
                                     'race_time' => isset($race->Time) ? $race->Time : '',
-                                    'course' => isset($race->course) ? $race->course : ''
+                                    'course' => isset($race->course) ? $race->course : '',
+                                    'forecast_odds' => is_string($odds ?? null) ? $odds : (isset($odds) ? (string) $odds : ''),
                                 ],
                                 [
                                     'show_latest_flag' => true,
+                                    'show_bet_tracker' => true,
                                     'wrapper_class' => 'tracker-race-row'
                                 ]
                             );
