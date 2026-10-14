@@ -551,6 +551,9 @@
 }
 
 .fhor-race-premium .runners-table--fit tbody tr.runner-row {
+  /* Override fhor-ui.css mobile 2-col grid (legacy per-cell rows); one card per tr */
+  display: block;
+  width: 100%;
   margin: 0;
   padding: 0;
   background: transparent !important;
@@ -565,6 +568,8 @@
 
 .fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-card-cell {
   display: block;
+  width: 100%;
+  max-width: 100%;
   padding: 0 !important;
   border: none !important;
   background: transparent !important;
@@ -575,6 +580,8 @@
   grid-template-columns: 230px 1fr;
   gap: 18px;
   position: relative;
+  width: 100%;
+  max-width: 100%;
   padding: 16px;
   background: var(--rd-s1);
   border: 1px solid var(--rd-line);
@@ -693,8 +700,10 @@
 }
 
 .fhor-race-premium .runner-card-wide__metric .fhor-meter {
+  display: block;
   margin-top: 5px;
   width: 100%;
+  height: 5px;
 }
 
 .fhor-race-premium .runner-card-wide__groups {
@@ -735,7 +744,7 @@
   border-bottom: 0;
 }
 
-.fhor-race-premium .runner-card-kv span {
+.fhor-race-premium .runner-card-kv > span {
   color: var(--rd-mu);
   font-size: 11px;
   text-transform: uppercase;
@@ -748,6 +757,54 @@
   text-align: right;
   font-weight: 600;
   min-width: 0;
+  flex: 1;
+}
+
+.fhor-race-premium .runner-card-kv .lin5-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.fhor-race-premium .runner-card-kv .lin5-cell__pct--hi {
+  color: var(--rd-ac);
+}
+
+.fhor-race-premium .runner-card-kv .lin5-quality-badge {
+  display: inline-block;
+  width: auto;
+  max-width: 100%;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.fhor-race-premium .runner-card-kv .lin5-quality-high {
+  background: color-mix(in srgb, var(--rd-ac) 13%, transparent);
+  color: var(--rd-ac);
+}
+
+.fhor-race-premium .runner-card-kv .lin5-quality-med {
+  background: color-mix(in srgb, var(--rd-warn) 18%, transparent);
+  color: var(--rd-warn);
+}
+
+.fhor-race-premium .runner-card-kv .lin5-quality-low {
+  background: color-mix(in srgb, #ff6b6b 15%, transparent);
+  color: #ff6b6b;
+}
+
+.fhor-race-premium .runner-card-kv .lin5-quality-na {
+  background: var(--rd-s2);
+  color: var(--rd-mu);
 }
 
 .fhor-race-premium .runner-card-kv b.pos {
@@ -825,6 +882,20 @@
 
   .fhor-race-premium .runner-card-wide__rate {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .fhor-race-premium .runner-card-wide__metric b {
+    font-size: 18px;
+  }
+
+  .fhor-race-premium .runner-card-wide__id {
+    padding-right: 72px;
+  }
+
+  .fhor-race-premium .runner-card-wide__groups section + section {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--rd-line);
   }
 }
 
@@ -912,8 +983,9 @@
 }
 
 .fhor-race-premium .fhor-meter {
+  display: block;
   width: 70px;
-  height: 6px;
+  height: 5px;
   background: var(--rd-line);
   border-radius: 9px;
   overflow: hidden;
@@ -1138,6 +1210,78 @@
 
 .fhor-race-premium .prize-item:last-child::after {
   content: "";
+}
+
+@media (max-width: 768px) {
+  /* One gutter only — nested 16+16+12px pads were shrinking cards on phones */
+  #brx-content.race-detail-page-shell {
+    width: 100%;
+    max-width: none;
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+  }
+
+  .race-detail-page-shell:has(.fhor-race-premium) {
+    max-width: none;
+    width: 100%;
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+  }
+
+  .race-detail-page-shell:has(.fhor-race-premium) .race-detail-container.fhor-race-premium {
+    width: 100%;
+    max-width: none !important;
+    padding: 0 0 calc(90px + env(safe-area-inset-bottom, 0px)) !important;
+    margin: 0;
+  }
+
+  .fhor-race-premium {
+    width: 100%;
+    max-width: none;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .fhor-race-premium .race-upward-links,
+  .fhor-race-premium .back-button-container,
+  .fhor-race-premium .race-quick-nav,
+  .fhor-race-premium .race-header-card,
+  .fhor-race-premium .fhor-race-picks,
+  .fhor-race-premium .fhor-race-tabs,
+  .fhor-race-premium .filter-controls,
+  .fhor-race-premium .lin5-legend,
+  .fhor-race-premium .runners-mobile-toolbar,
+  .fhor-race-premium .runners-header,
+  .fhor-race-premium .fhor-panel,
+  .fhor-race-premium .premium-ratings-container > .fhor-race-panel:not([data-fhor-panel="runners"]) {
+    padding-left: 12px;
+    padding-right: 12px;
+    box-sizing: border-box;
+  }
+
+  .fhor-race-premium .runners-table-wrapper,
+  .fhor-race-premium .runners-table--fit,
+  .fhor-race-premium .runners-table--fit tbody {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .fhor-race-premium .runners-table--fit tbody {
+    gap: 8px;
+  }
+
+  .fhor-race-premium .runner-card-wide {
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+    width: 100%;
+  }
+
+  .fhor-race-premium .runners-mobile-toolbar {
+    margin-left: 12px;
+    margin-right: 12px;
+    width: auto;
+  }
 }
 
 @media (max-width: 760px) {

@@ -120,9 +120,11 @@ if (!defined('ABSPATH')) {
                                             <h4>Pedigree</h4>
                                             <div class="runner-card-kv">
                                                 <span>Lin5</span>
-                                                <b class="<?php echo ($sire_5y_pct !== null && $sire_5y_pct >= 14) ? 'pos' : ''; ?>" title="<?php echo esc_attr($sire_5y_title); ?>">
-                                                    <?php echo esc_html($sire_5y_display); ?>
-                                                    <span class="lin5-quality-badge <?php echo esc_attr($sire_5y_quality['class']); ?>"><?php echo esc_html($sire_5y_quality['label']); ?></span>
+                                                <b title="<?php echo esc_attr($sire_5y_title); ?>">
+                                                    <span class="lin5-cell">
+                                                        <span class="lin5-cell__pct<?php echo ($sire_5y_pct !== null && $sire_5y_pct >= 14) ? ' lin5-cell__pct--hi' : ''; ?>"><?php echo esc_html($sire_5y_display); ?></span>
+                                                        <span class="lin5-quality-badge <?php echo esc_attr($sire_5y_quality['class']); ?>"><?php echo esc_html($sire_5y_quality['label']); ?></span>
+                                                    </span>
                                                 </b>
                                             </div>
                                             <div class="runner-card-kv"><span>DI / CD</span><b class="blue" title="<?php echo esc_attr($dosage_tooltip); ?>"><?php echo esc_html($dosage_kv); ?></b></div>
