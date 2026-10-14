@@ -4031,7 +4031,7 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
         </div>
         <div class="filter-controls__meta">
             <span id="activeRunnersCount"><?php echo count($runners); ?></span> runners shown
-            <span class="filter-controls__hint">All stats per runner — scroll vertically only</span>
+            <span class="filter-controls__hint">Wide cards — sort via toolbar; expand Details for SR history</span>
         </div>
     </div>
     <div class="lin5-legend">
@@ -4386,10 +4386,47 @@ if ($speed_data) {
                     $is_ew_simple = !empty($points_info) && !empty($race_points_ew_simple) && (($race_points_ew_simple['runner_key'] ?? '') === ($points_info['runner_key'] ?? ''));
                     $is_ew_edge = !empty($points_info) && !empty($race_points_ew_edge) && (($race_points_ew_edge['runner_key'] ?? '') === ($points_info['runner_key'] ?? ''));
                     $points_reasons_text = !empty($points_info['model_reasons']) ? implode(', ', $points_info['model_reasons']) : 'No standout factors';
+
+                    $trainer_name_key = isset($runner->trainer_name) ? trim((string) $runner->trainer_name) : '';
+                    $trainer_course = ($trainer_name_key !== '' && isset($trainer_course_lookup[$trainer_name_key])) ? $trainer_course_lookup[$trainer_name_key] : null;
+                    $trainer_course_kv = '—';
+                    if ($trainer_course) {
+                        $tc_pct = isset($trainer_course['win_pct']) ? floatval($trainer_course['win_pct']) : 0;
+                        $tc_runs = isset($trainer_course['runs']) ? intval($trainer_course['runs']) : 0;
+                        $tc_wins = isset($trainer_course['wins']) ? intval($trainer_course['wins']) : 0;
+                        $tc_rank = isset($trainer_course_ranks[$trainer_name_key]) ? intval($trainer_course_ranks[$trainer_name_key]) : 0;
+                        $trainer_course_kv = number_format($tc_pct, 1) . '% (' . $tc_wins . '/' . $tc_runs . ')';
+                        if ($tc_rank > 0) {
+                            $trainer_course_kv .= ' · #' . $tc_rank . ' in race';
+                        }
+                    }
+
+                    $dosage_kv = $dosage_display;
+                    if (!empty($dosage['di_is_infinite'])) {
+                        $cd_part = (isset($dosage['cd']) && is_numeric($dosage['cd'])) ? number_format((float) $dosage['cd'], 2) : '—';
+                        $dosage_kv = 'Inf / ' . $cd_part;
+                    } elseif (isset($dosage['di']) && is_numeric($dosage['di']) && isset($dosage['cd']) && is_numeric($dosage['cd'])) {
+                        $dosage_kv = number_format((float) $dosage['di'], 2) . ' / ' . number_format((float) $dosage['cd'], 2);
+                    }
+
+                    $runner_origin_bits = [];
+                    if (isset($runner->bred) && $runner->bred) {
+                        $runner_origin_bits[] = $runner->bred;
+                    }
+                    if (!empty($runner->gender)) {
+                        $runner_origin_bits[] = $runner->gender;
+                    }
+                    $runner_origin_line = !empty($runner_origin_bits) ? implode(' · ', $runner_origin_bits) : '—';
+
+                    $cls_val_class = (floatval($cls) < 0) ? 'pos' : ((floatval($cls) > 0) ? 'neg' : '');
+                    $or_val_class = (floatval($or_diff) < 0) ? 'neg' : ((floatval($or_diff) > 0) ? 'pos' : '');
+                    $is_top_fsr_card = ($index === 0 && is_numeric($fsr) && floatval($fsr) > -999);
+                    $comb_num = floatval(str_replace('%', '', (string) $comb));
+                    $comb_width = ($comb_num > 0 && $comb !== '-') ? min(100, max(0, $comb_num)) : 0;
                     ?>
-                    <tr class="runner-row<?php echo $non_runner_class; ?>" 
-                        style="background:<?php echo $background_color; ?>;border-bottom:1px solid <?php echo $border_color; ?>;transition:background-color 0.2s ease;"
+                    <tr class="runner-row<?php echo $non_runner_class; ?>"
                         data-runner-index="<?php echo esc_attr($index); ?>"
+                        data-trainer="<?php echo esc_attr($runner->trainer_name ?: ''); ?>"
                         data-cloth-number="<?php echo esc_attr($runner->cloth_number ?: ''); ?>"
                         data-is-non-runner="<?php echo $is_non_runner ? '1' : '0'; ?>"
                         <?php if (!$is_national_hunt): ?>
@@ -4421,277 +4458,15 @@ if ($speed_data) {
                         data-sr-highlight="<?php echo $sr_highlight ? '1' : '0'; ?>"
                         data-runner-id="<?php echo esc_attr($runner->runner_id ?: ''); ?>">
                         
-                        <!-- No. -->
-                        <td class="runner-cell runner-cell--cloth" data-label="No.">
-                            <div style="display:flex;align-items:center;gap:8px;">
-                                <div class="cloth-badge" style="background:linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);color:white;width:35px;height:35px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;box-shadow:0 2px 8px rgba(59,130,246,0.3);">
-                                    <?php echo esc_html($runner->cloth_number ?: ''); ?>
-                                </div>
-                                <?php if ($is_non_runner): ?>
-                                    <span class="non-runner-badge">NR</span>
-                                <?php endif; ?>
-                            </div>
-                        </td>
-                                
-                                      <?php if (!$is_national_hunt): ?>
-        <!-- Stall -->
-        <td class="runner-cell" data-label="Stall">
-            <div style="font-weight:600;color:#374151;"><?php echo esc_html($stall_number); ?></div>
-        </td>
-        
-        <!-- Db% -->
-        <td class="runner-cell" data-label="Db%">
-            <div class="<?php echo (floatval(str_replace('%', '', $draw_bias_pct)) >= 12) ? 'green-text' : ''; ?>" style="font-weight:600;"><?php echo esc_html($draw_bias_pct); ?></div>
-        </td>
-        <?php endif; ?>
-                                
-                                <?php if (!$is_tomorrow_race): ?>
-                                <!-- Win% -->
-                                <td class="runner-cell runner-cell--stat" data-label="WIN%">
-                                    <div class="<?php echo (floatval(str_replace('%', '', $win_percentage)) >= 60) ? 'green-text' : ''; ?>" style="font-weight:600;"><?php echo esc_html($win_percentage); ?></div>
-                                </td>
-                                
-                                <!-- Pla% -->
-                                <td class="runner-cell runner-cell--stat" data-label="Pla%">
-                                    <div class="<?php echo (floatval(str_replace('%', '', $place_percentage)) >= 60) ? 'green-text' : ''; ?>" style="font-weight:600;"><?php echo esc_html($place_percentage); ?></div>
-                                </td>
-                                <?php endif; ?>
-                                
-                                <!-- FSr -->
-                                <td class="runner-cell runner-cell--stat runner-cell--primary" data-label="FSr">
-                                    <div class="<?php echo (floatval($fsr) >= 80) ? 'green-text sr-highlight' : ''; ?>" style="font-weight:600;"><?php echo esc_html($fsr); ?></div>
-                                </td>
-                                
-                                <!-- FSRr -->
-                                <td class="runner-cell runner-cell--stat" data-label="FSRr">
-                                    <div style="font-weight:600;color:#059669;"><?php echo esc_html($fsrr); ?></div>
-                                </td>
-
-                                <!-- Points -->
-                                <td class="runner-cell runner-cell--stat runner-cell--primary" data-label="Pts">
-                                    <div title="<?php echo esc_attr('Model score 0-100. Reasons: ' . $points_reasons_text); ?>" style="font-weight:800;color:#1e3a8a;">
-                                        <?php echo esc_html(number_format($points_score, 1)); ?>
-                                    </div>
-                                </td>
-
-                                
-                                <!-- Comb -->
-                                <td class="runner-cell runner-cell--stat" data-label="Comb">
-                                    <?php
-                                    $comb_num = floatval(str_replace('%', '', (string) $comb));
-                                    $comb_width = ($comb_num > 0 && $comb !== '-') ? min(100, max(0, $comb_num)) : 0;
-                                    ?>
-                                    <div class="fhor-comb-wrap">
-                                        <span class="<?php echo ($comb_num >= 70) ? 'green-text' : ''; ?>" style="font-weight:600;"><?php echo esc_html($comb); ?></span>
-                                        <?php if ($comb_width > 0): ?>
-                                        <span class="fhor-meter" aria-hidden="true"><i style="width:<?php echo esc_attr((string) $comb_width); ?>%"></i></span>
-                                        <?php endif; ?>
-                                    </div>
-                                </td>
-                                
-                                <!-- Form -->
-                                <td class="runner-cell" data-label="Form">
-                                    <div style="font-weight:600;color:#059669;font-family:monospace;font-size:11px;"><?php echo esc_html($form); ?></div>
-                                </td>
-                                
-                                <!-- dslr -->
-                                <td class="runner-cell" data-label="DSLR">
-                                    <div class="<?php echo (floatval($dslr) >= 50) ? 'red-text' : ''; ?>" style="font-weight:600;"><?php echo esc_html($dslr); ?></div>
-                                </td>
-                                
-                                <!-- Wgt -->
-                                <td class="runner-cell" data-label="Wgt">
-                                    <div style="font-weight:600;color:#059669;font-family:monospace;"><?php echo esc_html($weight_formatted); ?></div>
-                                </td>
-                                
-                                <!-- C/D/G -->
-                                <td class="runner-cell" data-label="C/D/G">
-                                    <div style="font-weight:600;color:#059669;"><?php echo esc_html($wins_display); ?></div>
-                                </td>
-                                
-                              
-                                
-                                <!-- LBF -->
-                                <td class="runner-cell" data-label="LBF">
-                                    <div class="<?php echo (floatval($lbf) >= 1) ? 'green-text' : ''; ?>" style="font-weight:600;"><?php echo esc_html($lbf); ?></div>
-                                </td>
-                                
-                                <!-- Name -->
-                               <!-- Name -->
-     <!-- Name (update this cell to show non-runner status) -->
-                        <td class="runner-cell runner-cell--name" data-label="Name">
-                            <?php if ($runner->runner_id): ?>
-                                <a href="<?php echo esc_url(bricks_horse_history_url($runner->runner_id)); ?>" 
-                                   class="horse-name-link"
-                                   title="View <?php echo esc_attr($runner->name); ?>'s complete racing history"
-                                   style="font-weight:700;color:#111827;font-size:14px;text-decoration:none;display:block;">
-                                    <?php echo esc_html($runner->name ?: 'N/A'); ?>
-                                </a>
-                            <?php else: ?>
-                                <div style="font-weight:700;color:#111827;font-size:14px;"><?php echo esc_html($runner->name ?: 'N/A'); ?></div>
-                            <?php endif; ?>
-                            <?php
-                            echo bricks_tracker_render_horse_widget(
-                                $runner->name ?: '',
-                                [
-                                    'race_id' => $race_id,
-                                    'race_date' => $race_date,
-                                    'race_time' => isset($race->Time) ? $race->Time : '',
-                                    'course' => isset($race->course) ? $race->course : '',
-                                    'forecast_odds' => is_string($odds ?? null) ? $odds : (isset($odds) ? (string) $odds : ''),
-                                ],
-                                [
-                                    'show_latest_flag' => true,
-                                    'show_bet_tracker' => true,
-                                    'wrapper_class' => 'tracker-race-row'
-                                ]
-                            );
-                            ?>
-                            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">
-                                <?php if ($is_win_candidate): ?>
-                                    <span class="fhor-pick-pill fhor-pick-pill--w" title="Top overall model score for this race.">Win</span>
-                                <?php endif; ?>
-                                <?php if ($is_place_candidate): ?>
-                                    <span class="fhor-pick-pill fhor-pick-pill--p" title="Top 3 model-ranked runner for place profile.">Place</span>
-                                <?php endif; ?>
-                                <?php if ($is_ew_simple): ?>
-                                    <span class="fhor-pick-pill fhor-pick-pill--ew" title="Simple EW: odds 5/1+ and best model score among EW-eligible runners.">EW</span>
-                                <?php endif; ?>
-                                <?php if ($is_ew_edge): ?>
-                                    <span class="fhor-pick-pill fhor-pick-pill--ew" title="Edge EW: odds 5/1+ and strong model-vs-market edge.">EW Edge</span>
-                                <?php endif; ?>
-                                <?php if ($points_edge > 0): ?>
-                                    <span title="Model vs market edge score. Higher means bigger disagreement in your favour." style="display:inline-block;padding:2px 6px;border-radius:999px;background:#f3f4f6;color:#374151;font-size:10px;font-weight:700;">Edge <?php echo esc_html(number_format($points_edge, 1)); ?></span>
-                                <?php endif; ?>
-                            </div>
-                            <?php if (isset($runner->bred) && $runner->bred): ?>
-                                <div style="font-size:11px;color:#6b7280;margin-top:2px;"><?php echo esc_html($runner->bred); ?></div>
-                            <?php endif; ?>
-                            <?php if ($runner->gender): ?>
-                                <div style="font-size:11px;color:#6b7280;text-transform:uppercase;margin-top:2px;"><?php echo esc_html($runner->gender); ?></div>
-                            <?php endif; ?>
-                            <div
-                                class="dosage-metrics<?php echo $dosage_is_empty ? ' dosage-metrics--empty' : ''; ?>"
-                                title="<?php echo esc_attr($dosage_tooltip); ?>"
-                                style="margin-top:4px;">
-                                <?php echo esc_html($dosage_display); ?>
-                            </div>
-                            <?php if ($maturity_edge): ?>
-                                <span
-                                    class="maturity-edge-badge <?php echo esc_attr($maturity_edge['class']); ?>"
-                                    title="<?php echo esc_attr($maturity_edge['tooltip']); ?>">
-                                    <?php echo esc_html('Maturity Edge ' . ($maturity_edge['score'] > 0 ? '+' : '') . $maturity_edge['score'] . ' - ' . $maturity_edge['label']); ?>
-                                </span>
-                            <?php endif; ?>
-                        </td>
-
-                                <?php if ($show_maturity_edge): ?>
-                                <!-- Maturity -->
-                                <td class="runner-cell" data-label="Mat">
-                                    <?php if ($maturity_edge): ?>
-                                        <span
-                                            class="maturity-edge-badge <?php echo esc_attr($maturity_edge['class']); ?>"
-                                            title="<?php echo esc_attr($maturity_edge['tooltip']); ?>"
-                                            style="margin-top:0;">
-                                            <?php echo esc_html(($maturity_edge['score'] > 0 ? '+' : '') . $maturity_edge['score']); ?>
-                                        </span>
-                                    <?php else: ?>
-                                        <span style="color:#94a3b8;">-</span>
-                                    <?php endif; ?>
-                                </td>
-                                <?php endif; ?>
-
-
-                                <!-- Lineage 5Y -->
-                                <td class="runner-cell runner-cell--stat" data-label="Lin5">
-                                    <div
-                                        title="<?php echo esc_attr($sire_5y_title); ?>"
-                                        class="<?php echo ($sire_5y_pct !== null && $sire_5y_pct >= 14) ? 'green-text' : ''; ?>"
-                                        style="font-weight:600;">
-                                        <span class="lin5-cell">
-                                            <span><?php echo esc_html($sire_5y_display); ?></span>
-                                            <span class="lin5-quality-badge <?php echo esc_attr($sire_5y_quality['class']); ?>">
-                                                <?php echo esc_html($sire_5y_quality['label']); ?>
-                                            </span>
-                                        </span>
-                                    </div>
-                                </td>
-
-                                <!-- Dosage Index / Center of Distribution -->
-                                <td class="runner-cell runner-cell--stat runner-cell--dosage" data-label="DI/CD">
-                                    <div
-                                        class="dosage-metrics<?php echo $dosage_is_empty ? ' dosage-metrics--empty' : ''; ?>"
-                                        title="<?php echo esc_attr($dosage_tooltip); ?>">
-                                        <?php echo esc_html($dosage_display); ?>
-                                    </div>
-                                </td>
-
-                                
-                                <!-- Continue with all remaining columns... -->
-                                <td class="runner-cell" data-label="Cls">
-                                    <div class="<?php echo (floatval($cls) < 0) ? 'green-text' : (floatval($cls) > 0 ? 'red-text' : ''); ?>" style="font-weight:600;"><?php echo esc_html($cls); ?></div>
-                                </td>
-                                <td class="runner-cell" data-label="OR+/-">
-                                    <div class="<?php echo (floatval($or_diff) < 0) ? 'red-text' : (floatval($or_diff) >= 0 ? 'green-text' : ''); ?>" style="font-weight:600;"><?php echo esc_html($or_diff); ?></div>
-                                </td>
-                                <td class="runner-cell runner-cell--wide" data-label="Jockey">
-                                    <div style="font-weight:500;color:#374151;"><?php echo esc_html($runner->jockey_name ?: 'N/A'); ?></div>
-                                    <?php if ($runner->jockey_claim): ?>
-                                        <div style="font-size:11px;color:#059669;margin-top:2px;">(<?php echo esc_html($runner->jockey_claim); ?>lb)</div>
-                                    <?php endif; ?>
-                                </td>
-                               <td class="runner-cell runner-cell--wide" data-label="Trainer / RTF%">
-    <div style="font-weight:500;color:#374151;"><?php echo esc_html($runner->trainer_name ?: 'N/A'); ?></div>
-    <?php
-    $trainer_name_key = isset($runner->trainer_name) ? trim((string) $runner->trainer_name) : '';
-    $trainer_course = ($trainer_name_key !== '' && isset($trainer_course_lookup[$trainer_name_key])) ? $trainer_course_lookup[$trainer_name_key] : null;
-    if ($trainer_course):
-        $tc_pct = isset($trainer_course['win_pct']) ? floatval($trainer_course['win_pct']) : 0;
-        $tc_runs = isset($trainer_course['runs']) ? intval($trainer_course['runs']) : 0;
-        $tc_wins = isset($trainer_course['wins']) ? intval($trainer_course['wins']) : 0;
-        $tc_rank = isset($trainer_course_ranks[$trainer_name_key]) ? intval($trainer_course_ranks[$trainer_name_key]) : 0;
-        $tc_class = ($tc_pct >= 18 && $tc_runs >= 10) ? 'green-text' : (($tc_pct >= 12 && $tc_runs >= 6) ? '' : 'red-text');
-        $tc_tooltip = 'Trainer course performance over the last 5 years up to the race date. Win % is wins divided by runs at this course. Displayed as wins/runs, with rank versus other trainers in this race.';
-    ?>
-        <div style="font-size:11px;margin-top:2px;">
-            <span style="color:#6b7280;" title="<?php echo esc_attr($tc_tooltip); ?>">Course 5Y:</span>
-            <span class="<?php echo esc_attr($tc_class); ?>" style="font-weight:700;" title="<?php echo esc_attr('Win percentage at this course in the 5-year lookback window.'); ?>">
-                <?php echo esc_html(number_format($tc_pct, 1)); ?>%
-            </span>
-            <span style="color:#6b7280;" title="<?php echo esc_attr('Wins/Runs at this course in the same 5-year lookback window.'); ?>">(<?php echo esc_html($tc_wins . '/' . $tc_runs); ?>)</span>
-            <?php if ($tc_rank > 0): ?>
-                <span style="color:#6b7280;" title="<?php echo esc_attr('Rank by Course 5Y win percentage among trainers declared in this race.'); ?>">#<?php echo esc_html($tc_rank); ?> in race</span>
-            <?php endif; ?>
-        </div>
-    <?php endif; ?>
-    <?php if ($rft_percentage && $rft_percentage !== '-'): ?>
-        <div style="font-size:11px;margin-top:2px;">
-            <span style="color:#6b7280;">RTF:</span>
-            <span class="<?php echo (floatval(str_replace('%', '', $rft_percentage)) >= 40) ? 'green-text' : ''; ?>" style="font-weight:600;">
-                <?php echo esc_html($rft_percentage); ?>
-            </span>
-        </div>
-    <?php endif; ?>
-</td>
-
-                               
-                                
-                                
-                                <!-- Speed Ratings with highlighting -->
-                              <!-- Details Toggle Button -->
-<td class="runner-cell runner-cell--details" data-label="Details" style="text-align:center;">
-    <button class="toggle-details-btn" data-runner-index="<?php echo $index; ?>" style="background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px;transition:all 0.2s ease;">
-        <span class="toggle-icon">▼</span> View
-    </button>
-</td>
-</tr>
-
-<!-- Hidden Details Row -->
-<tr class="details-row details-row-<?php echo $index; ?>" style="background:rgba(59,130,246,0.05);">
-    <td colspan="<?php echo $is_national_hunt ? '17' : ($show_maturity_edge ? '21' : '20'); ?>">
-
-        <div class="runner-sr-history">
-            <h4 class="runner-sr-history__title">📊 Speed Rating History - <?php echo esc_html($runner->name); ?></h4>
+                        <?php
+                        $runner_card_wide = get_stylesheet_directory() . '/inc/runner-card-wide.php';
+                        if (is_readable($runner_card_wide)) {
+                            require $runner_card_wide;
+                        }
+                        ?>
+        <div class="runner-sr-history runner-sr-history--panel">
+            <h4 class="runner-sr-history__title">Speed rating history</h4>
+            <p class="runner-sr-history__subtitle"><?php echo esc_html($runner->name); ?></p>
             
             <div class="runner-sr-history__grid">
                 <!-- Last Time Out -->
@@ -4845,8 +4620,10 @@ if ($speed_data) {
                 </div>
             </div>
         </div>
-    </td>
-</tr>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
 
                         <?php endforeach; ?>
                     </tbody>
@@ -6461,13 +6238,9 @@ if (trainerPerformanceCtx) {
             const activeTrainers = new Set();
             document.querySelectorAll('.runner-row').forEach(function(row) {
                 if (!row.classList.contains('hidden')) {
-                    const trainerCell = row.querySelector('td:nth-last-child(2)');
-                    if (trainerCell) {
-                        const trainerText = trainerCell.textContent.trim();
-                        const trainerName = trainerText.split('\n')[0].trim();
-                        if (trainerName) {
-                            activeTrainers.add(trainerName);
-                        }
+                    const trainerName = (row.dataset.trainer || '').trim();
+                    if (trainerName) {
+                        activeTrainers.add(trainerName);
                     }
                 }
             });
@@ -6526,20 +6299,17 @@ if (trainerPerformanceCtx) {
 
 <script>
 // Toggle details rows
-jQuery(document).on('click', '.toggle-details-btn', function() {
-    const index = jQuery(this).data('runner-index');
-    const detailsRow = jQuery('.details-row-' + index);
-    const icon = jQuery(this).find('.toggle-icon');
-    
-    if (detailsRow.hasClass('is-open')) {
-        detailsRow.removeClass('is-open');
-        icon.text('▼');
-        jQuery(this).html('<span class="toggle-icon">▼</span> View');
-    } else {
-        detailsRow.addClass('is-open');
-        icon.text('▲');
-        jQuery(this).html('<span class="toggle-icon">▲</span> Hide');
-    }
+jQuery(document).on('click', '.toggle-details-btn', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const $btn = jQuery(this);
+    const $card = $btn.closest('.runner-card-wide');
+    const opening = !$card.hasClass('is-open');
+
+    $card.toggleClass('is-open', opening);
+    $btn.attr('aria-expanded', opening ? 'true' : 'false');
+    $btn.find('.toggle-icon').text(opening ? '▲' : '▼');
+    $btn.find('.toggle-details-btn__label').text(opening ? 'Hide' : 'Details');
 });
 
 </script>
@@ -6662,15 +6432,6 @@ jQuery(document).on('click', '.toggle-details-btn', function() {
                 document.querySelectorAll('.runner-row').forEach(function(row) {
                     if (row.dataset.isNonRunner === '1') {
                         row.classList.toggle('hidden', hide);
-                        var next = row.nextElementSibling;
-                        if (next && next.classList.contains('details-row')) {
-                            if (hide) {
-                                next.style.display = 'none';
-                                next.classList.add('hidden');
-                            } else {
-                                next.classList.remove('hidden');
-                            }
-                        }
                     }
                 });
                 updateActiveRunnerCount();
@@ -6758,21 +6519,11 @@ jQuery(document).on('click', '.toggle-details-btn', function() {
                     currentSortDirection = sortType === 'number' ? 'desc' : 'asc';
                 }
 
-                // Get all runner rows and their associated detail rows
-                var allRows = Array.from(tbody.querySelectorAll('tr'));
-                var rowPairs = [];
-                for (var i = 0; i < allRows.length; i++) {
-                    if (allRows[i].classList.contains('runner-row')) {
-                        var detailRow = (i + 1 < allRows.length && allRows[i + 1].classList.contains('details-row')) 
-                            ? allRows[i + 1] : null;
-                        rowPairs.push({ runner: allRows[i], detail: detailRow });
-                    }
-                }
+                var runnerRows = Array.from(tbody.querySelectorAll('tr.runner-row'));
 
-                // Sort the pairs
-                rowPairs.sort(function(a, b) {
-                    var valA = getDataAttr(a.runner, column);
-                    var valB = getDataAttr(b.runner, column);
+                runnerRows.sort(function(a, b) {
+                    var valA = getDataAttr(a, column);
+                    var valB = getDataAttr(b, column);
 
                     var result;
                     if (sortType === 'number') {
@@ -6784,20 +6535,15 @@ jQuery(document).on('click', '.toggle-details-btn', function() {
                     return currentSortDirection === 'desc' ? -result : result;
                 });
 
-                // Re-append rows in sorted order and update zebra striping
-                rowPairs.forEach(function(pair, idx) {
-                    var bgColor = idx % 2 === 0 ? '#ffffff' : '#f9fafb';
-                    // Preserve non-runner and SR highlight backgrounds
-                    if (pair.runner.dataset.isNonRunner === '1') {
-                        bgColor = '#dbeafe';
-                    } else if (pair.runner.dataset.srHighlight === '1') {
-                        bgColor = '#FFE7EF';
+                runnerRows.forEach(function(row, idx) {
+                    var card = row.querySelector('.runner-card-wide');
+                    if (card) {
+                        card.classList.remove('runner-card-wide--top');
+                        if (idx === 0 && column === 'fsr' && currentSortDirection === 'desc') {
+                            card.classList.add('runner-card-wide--top');
+                        }
                     }
-                    pair.runner.style.background = bgColor;
-                    tbody.appendChild(pair.runner);
-                    if (pair.detail) {
-                        tbody.appendChild(pair.detail);
-                    }
+                    tbody.appendChild(row);
                 });
 
                 // Update header sort indicators
