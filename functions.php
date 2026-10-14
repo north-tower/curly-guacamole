@@ -3608,12 +3608,17 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
 }
 
     </style>
-          <!-- Add debug info to the page -->
+    <?php
+    $rd_premium_css = get_stylesheet_directory() . '/race-detail-premium.css';
+    if (is_file($rd_premium_css)) {
+        echo '<link rel="stylesheet" href="' . esc_url(get_stylesheet_directory_uri() . '/race-detail-premium.css') . '?ver=' . esc_attr((string) filemtime($rd_premium_css)) . '">';
+    }
+    ?>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 
-    
-    <!-- Your existing styling and HTML continues here... -->
-
-    <div class="race-detail-container">
+    <div class="race-detail-container fhor-race-premium">
     <?php
     $race_upward_course = function_exists('bricks_seo_race_upward_context')
         ? bricks_seo_race_upward_context($race)
@@ -3942,11 +3947,51 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
                 </div>
             </div>
         </div>
+
+        <?php if ($runners && count($runners) > 0): ?>
+        <section class="fhor-race-picks" aria-label="Points engine picks">
+            <div class="fhor-race-pick fhor-race-pick--win">
+                <small>Win</small>
+                <div class="fhor-race-pick__name"><?php echo esc_html($race_points_picks['winner']['horse_name'] ?? 'N/A'); ?></div>
+            </div>
+            <div class="fhor-race-pick fhor-race-pick--place">
+                <small>Place</small>
+                <div class="fhor-race-pick__name"><?php echo esc_html(implode(' · ', array_map(function ($p) { return $p['horse_name'] ?? ''; }, $race_points_picks['place'] ?? [])) ?: 'N/A'); ?></div>
+            </div>
+            <div class="fhor-race-pick fhor-race-pick--ew">
+                <small>EW Simple</small>
+                <div class="fhor-race-pick__name"><?php echo esc_html($race_points_ew_simple['horse_name'] ?? 'N/A'); ?></div>
+            </div>
+            <div class="fhor-race-pick fhor-race-pick--ew">
+                <small>EW Edge</small>
+                <div class="fhor-race-pick__name">
+                    <?php
+                    $ew_edge_name = $race_points_ew_edge['horse_name'] ?? 'N/A';
+                    $ew_edge_score = isset($race_points_ew_edge['edge_score']) ? floatval($race_points_ew_edge['edge_score']) : null;
+                    echo esc_html($ew_edge_name);
+                    if ($ew_edge_score !== null && $ew_edge_name !== 'N/A') {
+                        echo ' <span style="font-size:13px;font-weight:600;color:var(--rd-mu);">+' . esc_html(number_format($ew_edge_score, 1)) . '</span>';
+                    }
+                    ?>
+                </div>
+            </div>
+        </section>
+
+        <div class="fhor-race-tabs" role="tablist" aria-label="Race data views">
+            <button type="button" class="fhor-race-tab is-active" role="tab" aria-selected="true" data-fhor-panel="runners" id="fhor-race-tab-runners">Runners</button>
+            <button type="button" class="fhor-race-tab" role="tab" aria-selected="false" data-fhor-panel="analysis" id="fhor-race-tab-analysis">Analysis</button>
+            <?php if ($race_show_premium_data): ?>
+            <button type="button" class="fhor-race-tab" role="tab" aria-selected="false" data-fhor-panel="pace" id="fhor-race-tab-pace">Pace map</button>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
         
         <?php if ($runners && count($runners) > 0): ?>
 
         <div class="premium-ratings-container paywall">
-        
+        <div id="race-detail-charts-<?php echo intval($race_id); ?>" class="fhor-race-charts-sentinel" aria-hidden="true"></div>
+
+        <div class="fhor-race-panel is-active" id="fhor-race-panel-runners" data-fhor-panel="runners" role="tabpanel" aria-labelledby="fhor-race-tab-runners">
         <!-- Runners Table -->
         <div class="runners-card">
             <div class="runners-header">
@@ -3970,24 +4015,6 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
                 <?php endif; ?>
             </div>
 
-            <div class="fhor-picks">
-                <div class="fhor-picks__title">Points Engine Picks</div>
-                <div class="fhor-picks__list">
-                    <span class="fhor-picks__chip" title="Top model score among active runners.">
-                        Win: <?php echo esc_html($race_points_picks['winner']['horse_name'] ?? 'N/A'); ?>
-                    </span>
-                    <span class="fhor-picks__chip" title="Top 3 model-ranked runners for place profile.">
-                        Place: <?php echo esc_html(implode(', ', array_map(function($p){ return $p['horse_name'] ?? ''; }, $race_points_picks['place'] ?? [])) ?: 'N/A'); ?>
-                    </span>
-                    <span class="fhor-picks__chip fhor-picks__chip--ew-simple" title="Simple each-way signal: odds 5/1+ and highest model score.">
-                        EW Simple: <?php echo esc_html($race_points_ew_simple['horse_name'] ?? 'N/A'); ?>
-                    </span>
-                    <span class="fhor-picks__chip fhor-picks__chip--ew-edge" title="Edge each-way signal: odds 5/1+ with strong model-vs-market edge.">
-                        EW Edge: <?php echo esc_html($race_points_ew_edge['horse_name'] ?? 'N/A'); ?>
-                    </span>
-                </div>
-            </div>
-
             <!-- Filter Controls -->
     <div class="filter-controls">
         <div class="filter-toggle">
@@ -4002,8 +4029,9 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
             </label>
             <?php endif; ?>
         </div>
-        <div style="font-size:12px;color:#6b7280;">
+        <div class="filter-controls__meta">
             <span id="activeRunnersCount"><?php echo count($runners); ?></span> runners shown
+            <span class="filter-controls__hint">All stats per runner — scroll vertically only</span>
         </div>
     </div>
     <div class="lin5-legend">
@@ -4057,7 +4085,7 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
             </div>
 
             <div class="runners-table-wrapper">
-               <table class="runners-table <?php echo $is_national_hunt ? 'national-hunt' : 'flat-race'; ?>">
+               <table class="runners-table runners-table--fit <?php echo $is_national_hunt ? 'national-hunt' : 'flat-race'; ?>">
 
                    <thead>
                 <tr>
@@ -4449,7 +4477,16 @@ if ($speed_data) {
                                 
                                 <!-- Comb -->
                                 <td class="runner-cell runner-cell--stat" data-label="Comb">
-                                    <div class="<?php echo (floatval(str_replace('%', '', $comb)) >= 70) ? 'green-text' : ''; ?>" style="font-weight:600;"><?php echo esc_html($comb); ?></div>
+                                    <?php
+                                    $comb_num = floatval(str_replace('%', '', (string) $comb));
+                                    $comb_width = ($comb_num > 0 && $comb !== '-') ? min(100, max(0, $comb_num)) : 0;
+                                    ?>
+                                    <div class="fhor-comb-wrap">
+                                        <span class="<?php echo ($comb_num >= 70) ? 'green-text' : ''; ?>" style="font-weight:600;"><?php echo esc_html($comb); ?></span>
+                                        <?php if ($comb_width > 0): ?>
+                                        <span class="fhor-meter" aria-hidden="true"><i style="width:<?php echo esc_attr((string) $comb_width); ?>%"></i></span>
+                                        <?php endif; ?>
+                                    </div>
                                 </td>
                                 
                                 <!-- Form -->
@@ -4512,16 +4549,16 @@ if ($speed_data) {
                             ?>
                             <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">
                                 <?php if ($is_win_candidate): ?>
-                                    <span title="Top overall model score for this race." style="display:inline-block;padding:2px 6px;border-radius:999px;background:#dcfce7;color:#166534;font-size:10px;font-weight:700;">Win Candidate</span>
+                                    <span class="fhor-pick-pill fhor-pick-pill--w" title="Top overall model score for this race.">Win</span>
                                 <?php endif; ?>
                                 <?php if ($is_place_candidate): ?>
-                                    <span title="Top 3 model-ranked runner for place profile." style="display:inline-block;padding:2px 6px;border-radius:999px;background:#dbeafe;color:#1e40af;font-size:10px;font-weight:700;">Place Candidate</span>
+                                    <span class="fhor-pick-pill fhor-pick-pill--p" title="Top 3 model-ranked runner for place profile.">Place</span>
                                 <?php endif; ?>
                                 <?php if ($is_ew_simple): ?>
-                                    <span title="Simple EW: odds 5/1+ and best model score among EW-eligible runners." style="display:inline-block;padding:2px 6px;border-radius:999px;background:#ffedd5;color:#9a3412;font-size:10px;font-weight:700;">EW Simple</span>
+                                    <span class="fhor-pick-pill fhor-pick-pill--ew" title="Simple EW: odds 5/1+ and best model score among EW-eligible runners.">EW</span>
                                 <?php endif; ?>
                                 <?php if ($is_ew_edge): ?>
-                                    <span title="Edge EW: odds 5/1+ and strong model-vs-market edge." style="display:inline-block;padding:2px 6px;border-radius:999px;background:#ede9fe;color:#5b21b6;font-size:10px;font-weight:700;">EW Edge</span>
+                                    <span class="fhor-pick-pill fhor-pick-pill--ew" title="Edge EW: odds 5/1+ and strong model-vs-market edge.">EW Edge</span>
                                 <?php endif; ?>
                                 <?php if ($points_edge > 0): ?>
                                     <span title="Model vs market edge score. Higher means bigger disagreement in your favour." style="display:inline-block;padding:2px 6px;border-radius:999px;background:#f3f4f6;color:#374151;font-size:10px;font-weight:700;">Edge <?php echo esc_html(number_format($points_edge, 1)); ?></span>
@@ -4816,6 +4853,9 @@ if ($speed_data) {
                 </table>
             </div>
         </div>
+        </div><!-- #fhor-race-panel-runners -->
+
+        <div class="fhor-race-panel" id="fhor-race-panel-analysis" data-fhor-panel="analysis" role="tabpanel" aria-labelledby="fhor-race-tab-analysis" hidden>
 
           <!-- Speed Rating Chart Section -->
         <?php
@@ -4823,7 +4863,6 @@ if ($speed_data) {
         $runner_count_chart = is_countable($runners) ? count($runners) : 0;
         $speed_chart_height_px = min(2400, max(500, ($runner_count_chart * 52) + 160));
         ?>
-        <div id="race-detail-charts-<?php echo intval($race_id); ?>"></div>
         <div class="fhor-panel">
             <h2 class="fhor-panel__title">📊 Fhorsite and Speed Rating Analysis</h2>
             <div class="fhor-chart-box speed-rating-chart-container" style="height:<?php echo (int) $speed_chart_height_px; ?>px;min-height:420px;">
@@ -4906,6 +4945,8 @@ if ($speed_data) {
             </div>
         </div>
         <?php endif; ?>
+
+        </div><!-- #fhor-race-panel-analysis -->
 
         <!-- Chart init runs after lazy Chart.js load (see inc/race-detail-perf.php) -->
         <script>
@@ -6549,15 +6590,44 @@ jQuery(document).on('click', '.toggle-details-btn', function() {
         <?php endif; ?>
 
         <?php if ($race_show_premium_data): ?>
+        <div class="fhor-race-panel" id="fhor-race-panel-pace" data-fhor-panel="pace" role="tabpanel" aria-labelledby="fhor-race-tab-pace" hidden>
         <?php
         echo do_shortcode('[competitors_pace_card race_id="' . intval($race_id) . '"]');
         echo do_shortcode('[pace_map race_id="' . intval($race_id) . '"]');
         ?>
+        </div>
         <?php endif; ?>
     </div>
 
     <script>
         (function() {
+            var tabRoot = document.querySelector('.fhor-race-premium');
+            if (tabRoot) {
+                var tabs = tabRoot.querySelectorAll('.fhor-race-tab');
+                var panels = tabRoot.querySelectorAll('.fhor-race-panel');
+                tabs.forEach(function(tab) {
+                    tab.addEventListener('click', function() {
+                        var id = tab.getAttribute('data-fhor-panel');
+                        tabs.forEach(function(t) {
+                            var on = t === tab;
+                            t.classList.toggle('is-active', on);
+                            t.setAttribute('aria-selected', on ? 'true' : 'false');
+                        });
+                        panels.forEach(function(panel) {
+                            var show = panel.getAttribute('data-fhor-panel') === id;
+                            if (show) {
+                                panel.removeAttribute('hidden');
+                            } else {
+                                panel.setAttribute('hidden', '');
+                            }
+                        });
+                        if (id === 'analysis' && window.dispatchEvent) {
+                            window.dispatchEvent(new Event('resize'));
+                        }
+                    });
+                });
+            }
+
             function updateActiveRunnerCount() {
                 var counter = document.getElementById('activeRunnersCount');
                 if (!counter) {

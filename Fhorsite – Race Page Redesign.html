@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fhorsite – Race Page Redesign</title>
+<style>
+:root{--bg:#0b0f14;--s1:#121821;--s2:#182130;--line:#243044;--tx:#e8edf5;--mu:#8b97ab;--ac:#2fd08a;--ac2:#4c8dff;--warn:#f5b84b;--bad:#ff6b6b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f4f6fa;--s1:#fff;--s2:#eef2f8;--line:#dbe2ee;--tx:#111827;--mu:#5b667a}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 Inter,system-ui,-apple-system,Segoe UI,sans-serif}
+.wrap{max-width:1280px;margin:0 auto;padding:0 16px 90px}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top .in{max-width:1280px;margin:0 auto;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.logo{font-weight:800;letter-spacing:.3px;color:var(--ac)}.crumb{color:var(--mu);font-size:12px}
+.sel{background:var(--s1);border:1px solid var(--line);color:var(--tx);padding:8px 12px;border-radius:10px;font-weight:600}
+.times{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;flex:1}
+.t{padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--s1);color:var(--mu);font-size:13px;white-space:nowrap;cursor:pointer}
+.t.on{background:var(--ac);color:#04130c;border-color:var(--ac);font-weight:700}
+.hero{margin:18px 0;background:linear-gradient(135deg,var(--s2),var(--s1));border:1px solid var(--line);border-radius:18px;padding:22px}
+.eyebrow{color:var(--ac);font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase}
+h1{margin:6px 0 14px;font-size:clamp(20px,3.2vw,30px);line-height:1.2}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:7px 11px}
+.chip small{display:block;color:var(--mu);font-size:10.5px;text-transform:uppercase;letter-spacing:.6px}.chip b{font-size:13px}
+.row2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--s1);border:1px solid var(--line);border-radius:14px;padding:14px}
+.advice{border-left:3px solid var(--warn)}.prize b{font-size:18px}
+.picks{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:16px 0}
+.pick{border-radius:14px;padding:14px;border:1px solid var(--line);background:var(--s1)}
+.pick small{color:var(--mu);text-transform:uppercase;font-size:11px;letter-spacing:.6px}.pick .n{font-size:17px;font-weight:700;margin-top:3px}
+.pick.w{border-color:var(--ac)}.pick.p{border-color:var(--ac2)}.pick.e{border-color:var(--warn)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:22px 0 12px}
+.tab{padding:10px 16px;background:none;border:0;color:var(--mu);font-weight:600;border-bottom:2px solid transparent;cursor:pointer}
+.tab.on{color:var(--tx);border-color:var(--ac)}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.bar label{color:var(--mu);font-size:13px;display:flex;gap:6px;align-items:center}.sp{flex:1}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--s1)}
+table{border-collapse:collapse;width:100%;min-width:980px}
+th{position:sticky;top:0;background:var(--s2);color:var(--mu);font-size:11px;letter-spacing:.7px;text-transform:uppercase;padding:10px 8px;text-align:right;cursor:pointer;white-space:nowrap}
+th.l,td.l{text-align:left}th.on{color:var(--ac)}
+td{padding:11px 8px;text-align:right;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+tr.r:hover{background:var(--s2)}
+td.l:first-child,th.l:first-child{position:sticky;left:0;background:inherit;z-index:2}
+td.l:first-child{background:var(--s1)}tr.r:hover td.l:first-child{background:var(--s2)}
+.no{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--ac2);color:#fff;font-weight:700}
+.nm{font-weight:700}.sub{color:var(--mu);font-size:12px}
+.hl{font-weight:700;color:var(--ac)}.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
+.pw{background:#2fd08a22;color:var(--ac)}.pp{background:#4c8dff22;color:var(--ac2)}.pe{background:#f5b84b22;color:var(--warn)}
+.meter{width:70px;height:6px;background:var(--line);border-radius:9px;display:inline-block;vertical-align:middle;margin-left:6px;overflow:hidden}.meter i{display:block;height:100%;background:var(--ac)}
+.btn{background:var(--s2);border:1px solid var(--line);color:var(--tx);padding:6px 10px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer}
+.btn.pr{background:var(--ac);color:#04130c;border-color:var(--ac)}
+.detail td{background:var(--s2);text-align:left}.dg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.dg div small{display:block;color:var(--mu);font-size:11px;text-transform:uppercase}
+.legend{color:var(--mu);font-size:12px;margin-top:10px}
+.cards{display:none}
+.rc{background:var(--s1);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px}
+.rc .h{display:flex;gap:10px;align-items:center}.rc .g{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+.rc .g div{background:var(--bg);border-radius:9px;padding:7px 8px}.rc .g small{display:block;color:var(--mu);font-size:10px;text-transform:uppercase}
+.bars .b{display:grid;grid-template-columns:150px 1fr 50px;gap:10px;align-items:center;margin:9px 0}
+.bars .tr{height:10px;background:var(--line);border-radius:9px;overflow:hidden}.bars .tr i{display:block;height:100%;background:linear-gradient(90deg,var(--ac2),var(--ac))}
+.zones{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:30}
+.dock{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.modal{position:fixed;inset:0;background:#000a;display:none;place-items:center;z-index:50;padding:16px}.modal.on{display:grid}
+.mb{background:var(--s1);border:1px solid var(--line);border-radius:16px;padding:20px;width:min(440px,100%)}
+.mb label{display:block;color:var(--mu);font-size:12px;margin:10px 0 4px}
+.mb input,.mb select{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--tx);padding:9px;border-radius:9px}
+.ft{display:flex;gap:8px;margin-top:16px}
+@media(max-width:760px){.tw,.legend{display:none}.cards{display:block}.bars .b{grid-template-columns:100px 1fr 40px}.hide-m{display:none}}
+</style></head><body>
+<div class="top"><div class="in">
+<span class="logo">FHORSITE</span><span class="crumb hide-m">Horse Racing / Nottingham</span>
+<select class="sel" aria-label="Course"><option>Nottingham</option><option>Kempton</option><option>Ffos Las</option><option>Punchestown</option></select>
+<div class="times" id="times"></div></div></div>
+
+<div class="wrap">
+<section class="hero">
+<div class="eyebrow">13:19 · Nottingham · Wed 14 Oct 2026</div>
+<h1>31st Oct Halloween Spooktacular Novice Stakes (GBB Race)</h1>
+<div class="chips">
+<div class="chip"><small>Class</small><b>4 · 2YO only</b></div><div class="chip"><small>Runners</small><b>7 · England</b></div>
+<div class="chip"><small>Type</small><b>Flat · Non-Handicap</b></div><div class="chip"><small>Distance</small><b>1108y (5f)</b></div>
+<div class="chip"><small>Going</small><b>Good to soft-soft in places</b></div><div class="chip"><small>Track</small><b>Turf · Left · Flat</b></div>
+<div class="chip"><small>Features</small><b>Galloping</b></div></div>
+<div class="row2">
+<div class="card advice"><small class="sub">TRACK ADVICE</small><div>High best in 5f &amp; 6f races.</div></div>
+<div class="card prize"><small class="sub">PRIZE MONEY</small><div><b>£5,234</b> <span class="sub">1st</span> · <b>£2,456</b> <span class="sub">2nd</span> · <b>£1,227</b> <span class="sub">3rd</span></div></div>
+<div class="card"><small class="sub">LAST YEAR'S WINNER</small><div><b>Westgate Warrior</b> <span class="sub">7/1 · S Bowring / Alistair Rawlinson</span></div></div>
+</div></section>
+
+<section class="picks">
+<div class="pick w"><small>Win</small><div class="n">Enriched</div></div>
+<div class="pick p"><small>Place</small><div class="n">Enriched · Chevere · Shaniko</div></div>
+<div class="pick e"><small>EW Simple</small><div class="n">Chevere</div></div>
+<div class="pick e"><small>EW Edge</small><div class="n">Chevere <span class="sub">+12.0</span></div></div>
+</section>
+
+<div class="tabs" role="tablist"><button class="tab on" data-t="runners">Runners</button><button class="tab" data-t="analysis">Analysis</button><button class="tab" data-t="pace">Pace map</button></div>
+
+<div id="runners">
+<div class="bar"><label><input type="checkbox" id="hideNR"> Hide non-runners</label><label><input type="checkbox" id="mat" checked> Maturity badges</label>
+<span class="sp"></span><label>Sort by <select class="sel" id="sortSel"></select></label></div>
+<div class="tw"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+<div class="cards" id="cards"></div>
+<div class="legend"><b>Lin5</b> = 5-year sire lineage signal (higher is better; confidence High/Med/Low by sample size). <b>DI/CD</b> = Dosage Index / Center of Distribution (higher = more speed, lower = more stamina). Click a row to expand.</div>
+</div>
+
+<div id="analysis" hidden><div class="card bars" id="bars"></div></div>
+<div id="pace" hidden><div class="zones" id="zones"></div></div>
+</div>
+
+<div class="modal" id="modal"><div class="mb">
+<h3 style="margin:0">Log bet</h3><div class="sub" id="mSel"></div>
+<label>Bet type</label><select><option>Single</option><option>Each-way</option></select>
+<label>Odds</label><input value="6/1">
+<label>Stake (£)</label><input id="stake" value="5.00">
+<label><input type="checkbox" checked style="width:auto"> Use recommended stake (Dynamic 5% · £5.00)</label>
+<label>Note</label><input placeholder="Optional">
+<div class="ft"><button class="btn pr" onclick="closeM()">Save bet</button><button class="btn" onclick="closeM()">Cancel</button></div>
+</div></div>
+
+<script>
+const R=[
+{n:4,h:'Enriched',st:2,db:10.4,w:0,p:50,fsr:15.97,rr:50.10,pts:39.7,comb:85.5,form:'36',dslr:25,wgt:'9-2',mat:'+4',lin:48.9,di:'2.00 / 0.33',cls:'+1',or:0,j:'Saffie Osborne',t:'Tom Clover',tags:['W','P']},
+{n:6,h:'Troublesome Guest',st:7,db:11.3,w:0,p:20,fsr:9.89,rr:68.55,pts:22.0,comb:31,form:'38654',dslr:70,wgt:'9-2',mat:'+1',lin:49.0,di:'—',cls:'+1',or:1,j:'Callum Shepherd',t:'G G Margarson',tags:[]},
+{n:5,h:'Shaniko',st:5,db:12,w:0,p:50,fsr:8.50,rr:51.62,pts:30.8,comb:40.8,form:'824423',dslr:18,wgt:'9-2',mat:'+4',lin:53.2,di:'2.00 / 0.33',cls:'+1',or:2,j:'D Allan',t:'Craig Lidster',tags:['P']},
+{n:1,h:'Chevere',st:6,db:13.3,w:0,p:0,fsr:6.10,rr:39.35,pts:33.7,comb:70.8,form:'87',dslr:26,wgt:'9-7',mat:'+1',lin:54.5,di:'0.33 / -0.50',cls:'0',or:0,j:'Callum Rodriguez',t:'Owen Burrows',tags:['P','EW']},
+{n:3,h:"Blake's Lass",st:4,db:12.8,w:0,p:50,fsr:5.18,rr:50.10,pts:23.3,comb:53.3,form:'25',dslr:121,wgt:'9-2',mat:'+4',lin:44.0,di:'0.33 / -0.50',cls:'+1',or:0,j:'T Eaves',t:'I Furtado',tags:[]},
+{n:7,h:'Valentina Bonita',st:3,db:11.7,w:0,p:0,fsr:3.11,rr:33.03,pts:24.2,comb:62.1,form:'—',dslr:16,wgt:'9-2',mat:'+4',lin:49.4,di:'0.33 / -0.50',cls:'0',or:0,j:'—',t:'M & D Easterby',tags:[]},
+{n:2,h:'Eagles Eternal',st:1,db:12.2,w:0,p:0,fsr:0,rr:11.87,pts:18.9,comb:64,form:'—',dslr:'—',wgt:'9-7',mat:'+2',lin:50.4,di:'2.33 / 0.40',cls:'0',or:0,j:'—',t:'J S Goldie',tags:[]}];
+const cols=[['no','No.'],['h','Name'],['st','Stall'],['db','DB%'],['p','Pla%'],['fsr','FSR'],['rr','FSRR'],['pts','Pts'],['comb','Comb'],['form','Form'],['dslr','DSLR'],['wgt','Wgt'],['lin','Lin5'],['di','DI/CD'],['or','OR+/-'],['j','Jockey / Trainer']];
+let sk='fsr',dir=-1,open=null;
+const $=s=>document.querySelector(s);
+$('#times').innerHTML=['13:19','13:54','14:29','15:04','15:39','16:14','16:47','17:22'].map((t,i)=>`<span class="t ${i?'':'on'}">${t}</span>`).join('');
+document.querySelectorAll('.t').forEach(e=>e.onclick=()=>{document.querySelectorAll('.t').forEach(x=>x.classList.remove('on'));e.classList.add('on')});
+$('#sortSel').innerHTML=cols.filter(c=>!['no','form','wgt','di','j'].includes(c[0])).map(c=>`<option value="${c[0]}" ${c[0]==sk?'selected':''}>${c[1]}</option>`).join('');
+$('#sortSel').onchange=e=>{sk=e.target.value;dir=sk=='h'||sk=='st'?1:-1;render()};
+function tagHtml(r){return r.tags.map(t=>t=='W'?'<span class="pill pw">Win</span>':t=='P'?'<span class="pill pp">Place</span>':'<span class="pill pe">EW</span>').join(' ')}
+function sorted(){return [...R].sort((a,b)=>{let x=a[sk],y=b[sk];if(sk=='no'){x=a.n;y=b.n}return (typeof x=='string'?x.localeCompare(y):(+x||0)-(+y||0))*dir})}
+function render(){
+$('#thead').innerHTML='<tr>'+cols.map(c=>`<th class="${['h','j'].includes(c[0])||c[0]=='no'?'l':''} ${c[0]==sk?'on':''}" data-k="${c[0]}">${c[1]}${c[0]==sk?(dir<0?' ▾':' ▴'):''}</th>`).join('')+'<th></th></tr>';
+document.querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(['j','di','form','wgt'].includes(k))return;dir=k==sk?-dir:-1;sk=k;$('#sortSel').value=k in $('#sortSel').options?k:sk;render()});
+const rows=sorted();
+$('#tbody').innerHTML=rows.map(r=>`<tr class="r" data-n="${r.n}" style="cursor:pointer">
+<td class="l"><span class="no">${r.n}</span></td>
+<td class="l"><div class="nm">${r.h}</div><div>${tagHtml(r)} ${$('#mat').checked?`<span class="sub">Maturity ${r.mat}</span>`:''}</div></td>
+<td>${r.st}</td><td>${r.db}%</td><td>${r.p}%</td><td class="hl">${r.fsr.toFixed(2)}</td><td>${r.rr.toFixed(2)}</td><td><b>${r.pts}</b></td>
+<td>${r.comb}%<span class="meter"><i style="width:${r.comb}%"></i></span></td><td>${r.form}</td><td>${r.dslr}</td><td>${r.wgt}</td>
+<td>${r.lin}%</td><td>${r.di}</td><td>${r.or>0?'+':''}${r.or}</td>
+<td class="l">${r.j}<div class="sub">${r.t}</div></td>
+<td><button class="btn pr" data-bet="${r.h}">+ Bet</button></td></tr>
+${open==r.n?`<tr class="detail"><td colspan="17"><div class="dg"><div><small>Class change</small>${r.cls}</div><div><small>Lin5 confidence</small>High</div><div><small>Win rate</small>${r.w}%</div><div><small>Notes</small><input class="sel" placeholder="Add your note…"></div><div><button class="btn">Add to tracker</button> <button class="btn" data-bet="${r.h}">Add to bet tracker</button></div></div></td></tr>`:''}`).join('');
+$('#cards').innerHTML=rows.map(r=>`<div class="rc"><div class="h"><span class="no">${r.n}</span><div style="flex:1"><div class="nm">${r.h}</div><div class="sub">${r.j} · ${r.t}</div></div><button class="btn pr" data-bet="${r.h}">+ Bet</button></div>
+<div style="margin-top:8px">${tagHtml(r)}</div>
+<div class="g"><div><small>FSR</small><b class="hl">${r.fsr.toFixed(2)}</b></div><div><small>Pts</small><b>${r.pts}</b></div><div><small>Comb</small><b>${r.comb}%</b></div><div><small>Lin5</small><b>${r.lin}%</b></div>
+<div><small>Stall</small>${r.st}</div><div><small>Pla%</small>${r.p}%</div><div><small>Form</small>${r.form}</div><div><small>Wgt</small>${r.wgt}</div></div></div>`).join('');
+document.querySelectorAll('tr.r').forEach(tr=>tr.onclick=e=>{if(e.target.closest('button'))return;open=open==tr.dataset.n?null:tr.dataset.n;render()});
+document.querySelectorAll('[data-bet]').forEach(b=>b.onclick=e=>{e.stopPropagation();$('#mSel').textContent=b.dataset.bet+' · Nottingham 13:19';$('#modal').classList.add('on')});
+}
+function closeM(){$('#modal').classList.remove('on')}
+$('#modal').onclick=e=>{if(e.target.id=='modal')closeM()};$('#mat').onchange=render;$('#hideNR').onchange=render;
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');['runners','analysis','pace'].forEach(id=>$('#'+id).hidden=id!=t.dataset.t)});
+$('#bars').innerHTML='<b>Fhorsite speed rating (FSRR)</b><div class="sub" style="margin-bottom:6px">Ranked, higher is better</div>'+[...R].sort((a,b)=>b.rr-a.rr).map(r=>`<div class="b"><span>${r.n}. ${r.h}</span><div class="tr"><i style="width:${r.rr}%"></i></div><b>${r.rr.toFixed(1)}</b></div>`).join('');
+const z=[['Zone 1 · Pace setters',['Enriched','Shaniko']],['Zone 2 · Prominent',['Troublesome Guest','Eagles Eternal']],['Zone 3 · Midfield',["Blake's Lass",'Valentina Bonita']],['Zone 4 · Rear chasers',['Chevere']]];
+$('#zones').innerHTML=z.map(a=>`<div class="card"><b>${a[0]}</b>${a[1].map(n=>`<div style="margin-top:8px" class="chip">${n}</div>`).join('')}</div>`).join('');
+render();
+</script></body></html>

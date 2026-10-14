@@ -1,0 +1,885 @@
+/**
+ * Race detail — premium layout (aligned with Fhorsite Race Page Redesign mock).
+ * Loaded after inline shortcode styles so these rules take precedence.
+ */
+
+.race-detail-page-shell:has(.fhor-race-premium) {
+  --rd-bg: #0b0f14;
+  --rd-s1: #121821;
+  --rd-s2: #182130;
+  --rd-line: #243044;
+  --rd-tx: #e8edf5;
+  --rd-mu: #8b97ab;
+  --rd-ac: #2fd08a;
+  --rd-ac2: #4c8dff;
+  --rd-warn: #f5b84b;
+  --fhor-bg: var(--rd-bg);
+  --fhor-surface: var(--rd-s1);
+  --fhor-surface-muted: var(--rd-s2);
+  --fhor-ink: var(--rd-tx);
+  --fhor-ink-muted: var(--rd-mu);
+  --fhor-border: var(--rd-line);
+  --fhor-primary: var(--rd-ac2);
+  --fhor-accent: var(--rd-ac);
+  background: var(--rd-bg);
+  color: var(--rd-tx);
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  max-width: 1280px;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+@media (prefers-color-scheme: light) {
+  .race-detail-page-shell:has(.fhor-race-premium) {
+    --rd-bg: #f4f6fa;
+    --rd-s1: #ffffff;
+    --rd-s2: #eef2f8;
+    --rd-line: #dbe2ee;
+    --rd-tx: #111827;
+    --rd-mu: #5b667a;
+  }
+}
+
+.fhor-race-premium {
+  max-width: 1280px;
+  padding: 0 0 90px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.fhor-race-premium .race-upward-links {
+  padding: 0;
+  margin-bottom: 12px;
+}
+
+.fhor-race-premium .race-upward-breadcrumb__list {
+  color: var(--rd-mu);
+  font-size: 12px;
+}
+
+.fhor-race-premium .race-upward-breadcrumb__item a {
+  color: var(--rd-ac2);
+}
+
+.fhor-race-premium .race-hub-cta {
+  background: color-mix(in srgb, var(--rd-ac2) 8%, var(--rd-s1));
+  border-color: var(--rd-line);
+}
+
+.fhor-race-premium .race-hub-cta__text {
+  color: var(--rd-tx);
+}
+
+.fhor-race-premium .back-button-container {
+  margin-bottom: 12px;
+  padding: 0;
+}
+
+.fhor-race-premium .back-button {
+  background: var(--rd-s2);
+  color: var(--rd-tx);
+  border: 1px solid var(--rd-line);
+  box-shadow: none;
+  padding: 8px 14px;
+  font-size: 13px;
+  border-radius: 10px;
+}
+
+.fhor-race-premium .back-button:hover {
+  transform: none;
+  background: var(--rd-s1);
+  color: var(--rd-tx);
+  box-shadow: none;
+}
+
+.fhor-race-premium .race-quick-nav {
+  position: sticky;
+  top: env(safe-area-inset-top, 0);
+  z-index: 25;
+  margin-bottom: 18px;
+  padding: 0;
+  background: color-mix(in srgb, var(--rd-bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border: none;
+  border-bottom: 1px solid var(--rd-line);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.fhor-race-premium .race-quick-nav-top {
+  padding: 10px 0;
+  border-bottom: none;
+  gap: 12px;
+}
+
+.fhor-race-premium .race-quick-nav-breadcrumb {
+  font-size: 12px;
+  color: var(--rd-mu);
+}
+
+.fhor-race-premium .race-quick-nav-breadcrumb a {
+  color: var(--rd-ac2);
+}
+
+.fhor-race-premium .course-selector-btn {
+  background: var(--rd-s1);
+  color: var(--rd-tx);
+  border: 1px solid var(--rd-line);
+  box-shadow: none;
+  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: 10px;
+}
+
+.fhor-race-premium .course-selector-btn:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.fhor-race-premium .course-dropdown {
+  background: var(--rd-s1);
+  border-color: var(--rd-line);
+}
+
+.fhor-race-premium .race-quick-nav-times {
+  flex: 1;
+  min-width: 0;
+  scrollbar-width: none;
+}
+
+.fhor-race-premium .race-quick-nav-times::-webkit-scrollbar {
+  display: none;
+}
+
+.fhor-race-premium .race-time-slot {
+  padding: 6px 11px;
+  border-radius: 999px;
+  font-size: 13px;
+  background: var(--rd-s1);
+  color: var(--rd-mu);
+  border: 1px solid var(--rd-line);
+}
+
+.fhor-race-premium .race-time-slot:hover {
+  background: var(--rd-s2);
+  color: var(--rd-tx);
+}
+
+.fhor-race-premium .race-time-slot.active {
+  background: var(--rd-ac);
+  color: #04130c;
+  border-color: var(--rd-ac);
+  box-shadow: none;
+  font-weight: 700;
+}
+
+/* Hero */
+.fhor-race-premium .race-header-card {
+  background: linear-gradient(135deg, var(--rd-s2), var(--rd-s1));
+  border: 1px solid var(--rd-line);
+  border-radius: 18px;
+  box-shadow: none;
+  margin-bottom: 16px;
+}
+
+.fhor-race-premium .race-header-top {
+  background: transparent;
+  border-bottom: none;
+  padding: 22px 22px 0;
+}
+
+.fhor-race-premium .race-meta-time {
+  color: var(--rd-ac);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.fhor-race-premium .race-title {
+  color: var(--rd-tx);
+  font-size: clamp(20px, 3.2vw, 30px);
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 14px;
+  text-wrap: balance;
+}
+
+.fhor-race-premium .race-details-grid {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.fhor-race-premium .race-detail-item {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 7px 11px;
+  background: var(--rd-bg);
+  border: 1px solid var(--rd-line);
+  border-radius: 10px;
+  backdrop-filter: none;
+}
+
+.fhor-race-premium .race-detail-icon {
+  display: none;
+}
+
+.fhor-race-premium .race-detail-label {
+  font-size: 10.5px;
+  letter-spacing: 0.6px;
+  opacity: 1;
+  color: var(--rd-mu);
+  margin-bottom: 0;
+}
+
+.fhor-race-premium .race-detail-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rd-tx);
+}
+
+.fhor-race-premium .race-header-bottom {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  padding: 14px 22px 22px;
+}
+
+.fhor-race-premium .track-advice-box {
+  background: var(--rd-s1);
+  border: 1px solid var(--rd-line);
+  border-left: 3px solid var(--rd-warn);
+  border-radius: 14px;
+  color: var(--rd-tx);
+  margin: 0;
+  padding: 14px;
+}
+
+.fhor-race-premium .track-advice-box strong {
+  color: var(--rd-mu);
+  font-size: 11px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.fhor-race-premium .prize-info {
+  margin: 0;
+  display: block;
+  background: var(--rd-s1);
+  border: 1px solid var(--rd-line);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.fhor-race-premium .prize-item {
+  background: transparent;
+  border: none;
+  padding: 0;
+  display: inline;
+}
+
+.fhor-race-premium .prize-label {
+  display: none;
+}
+
+.fhor-race-premium .prize-amount {
+  font-size: 18px;
+  color: var(--rd-tx);
+  display: inline;
+}
+
+.fhor-race-premium .prize-info::before {
+  content: "Prize money";
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--rd-mu);
+  margin-bottom: 8px;
+}
+
+.fhor-race-premium .last-year-winner {
+  background: var(--rd-s1);
+  border: 1px solid var(--rd-line);
+  border-radius: 14px;
+  color: var(--rd-tx);
+  padding: 14px;
+}
+
+.fhor-race-premium .last-year-label {
+  color: var(--rd-mu);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.fhor-race-premium .last-year-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--rd-tx);
+}
+
+/* Picks */
+.fhor-race-picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+.fhor-race-pick {
+  border-radius: 14px;
+  padding: 14px;
+  border: 1px solid var(--rd-line);
+  background: var(--rd-s1);
+}
+
+.fhor-race-pick small {
+  color: var(--rd-mu);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.6px;
+}
+
+.fhor-race-pick__name {
+  font-size: 17px;
+  font-weight: 700;
+  margin-top: 3px;
+  color: var(--rd-tx);
+  overflow-wrap: anywhere;
+}
+
+.fhor-race-pick--win {
+  border-color: var(--rd-ac);
+}
+
+.fhor-race-pick--place {
+  border-color: var(--rd-ac2);
+}
+
+.fhor-race-pick--ew {
+  border-color: var(--rd-warn);
+}
+
+/* Tabs */
+.fhor-race-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--rd-line);
+  margin: 8px 0 12px;
+}
+
+.fhor-race-tab {
+  padding: 10px 16px;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--rd-mu);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: inherit;
+  margin-bottom: -1px;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.fhor-race-tab:hover {
+  color: var(--rd-tx);
+}
+
+.fhor-race-tab.is-active {
+  color: var(--rd-tx);
+  border-bottom-color: var(--rd-ac);
+}
+
+.fhor-race-tab:focus-visible {
+  outline: 2px solid var(--rd-ac2);
+  outline-offset: 2px;
+}
+
+.fhor-race-panel[hidden] {
+  display: none !important;
+}
+
+.fhor-race-charts-sentinel {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+/* Runners card */
+.fhor-race-premium .runners-card {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.fhor-race-premium .runners-header {
+  background: transparent;
+  border: none;
+  padding: 0 0 12px;
+}
+
+.fhor-race-premium .runners-title {
+  font-size: 18px;
+  color: var(--rd-tx);
+  margin-bottom: 4px;
+}
+
+.fhor-race-premium .runners-subtitle {
+  font-size: 13px;
+  color: var(--rd-mu);
+}
+
+.fhor-race-premium .filter-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 0;
+}
+
+.fhor-race-premium .filter-toggle label {
+  color: var(--rd-mu);
+  font-size: 13px;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.fhor-race-premium .lin5-legend {
+  margin: 0 0 10px;
+  padding: 12px;
+  font-size: 12px;
+  color: var(--rd-mu);
+  background: var(--rd-s1);
+  border: 1px solid var(--rd-line);
+  border-radius: 14px;
+}
+
+/* Runners: card layout at all widths — no horizontal scroll */
+.fhor-race-premium .filter-controls__meta {
+  font-size: 12px;
+  color: var(--rd-mu);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.fhor-race-premium .filter-controls__hint {
+  font-size: 11px;
+  color: var(--rd-mu);
+  opacity: 0.9;
+}
+
+.fhor-race-premium .runners-mobile-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: var(--rd-s1);
+  border: 1px solid var(--rd-line);
+  border-radius: 14px;
+}
+
+.fhor-race-premium .runners-mobile-toolbar__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--rd-mu);
+  flex-shrink: 0;
+}
+
+.fhor-race-premium .runners-mobile-toolbar__select {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--rd-line);
+  border-radius: 10px;
+  background: var(--rd-bg);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--rd-tx);
+  outline: none;
+}
+
+.fhor-race-premium .runners-table-wrapper {
+  overflow: visible;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.fhor-race-premium .runners-table--fit,
+.fhor-race-premium .runners-table--fit thead,
+.fhor-race-premium .runners-table--fit tbody,
+.fhor-race-premium .runners-table--fit tr,
+.fhor-race-premium .runners-table--fit th,
+.fhor-race-premium .runners-table--fit td {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
+.fhor-race-premium .runners-table--fit {
+  min-width: 0 !important;
+  border: none !important;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.fhor-race-premium .runners-table--fit thead {
+  display: none !important;
+}
+
+.fhor-race-premium .runners-table--fit tbody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  align-items: start;
+  margin: 0;
+  padding: 14px;
+  background: var(--rd-s1) !important;
+  border: 1px solid var(--rd-line) !important;
+  border-radius: 14px;
+  box-shadow: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row:hover {
+  background: var(--rd-s2) !important;
+  transform: none;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row.non-runner {
+  border-left: 3px solid var(--rd-ac2) !important;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row.hidden,
+.fhor-race-premium .runners-table--fit tbody tr.details-row.hidden {
+  display: none !important;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: right;
+  color: var(--rd-tx);
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell::before {
+  content: attr(data-label);
+  flex: 0 0 auto;
+  max-width: 48%;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--rd-mu);
+  text-align: left;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell > * {
+  text-align: right;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell--cloth {
+  order: -30;
+  grid-column: 1;
+  justify-content: flex-start;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell--cloth::before {
+  display: none;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell--cloth > * {
+  margin-left: 0;
+  text-align: left;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell--details {
+  order: -29;
+  grid-column: 2;
+  justify-content: flex-end;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell--details::before {
+  display: none;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell--details > * {
+  margin-left: 0;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell--name {
+  order: -28;
+  grid-column: 1 / -1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding-bottom: 10px !important;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--rd-line) !important;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell--name::before {
+  display: none;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell--name > * {
+  margin-left: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell--name .dosage-metrics,
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell--name .maturity-edge-badge {
+  display: none;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell--name .tracker-race-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell--name .tracker-race-row a,
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell--name .tracker-race-row button {
+  font-size: 11px !important;
+  padding: 5px 8px !important;
+  line-height: 1.2 !important;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell--primary {
+  background: color-mix(in srgb, var(--rd-ac2) 6%, var(--rd-s1)) !important;
+  border-radius: 10px;
+  padding: 8px 10px !important;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell--wide {
+  grid-column: 1 / -1;
+  align-items: flex-start;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.runner-row td.runner-cell--wide > * {
+  text-align: right;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.details-row {
+  display: none;
+  margin: -6px 0 4px;
+  padding: 0;
+  background: transparent !important;
+  border: none !important;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.details-row.is-open {
+  display: block !important;
+}
+
+.fhor-race-premium .runners-table--fit tbody tr.details-row > td {
+  display: block;
+  padding: 0 !important;
+  position: static;
+  background: transparent !important;
+  backdrop-filter: none;
+}
+
+@media (min-width: 640px) {
+  .fhor-race-premium .runners-table--fit tbody tr.runner-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 960px) {
+  .fhor-race-premium .runners-table--fit tbody tr.runner-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .fhor-race-premium .runners-table--fit tbody tr.runner-row {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+.fhor-race-premium .cloth-badge {
+  width: 28px !important;
+  height: 28px !important;
+  font-size: 13px !important;
+  background: var(--rd-ac2) !important;
+  box-shadow: none !important;
+}
+
+.fhor-race-premium .runner-cell--primary .green-text,
+.fhor-race-premium .green-text {
+  color: var(--rd-ac) !important;
+  font-weight: 700;
+}
+
+.fhor-race-premium .fhor-comb-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.fhor-race-premium .fhor-meter {
+  width: 70px;
+  height: 6px;
+  background: var(--rd-line);
+  border-radius: 9px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.fhor-race-premium .fhor-meter i {
+  display: block;
+  height: 100%;
+  background: var(--rd-ac);
+}
+
+.fhor-race-premium .fhor-pick-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.fhor-race-premium .fhor-pick-pill--w {
+  background: color-mix(in srgb, var(--rd-ac) 15%, transparent);
+  color: var(--rd-ac);
+}
+
+.fhor-race-premium .fhor-pick-pill--p {
+  background: color-mix(in srgb, var(--rd-ac2) 15%, transparent);
+  color: var(--rd-ac2);
+}
+
+.fhor-race-premium .fhor-pick-pill--ew {
+  background: color-mix(in srgb, var(--rd-warn) 15%, transparent);
+  color: var(--rd-warn);
+}
+
+.fhor-race-premium .btn,
+.fhor-race-premium .toggle-details-btn {
+  background: var(--rd-s2);
+  border: 1px solid var(--rd-line);
+  color: var(--rd-tx);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fhor-race-premium .toggle-details-btn {
+  padding: 6px 10px;
+}
+
+.fhor-race-premium .runners-table--fit .toggle-details-btn {
+  background: var(--rd-s2) !important;
+  color: var(--rd-tx) !important;
+  border: 1px solid var(--rd-line) !important;
+  box-shadow: none !important;
+}
+
+.fhor-race-premium .fhor-panel {
+  background: var(--rd-s1);
+  border-color: var(--rd-line);
+  box-shadow: none;
+}
+
+.fhor-race-premium .fhor-panel__title {
+  text-align: left;
+  font-size: 1.15rem;
+}
+
+.fhor-race-premium .fhor-chart-box,
+.fhor-race-premium .fhor-chart-card {
+  background: var(--rd-s2);
+  border-color: var(--rd-line);
+}
+
+.fhor-race-premium .fhor-chart-card h3 {
+  color: var(--rd-tx);
+}
+
+.fhor-race-premium .pace-map,
+.fhor-race-premium .cpc {
+  background: var(--rd-s1);
+  border-color: var(--rd-line);
+}
+
+.fhor-race-premium .dosage-metrics {
+  color: var(--rd-ac2);
+}
+
+.fhor-race-premium .horse-name-link {
+  color: var(--rd-tx) !important;
+}
+
+.fhor-race-premium .horse-name-link:hover {
+  color: var(--rd-ac2) !important;
+}
+
+.fhor-race-premium .prize-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: baseline;
+}
+
+.fhor-race-premium .prize-item::after {
+  content: " ·";
+  color: var(--rd-mu);
+  font-weight: 400;
+}
+
+.fhor-race-premium .prize-item:last-child::after {
+  content: "";
+}
+
+@media (max-width: 760px) {
+  .fhor-race-premium .race-quick-nav-breadcrumb {
+    display: none;
+  }
+
+  .fhor-race-premium .lin5-legend {
+    display: none;
+  }
+
+  .fhor-race-premium .filter-controls__hint {
+    display: none;
+  }
+}
