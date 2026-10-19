@@ -1,11 +1,110 @@
 /**
  * Trainer Cycles profile delta chart (Chart.js 4) + Jumps / Flat AJAX toggle (Phase 2.4–2.5).
  * Macro dashboard hot/cold (Phase 3.2), pattern spotlights (3.3), volatility rail (3.4), AJAX code toggle (3.5).
+ * Phase 4.1: aria-live dashboard updates, keyboard tablists, reduced-motion charts.
  */
 (function () {
     'use strict';
 
     var DELTA_CLASSES = ['fhor-tc-delta--hot', 'fhor-tc-delta--cold', 'fhor-tc-delta--neutral'];
+
+    function prefersReducedMotion() {
+        return window.matchMedia
+            && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+
+    function tablistButtons(toggle) {
+        return Array.prototype.slice.call(
+            toggle.querySelectorAll('.fhor-tc-code-toggle__btn:not(:disabled)')
+        );
+    }
+
+    function focusTablistButton(toggle, btn) {
+        tablistButtons(toggle).forEach(function (b) {
+            b.tabIndex = b === btn ? 0 : -1;
+        });
+        btn.focus();
+    }
+
+    function bindTablistKeyboard(toggle) {
+        if (!toggle || toggle.getAttribute('data-fhor-tc-tablist-bound') === '1') {
+            return;
+        }
+        toggle.setAttribute('data-fhor-tc-tablist-bound', '1');
+
+        toggle.addEventListener('keydown', function (event) {
+            var btn = event.target.closest('.fhor-tc-code-toggle__btn');
+            if (!btn || !toggle.contains(btn)) {
+                return;
+            }
+
+            var buttons = tablistButtons(toggle);
+            var index = buttons.indexOf(btn);
+            if (index < 0) {
+                return;
+            }
+
+            var next = null;
+            if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+                next = buttons[(index + 1) % buttons.length];
+            } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+                next = buttons[(index - 1 + buttons.length) % buttons.length];
+            } else if (event.key === 'Home') {
+                next = buttons[0];
+            } else if (event.key === 'End') {
+                next = buttons[buttons.length - 1];
+            } else if (event.key === ' ' || event.key === 'Enter') {
+                if (!btn.disabled && !btn.classList.contains('is-active')) {
+                    event.preventDefault();
+                    btn.click();
+                }
+                return;
+            } else {
+                return;
+            }
+
+            event.preventDefault();
+            focusTablistButton(toggle, next);
+        });
+    }
+
+    function announceDashboardLive(root, message) {
+        if (!root || !message) {
+            return;
+        }
+        var live = root.querySelector('[data-fhor-tc-dashboard-live]');
+        if (!live) {
+            return;
+        }
+        live.textContent = '';
+        window.setTimeout(function () {
+            live.textContent = message;
+        }, 40);
+    }
+
+    function codeLabelFromData(data, ui) {
+        if (ui && ui.heroMeta) {
+            var parts = String(ui.heroMeta).split('·');
+            if (parts[0]) {
+                return parts[0].trim();
+            }
+        }
+        if (data && data.code === 'flat') {
+            return 'Flat';
+        }
+        return 'Jumps';
+    }
+
+    function dashboardFilterAnnouncement(data, ui) {
+        var label = codeLabelFromData(data, ui);
+        var count = data && data.trainers ? data.trainers.length : 0;
+        var yardsWord = count === 1 ? 'yard' : 'yards';
+        return 'Dashboard updated for ' + label + '. ' + count + ' ' + yardsWord + ' in macro pool.';
+    }
+
+    function volatilityModeLabel(mode) {
+        return mode === 'wavemakers' ? 'Wavemakers' : 'Flatliners';
+    }
 
     function readCssVar(el, name, fallback) {
         if (!el || !window.getComputedStyle) {
@@ -112,8 +211,7 @@
             }
         });
 
-        var reducedMotion = window.matchMedia
-            && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var reducedMotion = prefersReducedMotion();
 
         var chart = new window.Chart(canvas, {
             type: 'line',
@@ -363,6 +461,7 @@
             return;
         }
         toggle.setAttribute('data-fhor-tc-bound', '1');
+        bindTablistKeyboard(toggle);
 
         toggle.addEventListener('click', function (event) {
             var btn = event.target.closest('.fhor-tc-code-toggle__btn');
@@ -883,6 +982,7 @@
             return;
         }
         toggle.setAttribute('data-fhor-tc-bound', '1');
+        bindTablistKeyboard(toggle);
 
         toggle.addEventListener('click', function (event) {
             var btn = event.target.closest('.fhor-tc-code-toggle__btn');
@@ -897,6 +997,10 @@
             var data = readDashboardData(root);
             setVolatilityToggleActive(root, mode);
             renderDashboardVolatility(root, data, mode);
+            announceDashboardLive(
+                root,
+                'Volatility list sorted by ' + volatilityModeLabel(mode) + '.'
+            );
         });
     }
 
@@ -1044,6 +1148,7 @@
             return;
         }
         toggle.setAttribute('data-fhor-tc-bound', '1');
+        bindTablistKeyboard(toggle);
 
         toggle.addEventListener('click', function (event) {
             var btn = event.target.closest('.fhor-tc-code-toggle__btn');
@@ -1063,6 +1168,7 @@
 
             var sections = root.querySelector('[data-fhor-tc-dashboard-sections]');
             root.classList.add('is-loading');
+            announceDashboardLive(root, 'Loading dashboard data.');
             if (sections) {
                 sections.setAttribute('aria-busy', 'true');
             }
@@ -1079,11 +1185,13 @@
                     setDashboardToggleActive(root, code);
                     refreshDashboardPanels(root, nextData);
                     syncDashboardUrl(code);
+                    announceDashboardLive(root, dashboardFilterAnnouncement(nextData, ui));
                 })
                 .catch(function () {
                     if (data && data.code) {
                         setDashboardToggleActive(root, data.code);
                     }
+                    announceDashboardLive(root, 'Could not update dashboard. Showing previous data.');
                 })
                 .finally(function () {
                     root.classList.remove('is-loading');

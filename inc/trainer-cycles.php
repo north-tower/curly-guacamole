@@ -2187,6 +2187,14 @@ if (!function_exists('fhor_tc_render_dashboard_shell')) {
                     </div>
                 </div>
 
+                <p
+                    class="fhor-tc-sr-only"
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    data-fhor-tc-dashboard-live
+                ></p>
+
                 <div class="fhor-tc-dashboard-sections" data-fhor-tc-dashboard-sections aria-busy="true">
                     <section class="runners-card fhor-tc-dashboard-panel fhor-tc-dashboard-panel--hot-cold" aria-labelledby="fhor-tc-hot-cold-heading">
                         <div class="runners-header">
