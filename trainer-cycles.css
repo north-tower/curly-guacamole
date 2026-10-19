@@ -1,0 +1,95 @@
+/**
+ * Trainer Cycles — profile widget + delta chart (Phase 2.3).
+ * Hot/cold tokens align with race-detail-premium.css (--rd-ac / --rd-ac2).
+ */
+
+.fhor-tc-profile {
+  --fhor-tc-hot: var(--rd-ac, #2fd08a);
+  --fhor-tc-cold: var(--rd-ac2, #4c8dff);
+  --fhor-tc-muted: color-mix(in srgb, var(--rd-tx, #64748b) 72%, transparent);
+  --fhor-tc-small: #94a3b8;
+}
+
+.fhor-tc-delta--hot {
+  color: var(--fhor-tc-hot);
+}
+
+.fhor-tc-delta--cold {
+  color: var(--fhor-tc-cold);
+}
+
+.fhor-tc-delta--neutral {
+  color: var(--fhor-tc-muted);
+}
+
+.fhor-tc-profile-chart-wrap {
+  position: relative;
+  width: 100%;
+  min-height: 260px;
+  height: clamp(240px, 42vw, 320px);
+}
+
+.fhor-tc-profile-chart {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.fhor-tc-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  align-items: center;
+  margin: 0.75rem 0 0;
+  font-size: 0.78rem;
+  color: var(--fhor-tc-muted);
+}
+
+.fhor-tc-chart-legend__swatch {
+  display: inline-block;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+  margin-right: 0.25rem;
+  vertical-align: middle;
+}
+
+.fhor-tc-chart-legend__swatch--hot {
+  background: var(--fhor-tc-hot);
+}
+
+.fhor-tc-chart-legend__swatch--cold {
+  background: var(--fhor-tc-cold);
+}
+
+.fhor-tc-chart-legend__swatch--small {
+  background: var(--fhor-tc-small);
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+.fhor-tc-profile-rules__list {
+  margin: 0.5rem 0 0;
+  padding-left: 1.15rem;
+  line-height: 1.55;
+}
+
+.fhor-tc-profile-rules__list li + li {
+  margin-top: 0.35rem;
+}
+
+.fhor-tc-profile-shell--embed {
+  max-width: 100%;
+}
+
+.fhor-tc-profile--embed .race-title {
+  font-size: clamp(1.35rem, 2.4vw, 1.85rem);
+}
+
+.fhor-tc-profile-embed-link .back-button {
+  font-size: 0.88rem;
+}
+
+.fhor-tc-profile-error {
+  margin: 1rem 0;
+}

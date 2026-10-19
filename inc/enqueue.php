@@ -155,6 +155,56 @@ function bricks_sire_insights_enqueue_scripts() {
 }
 add_action('wp_enqueue_scripts', 'bricks_sire_insights_enqueue_scripts');
 
+function bricks_trainer_cycles_enqueue_scripts() {
+    $is_trainer_route = (bool) get_query_var('fhor_trainer_slug')
+        || bricks_request_uri_contains(['/trainers/']);
+    $has_tc_shortcode = bricks_current_post_has_shortcode(['trainer_cycles_profile', 'trainer_cycles']);
+    if (!$is_trainer_route && !$has_tc_shortcode) {
+        return;
+    }
+
+    $rd_premium_css = get_stylesheet_directory() . '/race-detail-premium.css';
+    if (file_exists($rd_premium_css)) {
+        wp_enqueue_style(
+            'fhor-race-detail-premium',
+            get_stylesheet_directory_uri() . '/race-detail-premium.css',
+            ['fhor-ui'],
+            (string) filemtime($rd_premium_css)
+        );
+    }
+
+    $tc_css = get_stylesheet_directory() . '/trainer-cycles.css';
+    if (file_exists($tc_css)) {
+        $tc_style_deps = file_exists($rd_premium_css) ? ['fhor-race-detail-premium'] : ['fhor-ui'];
+        wp_enqueue_style(
+            'fhor-trainer-cycles',
+            get_stylesheet_directory_uri() . '/trainer-cycles.css',
+            $tc_style_deps,
+            (string) filemtime($tc_css)
+        );
+    }
+
+    wp_enqueue_script(
+        'fhor-chartjs',
+        'https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js',
+        [],
+        '4.4.6',
+        true
+    );
+
+    $tc_js = get_stylesheet_directory() . '/trainer-cycles.js';
+    if (file_exists($tc_js)) {
+        wp_enqueue_script(
+            'fhor-trainer-cycles',
+            get_stylesheet_directory_uri() . '/trainer-cycles.js',
+            ['fhor-chartjs'],
+            (string) filemtime($tc_js),
+            true
+        );
+    }
+}
+add_action('wp_enqueue_scripts', 'bricks_trainer_cycles_enqueue_scripts');
+
 function horse_history_enqueue_scripts() {
     // Only load on horse history pages
     if (get_query_var('horse_name') || get_query_var('runner_id')) {
