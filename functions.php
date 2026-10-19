@@ -1823,39 +1823,19 @@ function bricks_race_detail_shortcode($atts) {
         return '<div style="color:red;padding:20px;">Error: Race ID is required</div>';
     }
     
-    // Resolve race + table set in one pass.
-    $today = date('Y-m-d');
-    $tomorrow = date('Y-m-d', strtotime('+1 day'));
-    $races_table = 'advance_daily_races_beta';
-    $runners_table = 'advance_daily_runners_beta';
-    $speed_table = 'speed&performance_table';
-
-    $race = $wpdb->get_row($wpdb->prepare(
-        "SELECT * FROM `$races_table` WHERE race_id = %d",
-        $race_id
-    ));
-
-    if (!$race) {
-        $races_table = 'advance_daily_races';
-        $runners_table = 'advance_daily_runners';
-        $speed_table = 'adv_speed&performance_table';
-        $race = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM `$races_table` WHERE race_id = %d",
-            $race_id
-        ));
-    } elseif ($race->meeting_date === $tomorrow) {
-        $races_table = 'advance_daily_races';
-        $runners_table = 'advance_daily_runners';
-        $speed_table = 'adv_speed&performance_table';
-        $race = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM `$races_table` WHERE race_id = %d",
-            $race_id
-        ));
-    }
-
-    if (!$race) {
+    $race_ctx = function_exists('bricks_race_detail_resolve_context')
+        ? bricks_race_detail_resolve_context($race_id)
+        : null;
+    if (!$race_ctx || empty($race_ctx['race'])) {
         return '<div style="color:red;padding:20px;">Error: Race not found</div>';
     }
+
+    $race = $race_ctx['race'];
+    $races_table = $race_ctx['races_table'];
+    $runners_table = $race_ctx['runners_table'];
+    $speed_table = $race_ctx['speed_table'];
+    $today = date('Y-m-d');
+    $tomorrow = date('Y-m-d', strtotime('+1 day'));
 
     if (!function_exists('fhor_can_view_race_detail_page') || !fhor_can_view_race_detail_page()) {
         return fhor_race_detail_access_gate_html($race_id, $race);
@@ -1877,6 +1857,7 @@ function bricks_race_detail_shortcode($atts) {
     }
     
     $race_show_premium_data = bricks_race_detail_can_view_premium();
+    $race_pedigree_deferred = ($race_show_premium_data && !$is_national_hunt);
     
     // Check if this is tomorrow's race
     $is_tomorrow_race = ($race->meeting_date === $tomorrow);
@@ -2085,7 +2066,7 @@ if (!empty($runners)) {
 }
 $sire_names = array_values(array_unique(array_filter($sire_names)));
 bricks_debug_log('Race Detail Debug - Sire names candidate count: ' . count($sire_names));
-if (!empty($sire_names)) {
+if (!$is_national_hunt && !$race_pedigree_deferred && !empty($sire_names)) {
     $baseline_prb = bricks_race_detail_sire_baseline_prb_cached($sire_backtest_from, $sire_backtest_to);
     $sire_5y_lookup = bricks_race_detail_lin5_lookup_cached(
         $sire_names,
@@ -2129,7 +2110,7 @@ if ($runners && count($runners) > 0) {
 }
 
 $dosage_lookup = [];
-if (!empty($runners) && function_exists('bricks_dosage_metrics_for_runners')) {
+if (!$race_pedigree_deferred && !empty($runners) && function_exists('bricks_dosage_metrics_for_runners')) {
     try {
         $dosage_cache_key = 'bricks_dosage_race_' . intval($race_id);
         $dosage_cached = get_transient($dosage_cache_key);
@@ -3998,7 +3979,9 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
         <?php if ($runners && count($runners) > 0): ?>
 
         <div class="premium-ratings-container paywall">
-        <div id="race-detail-charts-<?php echo intval($race_id); ?>" class="fhor-race-charts-sentinel" aria-hidden="true"></div>
+        <?php if (!empty($race_pedigree_deferred)): ?>
+        <div id="fhor-race-pedigree-defer" data-race-id="<?php echo intval($race_id); ?>" hidden></div>
+        <?php endif; ?>
 
         <div class="fhor-race-panel is-active" id="fhor-race-panel-runners" data-fhor-panel="runners" role="tabpanel" aria-labelledby="fhor-race-tab-runners">
         <!-- Runners Table -->
@@ -4291,7 +4274,11 @@ if ($speed_data) {
                             $sire_5y_display = '-';
                             $sire_5y_title = 'Lineage 5Y PRB unavailable for this runner.';
                             $sire_5y_quality = bricks_lin5_quality(0);
-                            if ($sire_name !== '') {
+                            if (!empty($race_pedigree_deferred)) {
+                                $sire_5y_display = '…';
+                                $dosage_kv = '…';
+                                $dosage_display = '…';
+                            } elseif ($sire_name !== '') {
                                 if (isset($sire_5y_lookup[$sire_name])) {
                                     $sire_5y_pct = isset($sire_5y_lookup[$sire_name]['prb_pct']) ? $sire_5y_lookup[$sire_name]['prb_pct'] : (isset($sire_5y_lookup[$sire_name]['win_pct']) ? $sire_5y_lookup[$sire_name]['win_pct'] : null);
                                     $sire_5y_runs = isset($sire_5y_lookup[$sire_name]['runs']) ? $sire_5y_lookup[$sire_name]['runs'] : 0;
@@ -4339,22 +4326,25 @@ if ($speed_data) {
                                 'di_is_infinite' => false,
                                 'tooltip' => 'Dosage unavailable for this runner.',
                             ];
-                            if (function_exists('bricks_dosage_metrics_for_runner_row')) {
-                                try {
-                                    $dosage = bricks_dosage_metrics_for_runner_row($dosage_lookup, $runner, $index);
-                                } catch (Throwable $e) {
-                                    $dosage['tooltip'] = 'Dosage unavailable for this runner.';
+                            $dosage_tooltip = '';
+                            $dosage_is_empty = true;
+                            $dosage_sort_value = -9999;
+                            if (empty($race_pedigree_deferred)) {
+                                if (function_exists('bricks_dosage_metrics_for_runner_row')) {
+                                    try {
+                                        $dosage = bricks_dosage_metrics_for_runner_row($dosage_lookup, $runner, $index);
+                                    } catch (Throwable $e) {
+                                        $dosage['tooltip'] = 'Dosage unavailable for this runner.';
+                                    }
                                 }
-                            }
-                            $dosage_display = isset($dosage['display']) ? (string) $dosage['display'] : 'DI: — | CD: —';
-                            $dosage_tooltip = isset($dosage['tooltip']) ? (string) $dosage['tooltip'] : '';
-                            $dosage_is_empty = ($dosage_display === 'DI: — | CD: —');
-                            if (!empty($dosage['di_is_infinite'])) {
-                                $dosage_sort_value = 9999;
-                            } elseif (isset($dosage['di']) && is_numeric($dosage['di'])) {
-                                $dosage_sort_value = floatval($dosage['di']);
-                            } else {
-                                $dosage_sort_value = -9999;
+                                $dosage_display = isset($dosage['display']) ? (string) $dosage['display'] : 'DI: — | CD: —';
+                                $dosage_tooltip = isset($dosage['tooltip']) ? (string) $dosage['tooltip'] : '';
+                                $dosage_is_empty = ($dosage_display === 'DI: — | CD: —');
+                                if (!empty($dosage['di_is_infinite'])) {
+                                    $dosage_sort_value = 9999;
+                                } elseif (isset($dosage['di']) && is_numeric($dosage['di'])) {
+                                    $dosage_sort_value = floatval($dosage['di']);
+                                }
                             }
                             
                             // Row styling
@@ -4410,12 +4400,14 @@ if ($speed_data) {
                         }
                     }
 
-                    $dosage_kv = $dosage_display;
-                    if (!empty($dosage['di_is_infinite'])) {
-                        $cd_part = (isset($dosage['cd']) && is_numeric($dosage['cd'])) ? number_format((float) $dosage['cd'], 2) : '—';
-                        $dosage_kv = 'Inf / ' . $cd_part;
-                    } elseif (isset($dosage['di']) && is_numeric($dosage['di']) && isset($dosage['cd']) && is_numeric($dosage['cd'])) {
-                        $dosage_kv = number_format((float) $dosage['di'], 2) . ' / ' . number_format((float) $dosage['cd'], 2);
+                    if (empty($race_pedigree_deferred)) {
+                        $dosage_kv = $dosage_display;
+                        if (!empty($dosage['di_is_infinite'])) {
+                            $cd_part = (isset($dosage['cd']) && is_numeric($dosage['cd'])) ? number_format((float) $dosage['cd'], 2) : '—';
+                            $dosage_kv = 'Inf / ' . $cd_part;
+                        } elseif (isset($dosage['di']) && is_numeric($dosage['di']) && isset($dosage['cd']) && is_numeric($dosage['cd'])) {
+                            $dosage_kv = number_format((float) $dosage['di'], 2) . ' / ' . number_format((float) $dosage['cd'], 2);
+                        }
                     }
 
                     $runner_origin_bits = [];
@@ -4642,6 +4634,7 @@ if ($speed_data) {
         </div><!-- #fhor-race-panel-runners -->
 
         <div class="fhor-race-panel" id="fhor-race-panel-analysis" data-fhor-panel="analysis" role="tabpanel" aria-labelledby="fhor-race-tab-analysis" hidden>
+        <div id="race-detail-charts-<?php echo intval($race_id); ?>" class="fhor-race-charts-sentinel" aria-hidden="true"></div>
 
           <!-- Speed Rating Chart Section -->
         <?php
@@ -6399,8 +6392,14 @@ jQuery(document).on('click', '.toggle-details-btn', function(e) {
                                 panel.setAttribute('hidden', '');
                             }
                         });
-                        if (id === 'analysis' && window.dispatchEvent) {
-                            window.dispatchEvent(new Event('resize'));
+                        if (id === 'analysis') {
+                            var bootCharts = window['bricksBootRaceCharts_<?php echo intval($race_id); ?>'];
+                            if (typeof bootCharts === 'function') {
+                                bootCharts();
+                            }
+                            if (window.dispatchEvent) {
+                                window.dispatchEvent(new Event('resize'));
+                            }
                         }
                         if (id === 'pace') {
                             var paceHost = document.getElementById('fhor-race-pace-lazy');
@@ -6441,6 +6440,93 @@ jQuery(document).on('click', '.toggle-details-btn', function(e) {
                     });
                 });
             }
+
+            (function loadPedigreeEnrichmentDeferred() {
+                var host = document.getElementById('fhor-race-pedigree-defer');
+                if (!host || host.getAttribute('data-loaded') === '1') {
+                    return;
+                }
+                var raceId = parseInt(host.getAttribute('data-race-id') || '0', 10);
+                var ajaxUrl = (typeof bricks_tracker_obj !== 'undefined' && bricks_tracker_obj.ajax_url)
+                    ? bricks_tracker_obj.ajax_url
+                    : (typeof race_ajax_obj !== 'undefined' ? race_ajax_obj.ajax_url : '');
+                if (raceId <= 0 || !ajaxUrl) {
+                    return;
+                }
+                function applyRows(rows) {
+                    if (!rows || typeof rows !== 'object') {
+                        return;
+                    }
+                    Object.keys(rows).forEach(function(key) {
+                        var payload = rows[key];
+                        if (!payload) {
+                            return;
+                        }
+                        var rowEl = null;
+                        if (payload.runner_id > 0) {
+                            rowEl = document.querySelector('.runner-row[data-runner-id="' + payload.runner_id + '"]');
+                        }
+                        if (!rowEl && key.indexOf('idx_') === 0) {
+                            rowEl = document.querySelector('.runner-row[data-runner-index="' + key.replace('idx_', '') + '"]');
+                        }
+                        if (!rowEl) {
+                            return;
+                        }
+                        if (payload.data_sire5y !== undefined) {
+                            rowEl.setAttribute('data-sire5y', String(payload.data_sire5y));
+                        }
+                        if (payload.data_dosage_di !== undefined) {
+                            rowEl.setAttribute('data-dosage-di', String(payload.data_dosage_di));
+                        }
+                        var lin5Cell = rowEl.querySelector('.lin5-cell');
+                        if (lin5Cell && payload.lin5_html) {
+                            lin5Cell.outerHTML = payload.lin5_html;
+                        }
+                        var lin5TitleTarget = rowEl.querySelector('.runner-card-kv b[title] .lin5-cell');
+                        if (!lin5TitleTarget) {
+                            lin5TitleTarget = rowEl.querySelector('.runner-card-kv b .lin5-cell');
+                        }
+                        if (lin5TitleTarget && lin5TitleTarget.parentElement && payload.lin5_title) {
+                            lin5TitleTarget.parentElement.setAttribute('title', payload.lin5_title);
+                        }
+                        var dosageTargets = rowEl.querySelectorAll('.runner-card-kv b.blue');
+                        dosageTargets.forEach(function(el) {
+                            if (payload.dosage_kv) {
+                                el.textContent = payload.dosage_kv;
+                            }
+                            if (payload.dosage_title) {
+                                el.setAttribute('title', payload.dosage_title);
+                            }
+                        });
+                    });
+                }
+                function fetchPedigree() {
+                    host.setAttribute('data-loaded', 'loading');
+                    var body = new URLSearchParams();
+                    body.set('action', 'load_race_pedigree_enrichment');
+                    body.set('race_id', String(raceId));
+                    fetch(ajaxUrl, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+                        body: body.toString()
+                    }).then(function(res) { return res.json(); }).then(function(payload) {
+                        if (payload && payload.success && payload.data && payload.data.rows) {
+                            applyRows(payload.data.rows);
+                            host.setAttribute('data-loaded', '1');
+                        } else {
+                            host.setAttribute('data-loaded', '0');
+                        }
+                    }).catch(function() {
+                        host.setAttribute('data-loaded', '0');
+                    });
+                }
+                if (window.requestIdleCallback) {
+                    window.requestIdleCallback(fetchPedigree, { timeout: 2000 });
+                } else {
+                    setTimeout(fetchPedigree, 80);
+                }
+            })();
 
             function updateActiveRunnerCount() {
                 var counter = document.getElementById('activeRunnersCount');

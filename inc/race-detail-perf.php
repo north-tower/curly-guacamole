@@ -3,6 +3,71 @@
  * Race detail page performance helpers (caching, lazy-load hooks).
  */
 
+if (!function_exists('bricks_race_detail_resolve_context')) {
+    /**
+     * Resolve race row + table set (beta vs advance/tomorrow) with per-request cache.
+     *
+     * @return array<string, mixed>|null
+     */
+    function bricks_race_detail_resolve_context($race_id) {
+        global $wpdb;
+
+        $race_id = intval($race_id);
+        if ($race_id <= 0) {
+            return null;
+        }
+
+        static $request_cache = [];
+        if (array_key_exists($race_id, $request_cache)) {
+            return $request_cache[$race_id];
+        }
+
+        $tomorrow = date('Y-m-d', strtotime('+1 day'));
+        $races_table = 'advance_daily_races_beta';
+        $runners_table = 'advance_daily_runners_beta';
+        $speed_table = 'speed&performance_table';
+
+        $race = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM `$races_table` WHERE race_id = %d",
+            $race_id
+        ));
+
+        if (!$race) {
+            $races_table = 'advance_daily_races';
+            $runners_table = 'advance_daily_runners';
+            $speed_table = 'adv_speed&performance_table';
+            $race = $wpdb->get_row($wpdb->prepare(
+                "SELECT * FROM `$races_table` WHERE race_id = %d",
+                $race_id
+            ));
+        } elseif (isset($race->meeting_date) && $race->meeting_date === $tomorrow) {
+            $races_table = 'advance_daily_races';
+            $runners_table = 'advance_daily_runners';
+            $speed_table = 'adv_speed&performance_table';
+            $advance_race = $wpdb->get_row($wpdb->prepare(
+                "SELECT * FROM `$races_table` WHERE race_id = %d",
+                $race_id
+            ));
+            if ($advance_race) {
+                $race = $advance_race;
+            }
+        }
+
+        if (!$race) {
+            $request_cache[$race_id] = null;
+            return null;
+        }
+
+        $request_cache[$race_id] = [
+            'race' => $race,
+            'races_table' => $races_table,
+            'runners_table' => $runners_table,
+            'speed_table' => $speed_table,
+        ];
+        return $request_cache[$race_id];
+    }
+}
+
 if (!function_exists('bricks_race_detail_meeting_races_cached')) {
     function bricks_race_detail_meeting_races_cached($races_table, $race_date) {
         global $wpdb;
@@ -41,6 +106,45 @@ if (!function_exists('bricks_race_detail_sire_baseline_prb_cached')) {
             return floatval($cached);
         }
 
+        $stale_option = 'bricks_sire_baseline_stale_' . md5($from_date . '|' . $to_date);
+        $stale = get_option($stale_option);
+        $refresh_lock = $cache_key . '_refreshing';
+        if ($stale !== false && is_numeric($stale) && !get_transient($refresh_lock)) {
+            set_transient($refresh_lock, 1, 10 * MINUTE_IN_SECONDS);
+            register_shutdown_function(static function () use ($wpdb, $from_date, $to_date, $cache_key, $stale_option, $refresh_lock) {
+                $sire_flat_filter = "
+              COALESCE(dracb.race_type, hracb.race_type) IS NOT NULL
+          AND COALESCE(dracb.race_type, hracb.race_type) != ''
+          AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%hurdle%'
+          AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%chase%'
+          AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%nh%'
+          AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%national hunt%'";
+                $baseline_sql = "
+            SELECT ROUND(AVG((rf.field_size - hrunb.finish_position) / (rf.field_size - 1)) * 100, 1) AS baseline_prb
+            FROM historic_runners_beta hrunb
+            INNER JOIN historic_races_beta hracb ON hracb.race_id = hrunb.race_id
+            LEFT JOIN daily_races_beta dracb ON dracb.race_id = hrunb.race_id
+            INNER JOIN (
+                SELECT race_id, COUNT(*) AS field_size
+                FROM historic_runners_beta
+                WHERE finish_position IS NOT NULL AND finish_position > 0
+                GROUP BY race_id
+                HAVING COUNT(*) > 1
+            ) rf ON rf.race_id = hrunb.race_id
+            WHERE hracb.meeting_date BETWEEN %s AND %s
+              AND MONTH(hracb.meeting_date) BETWEEN 3 AND 10
+              AND $sire_flat_filter";
+                $baseline_prb = $wpdb->get_var($wpdb->prepare($baseline_sql, $from_date, $to_date));
+                if ($baseline_prb !== null && is_numeric($baseline_prb)) {
+                    $val = floatval($baseline_prb);
+                    set_transient($cache_key, $val, DAY_IN_SECONDS);
+                    update_option($stale_option, $val, false);
+                }
+                delete_transient($refresh_lock);
+            });
+            return floatval($stale);
+        }
+
         $sire_flat_filter = "
               COALESCE(dracb.race_type, hracb.race_type) IS NOT NULL
           AND COALESCE(dracb.race_type, hracb.race_type) != ''
@@ -69,9 +173,294 @@ if (!function_exists('bricks_race_detail_sire_baseline_prb_cached')) {
         $baseline_prb = ($baseline_prb !== null) ? floatval($baseline_prb) : 50.0;
 
         set_transient($cache_key, $baseline_prb, DAY_IN_SECONDS);
+        update_option($stale_option, $baseline_prb, false);
         return $baseline_prb;
     }
 }
+
+if (!function_exists('bricks_race_detail_speed_ratings_for_race')) {
+    /**
+     * @return array{0: object[], 1: array<string, object>, 2: array<string, object>}
+     */
+    function bricks_race_detail_speed_ratings_for_race($race_id, $speed_table, $runners_table, $meeting_date, $race_show_premium_data, $advanced_going = null) {
+        global $wpdb;
+
+        $race_id = intval($race_id);
+        $speed_ratings = [];
+        $speed_ratings_lookup = [];
+        $speed_ratings_by_runner_id = [];
+
+        if (!$race_show_premium_data && !empty($advanced_going)) {
+            return [$speed_ratings, $speed_ratings_lookup, $speed_ratings_by_runner_id];
+        }
+
+        $speed_ratings = $wpdb->get_results($wpdb->prepare(
+            "SELECT sp.*, r.name as horse_name
+             FROM `$speed_table` sp
+             LEFT JOIN $runners_table r ON sp.race_id = r.race_id AND sp.runner_id = r.runner_id
+             WHERE sp.race_id = %d",
+            $race_id
+        ));
+
+        if (!$speed_ratings || count($speed_ratings) === 0) {
+            $date_dmy = function_exists('convert_date_format')
+                ? convert_date_format($meeting_date, 'd-m-Y')
+                : $meeting_date;
+            $date_ymd = function_exists('convert_date_format')
+                ? convert_date_format($meeting_date, 'Y-m-d')
+                : $meeting_date;
+            $speed_ratings = $wpdb->get_results($wpdb->prepare(
+                "SELECT sp.*, r.name as horse_name
+                 FROM `$speed_table` sp
+                 LEFT JOIN $runners_table r ON sp.race_id = r.race_id AND sp.runner_id = r.runner_id
+                 WHERE sp.race_id = %d AND sp.Date IN (%s, %s)",
+                $race_id,
+                $date_dmy,
+                $date_ymd
+            ));
+        }
+
+        if ($speed_ratings) {
+            foreach ($speed_ratings as $rating) {
+                $horse_name = ($rating->horse_name ?? '') !== '' ? $rating->horse_name : ($rating->name ?? '');
+                if ($horse_name) {
+                    $speed_ratings_lookup[$horse_name] = $rating;
+                }
+                if (isset($rating->runner_id) && $rating->runner_id !== null && $rating->runner_id !== '') {
+                    $speed_ratings_by_runner_id[(string) $rating->runner_id] = $rating;
+                }
+            }
+        }
+
+        return [$speed_ratings, $speed_ratings_lookup, $speed_ratings_by_runner_id];
+    }
+}
+
+if (!function_exists('bricks_race_detail_collect_sire_names')) {
+    /**
+     * @param object[] $runners
+     * @param object[] $speed_ratings
+     * @return string[]
+     */
+    function bricks_race_detail_collect_sire_names(array $runners, array $speed_ratings) {
+        if (!function_exists('bricks_extract_sire_name')) {
+            return [];
+        }
+
+        $sire_names = [];
+        foreach ($speed_ratings as $rating) {
+            $raw = bricks_extract_sire_name($rating);
+            if ($raw !== '') {
+                $sire_names[] = $raw;
+            }
+        }
+        foreach ($runners as $runner_item) {
+            $raw = bricks_extract_sire_name($runner_item);
+            if ($raw !== '') {
+                $sire_names[] = $raw;
+            }
+        }
+        return array_values(array_unique(array_filter($sire_names)));
+    }
+}
+
+if (!function_exists('bricks_race_detail_pedigree_rows_payload')) {
+    /**
+     * Lin5 + dosage enrichment for runner cards (flat races only).
+     *
+     * @param object[] $runners
+     * @return array<int, array<string, mixed>>
+     */
+    function bricks_race_detail_pedigree_rows_payload($race_id, array $runners, array $speed_ratings_lookup, $is_national_hunt) {
+        if ($is_national_hunt || empty($runners)) {
+            return [];
+        }
+
+        $sire_backtest_to = date('Y-m-d', strtotime('-1 day'));
+        $sire_backtest_from = date('Y-m-d', strtotime('-5 years', strtotime($sire_backtest_to)));
+
+        $speed_ratings = [];
+        foreach ($speed_ratings_lookup as $rating) {
+            $speed_ratings[] = $rating;
+        }
+        $sire_names = bricks_race_detail_collect_sire_names($runners, $speed_ratings);
+        $sire_5y_lookup = [];
+        if (!empty($sire_names)) {
+            $baseline_prb = bricks_race_detail_sire_baseline_prb_cached($sire_backtest_from, $sire_backtest_to);
+            $sire_5y_lookup = bricks_race_detail_lin5_lookup_cached(
+                $sire_names,
+                $sire_backtest_from,
+                $sire_backtest_to,
+                $baseline_prb,
+                30.0
+            );
+        }
+
+        $dosage_lookup = [];
+        if (function_exists('bricks_dosage_metrics_for_runners')) {
+            $dosage_cache_key = 'bricks_dosage_race_' . intval($race_id);
+            $dosage_cached = get_transient($dosage_cache_key);
+            if (is_array($dosage_cached)) {
+                $dosage_lookup = $dosage_cached;
+            } else {
+                $dosage_lookup = bricks_dosage_metrics_for_runners($runners);
+                if (is_array($dosage_lookup)) {
+                    set_transient($dosage_cache_key, $dosage_lookup, DAY_IN_SECONDS);
+                }
+            }
+        }
+
+        $out = [];
+        foreach ($runners as $index => $runner) {
+            $runner_id = isset($runner->runner_id) ? intval($runner->runner_id) : 0;
+            $horse_name = isset($runner->name) ? (string) $runner->name : '';
+            $speed_data = ($horse_name !== '' && isset($speed_ratings_lookup[$horse_name]))
+                ? $speed_ratings_lookup[$horse_name]
+                : null;
+
+            $sire_name = $speed_data ? bricks_extract_sire_name($speed_data) : '';
+            if ($sire_name === '') {
+                $sire_name = bricks_extract_sire_name($runner);
+            }
+
+            $sire_5y_pct = null;
+            $sire_5y_runs = 0;
+            $sire_5y_display = '-';
+            $sire_5y_title = 'Lineage 5Y PRB unavailable for this runner.';
+            $sire_5y_quality = function_exists('bricks_lin5_quality') ? bricks_lin5_quality(0) : ['label' => 'N/A', 'class' => 'lin5-quality-na'];
+
+            if ($sire_name !== '' && function_exists('bricks_normalize_sire_name_key')) {
+                $entry = $sire_5y_lookup[$sire_name]
+                    ?? $sire_5y_lookup[strtolower($sire_name)]
+                    ?? $sire_5y_lookup[bricks_normalize_sire_name_key($sire_name)]
+                    ?? null;
+                if (is_array($entry)) {
+                    $sire_5y_pct = isset($entry['prb_pct']) ? floatval($entry['prb_pct']) : 0.0;
+                    $sire_5y_runs = isset($entry['runs']) ? intval($entry['runs']) : 0;
+                    $ctx_used = isset($entry['context']) ? (string) $entry['context'] : '';
+                    $raw_prb_used = isset($entry['raw_prb_pct']) ? $entry['raw_prb_pct'] : null;
+                    $baseline_prb_used = isset($entry['baseline_prb_pct']) ? $entry['baseline_prb_pct'] : null;
+                } else {
+                    $sire_5y_pct = 0.0;
+                    $ctx_used = 'No data';
+                    $raw_prb_used = null;
+                    $baseline_prb_used = null;
+                }
+                $sire_5y_display = number_format($sire_5y_pct, 1) . '%';
+                $sire_5y_quality = bricks_lin5_quality($sire_5y_runs);
+                $sire_5y_title = 'Lineage 5Y (internal): adjusted sire PRB% (percentage of rivals beaten) in locked window ('
+                    . $sire_backtest_from . ' to ' . $sire_backtest_to . '). '
+                    . (!empty($ctx_used) ? 'Context: ' . $ctx_used . '. ' : '')
+                    . 'Runs: ' . number_format($sire_5y_runs) . '.'
+                    . (($raw_prb_used !== null) ? ' Raw PRB: ' . number_format(floatval($raw_prb_used), 1) . '%.' : '')
+                    . (($baseline_prb_used !== null) ? ' Baseline PRB: ' . number_format(floatval($baseline_prb_used), 1) . '%.' : '')
+                    . ' Signal quality: ' . $sire_5y_quality['label'] . '.';
+            }
+
+            $dosage = [
+                'display' => 'DI: — | CD: —',
+                'di' => null,
+                'cd' => null,
+                'di_is_infinite' => false,
+                'tooltip' => 'Dosage unavailable for this runner.',
+            ];
+            if (function_exists('bricks_dosage_metrics_for_runner_row')) {
+                $dosage = bricks_dosage_metrics_for_runner_row($dosage_lookup, $runner, $index);
+            }
+            $dosage_display = isset($dosage['display']) ? (string) $dosage['display'] : 'DI: — | CD: —';
+            $dosage_tooltip = isset($dosage['tooltip']) ? (string) $dosage['tooltip'] : '';
+            $dosage_kv = $dosage_display;
+            if (!empty($dosage['di_is_infinite'])) {
+                $cd_part = (isset($dosage['cd']) && is_numeric($dosage['cd'])) ? number_format((float) $dosage['cd'], 2) : '—';
+                $dosage_kv = 'Inf / ' . $cd_part;
+            } elseif (isset($dosage['di']) && is_numeric($dosage['di']) && isset($dosage['cd']) && is_numeric($dosage['cd'])) {
+                $dosage_kv = number_format((float) $dosage['di'], 2) . ' / ' . number_format((float) $dosage['cd'], 2);
+            }
+            if (!empty($dosage['di_is_infinite'])) {
+                $dosage_sort_value = 9999;
+            } elseif (isset($dosage['di']) && is_numeric($dosage['di'])) {
+                $dosage_sort_value = floatval($dosage['di']);
+            } else {
+                $dosage_sort_value = -9999;
+            }
+
+            $hi_class = ($sire_5y_pct !== null && $sire_5y_pct >= 14) ? ' lin5-cell__pct--hi' : '';
+            $lin5_html = '<span class="lin5-cell">'
+                . '<span class="lin5-cell__pct' . esc_attr($hi_class) . '">' . esc_html($sire_5y_display) . '</span>'
+                . '<span class="lin5-quality-badge ' . esc_attr($sire_5y_quality['class']) . '">' . esc_html($sire_5y_quality['label']) . '</span>'
+                . '</span>';
+
+            $key = $runner_id > 0 ? $runner_id : ('idx_' . $index);
+            $out[$key] = [
+                'runner_id' => $runner_id,
+                'lin5_html' => $lin5_html,
+                'lin5_title' => $sire_5y_title,
+                'dosage_kv' => $dosage_kv,
+                'dosage_title' => $dosage_tooltip,
+                'data_sire5y' => ($sire_5y_pct !== null) ? $sire_5y_pct : -9999,
+                'data_dosage_di' => $dosage_sort_value,
+            ];
+        }
+
+        return $out;
+    }
+}
+
+if (!function_exists('bricks_ajax_load_race_pedigree_enrichment')) {
+    function bricks_ajax_load_race_pedigree_enrichment() {
+        $race_id = isset($_POST['race_id']) ? intval($_POST['race_id']) : 0;
+        if ($race_id <= 0) {
+            wp_send_json_error(['message' => 'Invalid race'], 400);
+        }
+        if (!function_exists('bricks_race_detail_can_view_premium') || !bricks_race_detail_can_view_premium()) {
+            wp_send_json_error(['message' => 'Forbidden'], 403);
+        }
+
+        $ctx = bricks_race_detail_resolve_context($race_id);
+        if (!$ctx || empty($ctx['race'])) {
+            wp_send_json_error(['message' => 'Race not found'], 404);
+        }
+
+        global $wpdb;
+        $race = $ctx['race'];
+        $runners_table = $ctx['runners_table'];
+        $speed_table = $ctx['speed_table'];
+        $runners = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $runners_table WHERE race_id = %d",
+            $race_id
+        ));
+        if (!is_array($runners)) {
+            $runners = [];
+        }
+
+        $is_national_hunt = false;
+        if (!empty($race->race_type)) {
+            $race_type_lower = strtolower((string) $race->race_type);
+            $is_national_hunt = (
+                strpos($race_type_lower, 'hurdle') !== false
+                || strpos($race_type_lower, 'chase') !== false
+                || strpos($race_type_lower, 'n_h_flat') !== false
+                || strpos($race_type_lower, 'nh_flat') !== false
+                || strpos($race_type_lower, 'national hunt') !== false
+            );
+        }
+
+        list(, $speed_ratings_lookup,) = bricks_race_detail_speed_ratings_for_race(
+            $race_id,
+            $speed_table,
+            $runners_table,
+            $race->meeting_date,
+            true,
+            $race->advanced_going ?? null
+        );
+
+        wp_send_json_success([
+            'rows' => bricks_race_detail_pedigree_rows_payload($race_id, $runners, $speed_ratings_lookup, $is_national_hunt),
+        ]);
+    }
+}
+add_action('wp_ajax_load_race_pedigree_enrichment', 'bricks_ajax_load_race_pedigree_enrichment');
+add_action('wp_ajax_nopriv_load_race_pedigree_enrichment', 'bricks_ajax_load_race_pedigree_enrichment');
 
 if (!function_exists('bricks_race_detail_lin5_sql_sire_names')) {
     /**
@@ -345,30 +734,19 @@ if (!function_exists('bricks_race_detail_enqueue_lazy_charts')) {
                     s.onload = cb;
                     document.head.appendChild(s);
                 }
+                var chartsBooted = false;
                 function bootCharts() {
+                    if (chartsBooted) {
+                        return;
+                    }
+                    chartsBooted = true;
                     loadChartLibrary(function () {
                         if (typeof window.<?php echo esc_js($init_name); ?> === 'function') {
                             window.<?php echo esc_js($init_name); ?>();
                         }
                     });
                 }
-                var anchor = document.getElementById('race-detail-charts-<?php echo intval($race_id); ?>');
-                if (!anchor) {
-                    return;
-                }
-                if ('IntersectionObserver' in window) {
-                    var observer = new IntersectionObserver(function (entries) {
-                        entries.forEach(function (entry) {
-                            if (entry.isIntersecting) {
-                                bootCharts();
-                                observer.disconnect();
-                            }
-                        });
-                    }, { rootMargin: '300px 0px' });
-                    observer.observe(anchor);
-                } else {
-                    bootCharts();
-                }
+                window.bricksBootRaceCharts_<?php echo intval($race_id); ?> = bootCharts;
             })();
             </script>
             <?php
