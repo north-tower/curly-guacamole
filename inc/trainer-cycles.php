@@ -1333,6 +1333,107 @@ if (!function_exists('fhor_tc_code_label')) {
     }
 }
 
+if (!function_exists('fhor_tc_profile_available_codes')) {
+    /**
+     * Codes where this trainer has enough lifetime resulted runs for a macro-style profile.
+     *
+     * @return array<int, string>
+     */
+    function fhor_tc_profile_available_codes($trainer_name) {
+        $name = trim((string) $trainer_name);
+        if ($name === '' || !fhor_tc_tables_ok()) {
+            return [];
+        }
+
+        $macro_min = (int) fhor_tc_config()['macro_min_lifetime_runners'];
+        $available = [];
+        foreach (['jumps', 'flat'] as $code) {
+            $baseline = fhor_tc_query_trainer_baseline($code, $name);
+            if ($baseline === null) {
+                continue;
+            }
+            if ((int) ($baseline['runs'] ?? 0) >= $macro_min) {
+                $available[] = $code;
+            }
+        }
+
+        return $available;
+    }
+}
+
+if (!function_exists('fhor_tc_profile_best_worst_lines')) {
+    /**
+     * @param array<string, mixed> $profile
+     * @return array{best: string, worst: string, best_class: string, worst_class: string}
+     */
+    function fhor_tc_profile_best_worst_lines(array $profile) {
+        $best = is_array($profile['best_month'] ?? null) ? $profile['best_month'] : null;
+        $worst = is_array($profile['worst_month'] ?? null) ? $profile['worst_month'] : null;
+
+        $best_line = '—';
+        $best_class = 'fhor-tc-delta--neutral';
+        if ($best !== null) {
+            $best_line = fhor_tc_cal_month_name((int) ($best['cal_month'] ?? 0))
+                . ' (' . fhor_tc_format_delta_pts($best['delta'] ?? null) . ')';
+            $best_class = fhor_tc_delta_tone_class($best['delta'] ?? null);
+        }
+
+        $worst_line = '—';
+        $worst_class = 'fhor-tc-delta--neutral';
+        if ($worst !== null) {
+            $worst_line = fhor_tc_cal_month_name((int) ($worst['cal_month'] ?? 0))
+                . ' (' . fhor_tc_format_delta_pts($worst['delta'] ?? null) . ')';
+            $worst_class = fhor_tc_delta_tone_class($worst['delta'] ?? null);
+        }
+
+        return [
+            'best' => $best_line,
+            'worst' => $worst_line,
+            'best_class' => $best_class,
+            'worst_class' => $worst_class,
+        ];
+    }
+}
+
+if (!function_exists('fhor_tc_profile_ui_snapshot')) {
+    /**
+     * Pre-formatted strings for profile AJAX / client DOM swaps (Phase 2.4).
+     *
+     * @param array<string, mixed> $profile
+     * @return array<string, mixed>
+     */
+    function fhor_tc_profile_ui_snapshot(array $profile) {
+        $code = fhor_tc_normalize_code($profile['code'] ?? 'jumps');
+        $code_label = fhor_tc_code_label($code);
+        $name = (string) ($profile['trainer_name'] ?? '');
+        $ref_month = (int) ($profile['reference_month'] ?? fhor_tc_reference_cal_month());
+        $current_delta = $profile['current_month_delta'] ?? null;
+        $gap_pts = $profile['gap_pts'] ?? null;
+        $extremes = fhor_tc_profile_best_worst_lines($profile);
+
+        return [
+            'code' => $code,
+            'codeLabel' => $code_label,
+            'codeLabelLower' => strtolower($code_label),
+            'trainerName' => $name,
+            'heroMeta' => $code_label . ' · seasonal cycle',
+            'baselinePct' => fhor_tc_format_pct($profile['baseline_pct'] ?? null),
+            'runs' => number_format_i18n((int) ($profile['runs'] ?? 0)),
+            'wins' => number_format_i18n((int) ($profile['wins'] ?? 0)),
+            'referenceMonthLabel' => fhor_tc_cal_month_name($ref_month),
+            'currentMonthDelta' => fhor_tc_format_delta_pts($current_delta),
+            'currentMonthDeltaClass' => fhor_tc_delta_tone_class($current_delta),
+            'gapPts' => $gap_pts === null ? '—' : number_format((float) $gap_pts, 1) . ' pts',
+            'bestMonth' => $extremes['best'],
+            'worstMonth' => $extremes['worst'],
+            'bestMonthClass' => $extremes['best_class'],
+            'worstMonthClass' => $extremes['worst_class'],
+            'profileUrl' => fhor_tc_trainer_url($name, $code),
+            'chartAriaLabel' => sprintf('%s seasonal win-rate deltas chart', $name),
+        ];
+    }
+}
+
 if (!function_exists('fhor_tc_cal_month_name')) {
     function fhor_tc_cal_month_name($cal_month) {
         $cal_month = (int) $cal_month;
@@ -1397,11 +1498,15 @@ if (!function_exists('fhor_tc_build_profile_client_bootstrap')) {
             $instance_id = 'fhor-tc-1';
         }
 
+        $trainer_name = (string) ($profile['trainer_name'] ?? '');
+
         return [
             'instanceId' => $instance_id,
             'canvasId' => 'fhor-tc-profile-chart-' . $instance_id,
-            'trainerName' => (string) ($profile['trainer_name'] ?? ''),
+            'trainerName' => $trainer_name,
+            'trainerSlug' => (string) ($profile['slug'] ?? fhor_tc_trainer_slug($trainer_name)),
             'code' => fhor_tc_normalize_code($profile['code'] ?? 'jumps'),
+            'availableCodes' => fhor_tc_profile_available_codes($trainer_name),
             'baselinePct' => (float) ($profile['baseline_pct'] ?? 0),
             'minMonthRunners' => (int) $cfg['min_month_runners'],
             'referenceMonth' => (int) ($profile['reference_month'] ?? fhor_tc_reference_cal_month()),
@@ -1530,20 +1635,11 @@ if (!function_exists('fhor_tc_render_profile_shell')) {
         $current_delta = $profile['current_month_delta'] ?? null;
         $gap_pts = $profile['gap_pts'] ?? null;
 
-        $best = is_array($profile['best_month'] ?? null) ? $profile['best_month'] : null;
-        $worst = is_array($profile['worst_month'] ?? null) ? $profile['worst_month'] : null;
-
-        $best_line = '—';
-        if ($best !== null) {
-            $best_line = fhor_tc_cal_month_name((int) ($best['cal_month'] ?? 0))
-                . ' (' . fhor_tc_format_delta_pts($best['delta'] ?? null) . ')';
-        }
-
-        $worst_line = '—';
-        if ($worst !== null) {
-            $worst_line = fhor_tc_cal_month_name((int) ($worst['cal_month'] ?? 0))
-                . ' (' . fhor_tc_format_delta_pts($worst['delta'] ?? null) . ')';
-        }
+        $extremes = fhor_tc_profile_best_worst_lines($profile);
+        $best_line = $extremes['best'];
+        $worst_line = $extremes['worst'];
+        $available_codes = fhor_tc_profile_available_codes($name);
+        $show_code_toggle = count($available_codes) >= 2;
 
         $dashboard_url = home_url('/trainer-cycles/');
         $shell_class = 'race-detail-page-shell fhor-tc-profile-shell';
@@ -1572,30 +1668,56 @@ if (!function_exists('fhor_tc_render_profile_shell')) {
                 </div>
                 <?php elseif ($profile_url !== '') : ?>
                 <div class="back-button-container fhor-tc-profile-embed-link">
-                    <a href="<?php echo esc_url($profile_url); ?>" class="back-button">Open full profile →</a>
+                    <a href="<?php echo esc_url($profile_url); ?>" class="back-button" data-fhor-tc-ui-link="profileUrl">Open full profile →</a>
                 </div>
                 <?php endif; ?>
 
                 <div class="race-header-card fhor-tc-profile-hero">
                     <div class="race-header-top">
-                        <div class="race-meta-time"><?php echo esc_html($code_label); ?> · seasonal cycle</div>
+                        <div class="fhor-tc-profile-hero__meta-row">
+                            <div class="race-meta-time" data-fhor-tc-ui="heroMeta"><?php echo esc_html($code_label); ?> · seasonal cycle</div>
+                            <?php if ($show_code_toggle) : ?>
+                            <div
+                                class="fhor-tc-code-toggle"
+                                role="tablist"
+                                aria-label="<?php esc_attr_e('Race code', 'bricks'); ?>"
+                                data-fhor-tc-code-toggle
+                            >
+                                <?php foreach (['jumps', 'flat'] as $toggle_code) :
+                                    if (!in_array($toggle_code, $available_codes, true)) {
+                                        continue;
+                                    }
+                                    $is_active = $toggle_code === $code;
+                                    ?>
+                                <button
+                                    type="button"
+                                    class="fhor-tc-code-toggle__btn<?php echo $is_active ? ' is-active' : ''; ?>"
+                                    role="tab"
+                                    data-code="<?php echo esc_attr($toggle_code); ?>"
+                                    aria-selected="<?php echo $is_active ? 'true' : 'false'; ?>"
+                                    <?php echo $is_active ? ' tabindex="0"' : ' tabindex="-1"'; ?>
+                                ><?php echo esc_html(fhor_tc_code_label($toggle_code)); ?></button>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php endif; ?>
+                        </div>
                         <h1 class="race-title"><?php echo esc_html($name); ?></h1>
                         <div class="race-details-grid">
                             <div class="race-detail-item">
                                 <span class="race-detail-label">Lifetime win rate</span>
-                                <span class="race-detail-value"><?php echo esc_html(fhor_tc_format_pct($baseline)); ?></span>
+                                <span class="race-detail-value" data-fhor-tc-ui="baselinePct"><?php echo esc_html(fhor_tc_format_pct($baseline)); ?></span>
                             </div>
                             <div class="race-detail-item">
                                 <span class="race-detail-label">Resulted runs</span>
-                                <span class="race-detail-value"><?php echo esc_html(number_format_i18n($runs)); ?></span>
+                                <span class="race-detail-value" data-fhor-tc-ui="runs"><?php echo esc_html(number_format_i18n($runs)); ?></span>
                             </div>
                             <div class="race-detail-item">
                                 <span class="race-detail-label">Wins</span>
-                                <span class="race-detail-value"><?php echo esc_html(number_format_i18n($wins)); ?></span>
+                                <span class="race-detail-value" data-fhor-tc-ui="wins"><?php echo esc_html(number_format_i18n($wins)); ?></span>
                             </div>
                             <div class="race-detail-item">
-                                <span class="race-detail-label"><?php echo esc_html($ref_label); ?> vs baseline</span>
-                                <span class="race-detail-value <?php echo esc_attr(fhor_tc_delta_tone_class($current_delta)); ?>">
+                                <span class="race-detail-label"><span data-fhor-tc-ui="referenceMonthLabel"><?php echo esc_html($ref_label); ?></span> vs baseline</span>
+                                <span class="race-detail-value <?php echo esc_attr(fhor_tc_delta_tone_class($current_delta)); ?>" data-fhor-tc-ui="currentMonthDelta">
                                     <?php echo esc_html(fhor_tc_format_delta_pts($current_delta)); ?>
                                 </span>
                             </div>
@@ -1604,7 +1726,7 @@ if (!function_exists('fhor_tc_render_profile_shell')) {
                     <div class="race-header-bottom">
                         <div class="track-advice-box fhor-tc-profile-hero__copy">
                             <strong>Hot vs cold months</strong>
-                            Win-rate deltas pool every <?php echo esc_html(strtolower($code_label)); ?> runner by calendar month (all years). Months with fewer than <?php echo esc_html((string) $min_month); ?> resulted runs are excluded from deltas and the chart.
+                            Win-rate deltas pool every <span data-fhor-tc-ui="codeLabelLower"><?php echo esc_html(strtolower($code_label)); ?></span> runner by calendar month (all years). Months with fewer than <?php echo esc_html((string) $min_month); ?> resulted runs are excluded from deltas and the chart.
                         </div>
                     </div>
                 </div>
@@ -1617,21 +1739,21 @@ if (!function_exists('fhor_tc_render_profile_shell')) {
                     <div class="race-details-grid fhor-tc-profile-stats-grid">
                         <div class="race-detail-item">
                             <span class="race-detail-label">Baseline win %</span>
-                            <span class="race-detail-value"><?php echo esc_html(fhor_tc_format_pct($baseline)); ?></span>
+                            <span class="race-detail-value" data-fhor-tc-ui="baselinePct"><?php echo esc_html(fhor_tc_format_pct($baseline)); ?></span>
                         </div>
                         <div class="race-detail-item">
                             <span class="race-detail-label">Volatility gap</span>
-                            <span class="race-detail-value"><?php echo esc_html($gap_pts === null ? '—' : number_format((float) $gap_pts, 1) . ' pts'); ?></span>
+                            <span class="race-detail-value" data-fhor-tc-ui="gapPts"><?php echo esc_html($gap_pts === null ? '—' : number_format((float) $gap_pts, 1) . ' pts'); ?></span>
                         </div>
                         <div class="race-detail-item">
                             <span class="race-detail-label">Hottest month</span>
-                            <span class="race-detail-value <?php echo esc_attr($best !== null ? fhor_tc_delta_tone_class($best['delta'] ?? null) : 'fhor-tc-delta--neutral'); ?>">
+                            <span class="race-detail-value <?php echo esc_attr($extremes['best_class']); ?>" data-fhor-tc-ui="bestMonth">
                                 <?php echo esc_html($best_line); ?>
                             </span>
                         </div>
                         <div class="race-detail-item">
                             <span class="race-detail-label">Coldest month</span>
-                            <span class="race-detail-value <?php echo esc_attr($worst !== null ? fhor_tc_delta_tone_class($worst['delta'] ?? null) : 'fhor-tc-delta--neutral'); ?>">
+                            <span class="race-detail-value <?php echo esc_attr($extremes['worst_class']); ?>" data-fhor-tc-ui="worstMonth">
                                 <?php echo esc_html($worst_line); ?>
                             </span>
                         </div>
@@ -1649,6 +1771,7 @@ if (!function_exists('fhor_tc_render_profile_shell')) {
                             class="fhor-tc-profile-chart"
                             role="img"
                             aria-label="<?php echo esc_attr(sprintf('%s seasonal win-rate deltas chart', $name)); ?>"
+                            data-fhor-tc-ui="chartAriaLabel"
                             height="280"
                         ></canvas>
                     </div>
@@ -1662,7 +1785,7 @@ if (!function_exists('fhor_tc_render_profile_shell')) {
                 <div class="track-advice-box fhor-tc-profile-rules">
                     <strong>How to read this page</strong>
                     <ul class="fhor-tc-profile-rules__list">
-                        <li><strong>Delta</strong> = that month’s win % minus this trainer’s lifetime <?php echo esc_html(strtolower($code_label)); ?> win % (points, not ratio).</li>
+                        <li><strong>Delta</strong> = that month’s win % minus this trainer’s lifetime <span data-fhor-tc-ui="codeLabelLower"><?php echo esc_html(strtolower($code_label)); ?></span> win % (points, not ratio).</li>
                         <li><strong>Eligible months</strong> need at least <?php echo esc_html((string) $min_month); ?> resulted runs; smaller samples are omitted so the wave is not skewed.</li>
                         <li><strong>Volatility gap</strong> is the spread between the best and worst eligible monthly win rates.</li>
                         <li>Non-runners and non-numeric finishes are excluded, matching System Builder historic filters.</li>
@@ -1805,3 +1928,61 @@ if (!function_exists('fhor_tc_flush_rewrites')) {
     }
 }
 add_action('init', 'fhor_tc_flush_rewrites', 999);
+
+if (!function_exists('fhor_tc_ajax_profile')) {
+    /**
+     * Public profile JSON for Jumps / Flat toggle (Phase 2.4).
+     */
+    function fhor_tc_ajax_profile() {
+        check_ajax_referer('fhor_tc_profile', 'nonce');
+
+        $name = isset($_POST['trainer']) ? trim(sanitize_text_field(wp_unslash($_POST['trainer']))) : '';
+        $slug = isset($_POST['slug']) ? sanitize_title(wp_unslash($_POST['slug'])) : '';
+        if ($name === '' && $slug !== '') {
+            $resolved = fhor_tc_resolve_trainer_from_slug($slug);
+            if (is_string($resolved) && $resolved !== '') {
+                $name = $resolved;
+            }
+        }
+
+        $code = isset($_POST['code']) ? fhor_tc_normalize_code(wp_unslash($_POST['code'])) : 'jumps';
+        $instance_id = isset($_POST['instance_id'])
+            ? preg_replace('/[^a-z0-9_-]/i', '', (string) wp_unslash($_POST['instance_id']))
+            : '';
+
+        if ($name === '') {
+            wp_send_json_error([
+                'ok' => false,
+                'error' => 'invalid_trainer',
+            ], 400);
+        }
+
+        $available = fhor_tc_profile_available_codes($name);
+        if ($available !== [] && !in_array($code, $available, true)) {
+            wp_send_json_error([
+                'ok' => false,
+                'error' => 'invalid_code',
+                'availableCodes' => $available,
+            ], 400);
+        }
+
+        $profile = fhor_tc_get_profile_data($name, $code);
+        if (empty($profile['ok'])) {
+            $error = (string) ($profile['error'] ?? 'unavailable');
+            $status = $error === 'not_found' ? 404 : 503;
+            wp_send_json_error($profile, $status);
+        }
+
+        if ($instance_id === '') {
+            $instance_id = 'fhor-tc-1';
+        }
+
+        wp_send_json_success([
+            'bootstrap' => fhor_tc_build_profile_client_bootstrap($profile, $instance_id),
+            'ui' => fhor_tc_profile_ui_snapshot($profile),
+            'meta' => $profile['meta'] ?? [],
+        ]);
+    }
+}
+add_action('wp_ajax_fhor_tc_profile', 'fhor_tc_ajax_profile');
+add_action('wp_ajax_nopriv_fhor_tc_profile', 'fhor_tc_ajax_profile');
