@@ -447,12 +447,12 @@ if (!function_exists('bricks_sire_insights_render_pagination')) {
         $end = min($total_pages, $current_page + 2);
         ob_start();
         ?>
-        <div class="sire-pagination-wrapper" style="margin-top:12px;text-align:center;">
+        <div class="sire-form-pagination">
             <?php if ($current_page > 1): ?>
                 <a class="sire-pagination-btn" href="#" data-page="<?php echo esc_attr($current_page - 1); ?>">&laquo; Prev</a>
             <?php endif; ?>
             <?php for ($i = $start; $i <= $end; $i++): ?>
-                <a class="sire-pagination-btn<?php echo $i === $current_page ? ' sire-pagination-btn-active' : ''; ?>" href="#" data-page="<?php echo esc_attr($i); ?>"><?php echo esc_html($i); ?></a>
+                <a class="sire-pagination-btn<?php echo $i === $current_page ? ' is-active' : ''; ?>" href="#" data-page="<?php echo esc_attr($i); ?>"><?php echo esc_html($i); ?></a>
             <?php endfor; ?>
             <?php if ($current_page < $total_pages): ?>
                 <a class="sire-pagination-btn" href="#" data-page="<?php echo esc_attr($current_page + 1); ?>">Next &raquo;</a>
@@ -463,31 +463,18 @@ if (!function_exists('bricks_sire_insights_render_pagination')) {
     }
 }
 
-if (!function_exists('bricks_sire_insights_render_horse_cell')) {
-    function bricks_sire_insights_render_horse_cell($row) {
+if (!function_exists('bricks_sire_insights_horse_label')) {
+    function bricks_sire_insights_horse_label($row) {
         $horse_label = trim((string) ($row->horse_display ?? $row->horse_name ?? ''));
         if ($horse_label === '' || preg_match('/^\d+$/', $horse_label)) {
-            $horse_label = '';
+            return '';
         }
-        $runner_id = isset($row->runner_id) ? intval($row->runner_id) : 0;
-        if ($horse_label === '' && $runner_id <= 0) {
-            echo '-';
-            return;
-        }
-        if ($horse_label === '') {
-            $horse_label = 'View runner';
-        }
-        if ($runner_id > 0 && function_exists('bricks_horse_history_url')) {
-            echo '<a class="sire-horse-link horse-name" href="' . esc_url(bricks_horse_history_url($runner_id)) . '">' . esc_html($horse_label) . '</a>';
-            return;
-        }
-        echo esc_html($horse_label);
+        return $horse_label;
     }
 }
 
-if (!function_exists('bricks_sire_insights_render_race_cell')) {
-    function bricks_sire_insights_render_race_cell($row) {
-        $race_id = isset($row->race_id) ? intval($row->race_id) : 0;
+if (!function_exists('bricks_sire_insights_race_link_text')) {
+    function bricks_sire_insights_race_link_text($row) {
         $race_label = trim((string) ($row->race_label ?? ''));
         if ($race_label === '') {
             $course = trim((string) ($row->course ?? ''));
@@ -495,16 +482,79 @@ if (!function_exists('bricks_sire_insights_render_race_cell')) {
                 $race_label = $course;
             }
         }
-        if ($race_id <= 0) {
-            echo esc_html($race_label !== '' ? $race_label : '-');
-            return;
+        return $race_label;
+    }
+}
+
+if (!function_exists('bricks_sire_insights_prb_tier')) {
+    function bricks_sire_insights_prb_tier($value) {
+        if ($value === null || $value === '') {
+            return 'neutral';
         }
-        $link_text = $race_label !== '' ? $race_label : 'Open race card';
-        if (function_exists('bricks_race_url')) {
-            echo '<a class="sire-race-link" href="' . esc_url(bricks_race_url($race_id)) . '">' . esc_html($link_text) . '</a>';
-            return;
+        $prb = floatval($value);
+        if ($prb >= 58) {
+            return 'strong';
         }
-        echo esc_html($link_text);
+        if ($prb >= 52) {
+            return 'good';
+        }
+        if ($prb <= 42) {
+            return 'weak';
+        }
+        return 'neutral';
+    }
+}
+
+if (!function_exists('bricks_sire_insights_format_prb')) {
+    function bricks_sire_insights_format_prb($value) {
+        if ($value === null || $value === '') {
+            return '-';
+        }
+        return number_format((float) $value, 1);
+    }
+}
+
+if (!function_exists('bricks_sire_insights_render_sort_bar')) {
+    function bricks_sire_insights_render_sort_bar() {
+        $columns = [
+            'mean_prb' => 'RT 5Y PRB',
+            'rc_21d_prb' => 'RC 21D',
+            'course_prb' => 'Course',
+            'distance_prb' => 'Distance',
+            'candd_prb' => 'C&D',
+            'horse_name' => 'Horse',
+            'sire_name' => 'Sire',
+            'course' => 'Meeting',
+        ];
+        ob_start();
+        ?>
+        <div class="sire-form-sort-bar" role="toolbar" aria-label="Sort sire form list">
+            <?php foreach ($columns as $key => $label): ?>
+                <button type="button" class="sortable-sire sire-form-sort-btn" data-sort="<?php echo esc_attr($key); ?>">
+                    <?php echo esc_html($label); ?>
+                    <span class="sort-indicator" aria-hidden="true"></span>
+                </button>
+            <?php endforeach; ?>
+        </div>
+        <?php
+        return ob_get_clean();
+    }
+}
+
+if (!function_exists('bricks_sire_insights_render_metric')) {
+    function bricks_sire_insights_render_metric($label, $value, $highlight = false) {
+        $tier = bricks_sire_insights_prb_tier($value);
+        $b_class = ($highlight && in_array($tier, ['strong', 'good'], true)) ? 'green-text' : '';
+        ?>
+        <div class="runner-card-wide__metric<?php echo $highlight ? ' runner-card-wide__metric--hi' : ''; ?>">
+            <small><?php echo esc_html($label); ?></small>
+            <?php if ($b_class !== ''): ?>
+                <b class="<?php echo esc_attr($b_class); ?>"><?php echo esc_html(bricks_sire_insights_format_prb($value)); ?></b>
+            <?php else: ?>
+                <b><?php echo esc_html(bricks_sire_insights_format_prb($value)); ?></b>
+            <?php endif; ?>
+        </div>
+        <?php
     }
 }
 
@@ -513,68 +563,85 @@ if (!function_exists('bricks_sire_insights_render_table_html')) {
         $current_page = intval($meta['page'] ?? 1);
         $total_pages = intval($meta['total_pages'] ?? 1);
         $total_rows = intval($meta['total_rows'] ?? count((array) $rows));
-        $colspan = 13;
+        $per_page = max(1, intval($meta['per_page'] ?? 50));
+        $row_offset = ($current_page - 1) * $per_page;
         ob_start();
+        echo bricks_sire_insights_render_sort_bar();
         ?>
-        <div class="sire-insights-table-wrap">
-            <table class="sire-insights-table">
-                <thead>
-                    <tr>
-                        <th class="sortable-sire" data-sort="horse_name">Horse <span class="sort-indicator"></span></th>
-                        <th class="sortable-sire" data-sort="course">Race <span class="sort-indicator"></span></th>
-                        <th class="sortable-sire" data-sort="sire_name">Sire <span class="sort-indicator"></span></th>
-                        <th class="sortable-sire" data-sort="race_type">Type <span class="sort-indicator"></span></th>
-                        <th class="sortable-sire" data-sort="going">Going <span class="sort-indicator"></span></th>
-                        <th class="sortable-sire" data-sort="distance_band">Dist (f) <span class="sort-indicator"></span></th>
-                        <th class="sortable-sire" data-sort="age">Age <span class="sort-indicator"></span></th>
-                        <th class="sortable-sire" data-sort="handicap">Hcap <span class="sort-indicator"></span></th>
-                        <th class="sortable-sire ta-right" data-sort="mean_prb">RT 5Y PRB <span class="sort-indicator"></span></th>
-                        <th class="sortable-sire ta-right" data-sort="rc_21d_prb">RC 21D PRB <span class="sort-indicator"></span></th>
-                        <th class="sortable-sire ta-right" data-sort="course_prb">Course PRB <span class="sort-indicator"></span></th>
-                        <th class="sortable-sire ta-right" data-sort="distance_prb">Dist PRB <span class="sort-indicator"></span></th>
-                        <th class="sortable-sire ta-right" data-sort="candd_prb">C&amp;D PRB <span class="sort-indicator"></span></th>
-                    </tr>
-                </thead>
+        <div class="runners-table-wrapper">
+            <table class="runners-table runners-table--fit sire-form-cards">
                 <tbody>
                     <?php if (empty($rows)): ?>
-                        <tr class="sire-row sire-row--empty">
-                            <td colspan="<?php echo esc_attr($colspan); ?>" class="sire-empty-cell">No sire form rows for this date and filter set. Try another date or reset filters.</td>
+                        <tr class="runner-row sire-form-row sire-form-row--empty">
+                            <td class="runner-card-cell">
+                                <div class="sire-form-empty">No sire form rows for this date and filter set. Try another date or reset filters.</div>
+                            </td>
                         </tr>
                     <?php else: ?>
-                        <?php foreach ($rows as $row): ?>
+                        <?php foreach ($rows as $index => $row): ?>
                             <?php
-                            $prb = isset($row->mean_prb) && $row->mean_prb !== null ? floatval($row->mean_prb) : null;
-                            $prb_class = 'prb-neutral';
-                            if ($prb !== null) {
-                                if ($prb >= 58) {
-                                    $prb_class = 'prb-strong';
-                                } elseif ($prb >= 52) {
-                                    $prb_class = 'prb-good';
-                                } elseif ($prb <= 42) {
-                                    $prb_class = 'prb-weak';
-                                }
+                            $horse_label = bricks_sire_insights_horse_label($row);
+                            $runner_id = isset($row->runner_id) ? intval($row->runner_id) : 0;
+                            $race_id = isset($row->race_id) ? intval($row->race_id) : 0;
+                            $race_text = bricks_sire_insights_race_link_text($row);
+                            $rt_tier = bricks_sire_insights_prb_tier($row->mean_prb ?? null);
+                            $card_class = 'runner-card-wide sire-form-card';
+                            if ($rt_tier === 'strong') {
+                                $card_class .= ' runner-card-wide--top';
                             }
+                            $rank = $row_offset + $index + 1;
                             ?>
-                            <tr class="sire-row">
-                                <td class="sire-cell horse-name" data-label="Horse"><?php bricks_sire_insights_render_horse_cell($row); ?></td>
-                                <td class="sire-cell" data-label="Race"><?php bricks_sire_insights_render_race_cell($row); ?></td>
-                                <td class="sire-cell sire-cell--sire sire-name" data-label="Sire"><?php echo esc_html($row->sire_name ?? '-'); ?></td>
-                                <td class="sire-cell" data-label="Type"><?php echo bricks_sire_insights_badge($row->race_type ?? '', 'violet'); ?></td>
-                                <td class="sire-cell" data-label="Going"><?php echo esc_html($row->going ?? '-'); ?></td>
-                                <td class="sire-cell" data-label="Dist (f)"><?php echo esc_html($row->distance_band ?? '-'); ?></td>
-                                <td class="sire-cell" data-label="Age"><?php echo esc_html($row->age ?? '-'); ?></td>
-                                <td class="sire-cell" data-label="Hcap"><?php echo esc_html(isset($row->handicap) ? intval($row->handicap) : '-'); ?></td>
-                                <td class="sire-cell sire-cell--prb ta-right" data-label="RT 5Y PRB">
-                                    <?php if ($prb === null): ?>
-                                        <span class="prb-score prb-neutral">-</span>
-                                    <?php else: ?>
-                                        <span class="prb-score <?php echo esc_attr($prb_class); ?>"><?php echo esc_html(number_format($prb, 1)); ?></span>
-                                    <?php endif; ?>
+                            <tr class="runner-row sire-form-row">
+                                <td class="runner-card-cell" colspan="24">
+                                    <div class="<?php echo esc_attr($card_class); ?>">
+                                        <div class="runner-card-wide__id">
+                                            <div class="runner-card-wide__head">
+                                                <span class="cloth-badge sire-form-card__rank"><?php echo esc_html((string) $rank); ?></span>
+                                                <div class="runner-card-wide__title">
+                                                    <?php if ($runner_id > 0 && function_exists('bricks_horse_history_url') && $horse_label !== ''): ?>
+                                                        <a href="<?php echo esc_url(bricks_horse_history_url($runner_id)); ?>" class="horse-name-link"><?php echo esc_html($horse_label); ?></a>
+                                                    <?php elseif ($horse_label !== ''): ?>
+                                                        <span class="runner-card-wide__name"><?php echo esc_html($horse_label); ?></span>
+                                                    <?php else: ?>
+                                                        <span class="runner-card-wide__name">Runner</span>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
+                                            <p class="runner-card-wide__sub">Sire: <?php echo esc_html($row->sire_name ?? '—'); ?></p>
+                                            <div class="runner-card-wide__pills">
+                                                <?php echo bricks_sire_insights_badge($row->race_type ?? '', 'violet'); ?>
+                                                <?php if (!empty($row->going)): ?>
+                                                    <?php echo bricks_sire_insights_badge($row->going, 'emerald'); ?>
+                                                <?php endif; ?>
+                                                <?php if (!empty($row->distance_band)): ?>
+                                                    <?php echo bricks_sire_insights_badge($row->distance_band . 'f', 'slate'); ?>
+                                                <?php endif; ?>
+                                                <?php if (isset($row->age) && $row->age !== null && $row->age !== ''): ?>
+                                                    <?php echo bricks_sire_insights_badge('Age ' . $row->age, 'blue'); ?>
+                                                <?php endif; ?>
+                                                <?php if (isset($row->handicap) && $row->handicap !== null && intval($row->handicap) === 1): ?>
+                                                    <?php echo bricks_sire_insights_badge('Hcap', 'amber'); ?>
+                                                <?php endif; ?>
+                                            </div>
+                                            <p class="sire-form-card__race">
+                                                <?php if ($race_id > 0 && function_exists('bricks_race_url')): ?>
+                                                    <a class="sire-race-link" href="<?php echo esc_url(bricks_race_url($race_id)); ?>"><?php echo esc_html($race_text !== '' ? $race_text : 'Open race card'); ?></a>
+                                                <?php else: ?>
+                                                    <?php echo esc_html($race_text !== '' ? $race_text : '—'); ?>
+                                                <?php endif; ?>
+                                            </p>
+                                        </div>
+                                        <div class="runner-card-wide__body">
+                                            <div class="runner-card-wide__rate sire-form-card__rate">
+                                                <?php bricks_sire_insights_render_metric('RT 5Y', $row->mean_prb ?? null, true); ?>
+                                                <?php bricks_sire_insights_render_metric('RC 21D', $row->rc_21d_prb ?? null); ?>
+                                                <?php bricks_sire_insights_render_metric('Course', $row->course_prb ?? null); ?>
+                                                <?php bricks_sire_insights_render_metric('Distance', $row->distance_prb ?? null); ?>
+                                                <?php bricks_sire_insights_render_metric('C&D', $row->candd_prb ?? null); ?>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </td>
-                                <td class="sire-cell ta-right" data-label="RC 21D PRB"><?php echo esc_html($row->rc_21d_prb !== null ? number_format((float) $row->rc_21d_prb, 1) : '-'); ?></td>
-                                <td class="sire-cell ta-right" data-label="Course PRB"><?php echo esc_html($row->course_prb !== null ? number_format((float) $row->course_prb, 1) : '-'); ?></td>
-                                <td class="sire-cell ta-right" data-label="Dist PRB"><?php echo esc_html($row->distance_prb !== null ? number_format((float) $row->distance_prb, 1) : '-'); ?></td>
-                                <td class="sire-cell ta-right" data-label="C&amp;D PRB"><?php echo esc_html($row->candd_prb !== null ? number_format((float) $row->candd_prb, 1) : '-'); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -582,7 +649,9 @@ if (!function_exists('bricks_sire_insights_render_table_html')) {
             </table>
         </div>
         <?php if (!empty($rows)): ?>
-            <div style="margin-top:8px;font-size:12px;color:#6b7280;">Showing <?php echo esc_html(count($rows)); ?> of <?php echo esc_html($total_rows); ?> rows</div>
+            <div class="filter-controls__meta sire-form-results-meta">
+                <span><?php echo esc_html(count($rows)); ?></span> shown of <?php echo esc_html($total_rows); ?> runners
+            </div>
             <?php echo bricks_sire_insights_render_pagination($current_page, $total_pages); ?>
         <?php endif; ?>
         <?php
@@ -734,6 +803,7 @@ if (!function_exists('bricks_ajax_load_sire_insights_table')) {
             'page' => $page,
             'total_pages' => $total_pages,
             'total_rows' => $total_rows,
+            'per_page' => $per_page,
         ]);
         wp_die();
     }
@@ -748,73 +818,110 @@ if (!function_exists('bricks_daily_sires_insights_shortcode')) {
         }
 
         $default_date = bricks_sire_insights_default_meeting_date();
+        $daily_url = home_url('/daily/');
         ob_start();
         ?>
-        <div class="daily-sires-insights-wrapper">
-            <div class="sire-header-row">
-                <div class="sire-header-copy">
-                    <h3>Sire form today</h3>
-                    <p class="sire-intro">Runners on the selected card with sire PRB angles (race type, course, distance and recent form). Sorted by RT 5Y PRB by default — use filters to narrow by course or sire.</p>
+        <div class="race-detail-page-shell fhor-sire-form-shell">
+            <div class="fhor-race-premium fhor-sire-form-page">
+                <div class="back-button-container">
+                    <a href="<?php echo esc_url($daily_url); ?>" class="back-button">← Today's races</a>
                 </div>
-                <div class="sire-date-label">Card date: <span id="sire-display-date"><?php echo esc_html($default_date); ?></span></div>
-            </div>
 
-            <button type="button" class="race-filters-toggle sire-filters-toggle" id="sireFiltersToggle" aria-expanded="false" aria-controls="sireFiltersPanel">
-                <span>Filters</span>
-                <span class="race-filters-toggle__state">Show</span>
-            </button>
+                <div class="race-header-card sire-form-hero">
+                    <div class="race-header-top">
+                        <div class="race-meta-time">Sire form</div>
+                        <h1 class="race-title">Today's sire angles</h1>
+                        <div class="race-details-grid">
+                            <div class="race-detail-item">
+                                <span class="race-detail-label">Card date</span>
+                                <span class="race-detail-value" id="sire-display-date"><?php echo esc_html($default_date); ?></span>
+                            </div>
+                            <div class="race-detail-item">
+                                <span class="race-detail-label">Default sort</span>
+                                <span class="race-detail-value">RT 5Y PRB</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="race-header-bottom">
+                        <div class="track-advice-box sire-form-hero__copy">
+                            <strong>What this is</strong>
+                            Runners on the selected card with sire PRB stats for race type, course, distance and recent form — same family of signals as the Lin5 column on race cards, scoped to today's meetings.
+                        </div>
+                    </div>
+                </div>
 
-            <div class="sire-insights-filters" id="sireFiltersPanel">
-                <div class="filter-group">
-                    <label for="sire-date-filter">Date</label>
-                    <input type="date" id="sire-date-filter" value="<?php echo esc_attr($default_date); ?>" />
-                </div>
-                <div class="filter-group">
-                    <label for="sire-course-filter">Course</label>
-                    <select id="sire-course-filter"><option value="">All Courses</option></select>
-                </div>
-                <div class="filter-group">
-                    <label for="sire-type-filter">Type</label>
-                    <select id="sire-type-filter"><option value="">All Types</option></select>
-                </div>
-                <div class="filter-group">
-                    <label for="sire-going-filter">Going</label>
-                    <select id="sire-going-filter"><option value="">All Going</option></select>
-                </div>
-                <div class="filter-group">
-                    <label for="sire-distance-filter">Distance</label>
-                    <select id="sire-distance-filter"><option value="">All Distances</option></select>
-                </div>
-                <div class="filter-group">
-                    <label for="sire-name-filter">Sire</label>
-                    <select id="sire-name-filter"><option value="">All Sires</option></select>
-                </div>
-            </div>
+                <div class="runners-card sire-form-card-panel">
+                    <div class="runners-header">
+                        <h2 class="runners-title"><span>🧬</span> Sire form list</h2>
+                        <p class="runners-subtitle">Wide cards like race runners — tap a horse or race time to open the full card.</p>
+                    </div>
 
-            <div class="sire-actions-row">
-                <button type="button" id="sire-apply-btn" class="fhor-btn fhor-btn--primary">Apply Filters</button>
-                <button type="button" id="sire-reset-btn" class="fhor-btn fhor-btn--secondary">Reset</button>
-            </div>
+                    <button type="button" class="race-filters-toggle sire-filters-toggle" id="sireFiltersToggle" aria-expanded="false" aria-controls="sireFiltersPanel">
+                        <span>Filters</span>
+                        <span class="race-filters-toggle__state">Show</span>
+                    </button>
 
-            <div class="race-mobile-toolbar sire-mobile-toolbar">
-                <label class="race-mobile-toolbar__label" for="sireMobileSort">Sort by</label>
-                <select id="sireMobileSort" class="race-mobile-toolbar__select" aria-label="Sort sire insights">
-                    <option value="mean_prb">RT 5Y PRB</option>
-                    <option value="horse_name">Horse</option>
-                    <option value="sire_name">Sire</option>
-                    <option value="course">Race (course)</option>
-                    <option value="race_type">Type</option>
-                    <option value="going">Going</option>
-                    <option value="distance_band">Distance</option>
-                    <option value="rc_21d_prb">RC 21D PRB</option>
-                    <option value="course_prb">Course PRB</option>
-                    <option value="distance_prb">Dist PRB</option>
-                    <option value="candd_prb">C&amp;D PRB</option>
-                </select>
-            </div>
+                    <div class="sire-insights-filters sire-form-filters" id="sireFiltersPanel">
+                        <div class="filter-group">
+                            <label for="sire-date-filter">Date</label>
+                            <input type="date" id="sire-date-filter" value="<?php echo esc_attr($default_date); ?>" />
+                        </div>
+                        <div class="filter-group">
+                            <label for="sire-course-filter">Course</label>
+                            <select id="sire-course-filter"><option value="">All Courses</option></select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="sire-type-filter">Type</label>
+                            <select id="sire-type-filter"><option value="">All Types</option></select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="sire-going-filter">Going</label>
+                            <select id="sire-going-filter"><option value="">All Going</option></select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="sire-distance-filter">Distance</label>
+                            <select id="sire-distance-filter"><option value="">All Distances</option></select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="sire-name-filter">Sire</label>
+                            <select id="sire-name-filter"><option value="">All Sires</option></select>
+                        </div>
+                    </div>
 
-            <div id="sire-insights-table-container">
-                <div style="text-align:center;padding:28px;color:#6b7280;">Loading sire insights...</div>
+                    <div class="filter-controls sire-form-filter-actions">
+                        <div class="filter-toggle">
+                            <button type="button" id="sire-apply-btn" class="fhor-btn fhor-btn--primary">Apply filters</button>
+                            <button type="button" id="sire-reset-btn" class="fhor-btn fhor-btn--secondary">Reset</button>
+                        </div>
+                    </div>
+
+                    <div class="lin5-legend sire-form-legend">
+                        <strong>PRB columns:</strong>
+                        RT 5Y = sire line vs race type (5 years). RC 21D = recent course form. Course / Distance / C&amp;D = situational sire PRB for today's race shape.
+                        Higher PRB means the sire's runners beat rivals more often in that scope.
+                    </div>
+
+                    <div class="runners-mobile-toolbar sire-mobile-toolbar">
+                        <label class="runners-mobile-toolbar__label" for="sireMobileSort">Sort by</label>
+                        <select id="sireMobileSort" class="runners-mobile-toolbar__select" aria-label="Sort sire form list">
+                            <option value="mean_prb">RT 5Y PRB</option>
+                            <option value="horse_name">Horse</option>
+                            <option value="sire_name">Sire</option>
+                            <option value="course">Race (course)</option>
+                            <option value="race_type">Type</option>
+                            <option value="going">Going</option>
+                            <option value="distance_band">Distance</option>
+                            <option value="rc_21d_prb">RC 21D PRB</option>
+                            <option value="course_prb">Course PRB</option>
+                            <option value="distance_prb">Dist PRB</option>
+                            <option value="candd_prb">C&amp;D PRB</option>
+                        </select>
+                    </div>
+
+                    <div id="sire-insights-table-container">
+                        <div class="sire-form-loading">Loading sire form…</div>
+                    </div>
+                </div>
             </div>
         </div>
         <?php

@@ -1297,3 +1297,207 @@
     display: none;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Sire form page (/daily_sires_insights/) — same shell as race detail        */
+/* -------------------------------------------------------------------------- */
+
+.fhor-sire-form-page.sire-form-card-panel,
+.fhor-sire-form-page .sire-form-card-panel {
+  margin-top: 0;
+}
+
+.fhor-sire-form-page .sire-form-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.fhor-sire-form-page .sire-form-filters .filter-group label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--rd-mu);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fhor-sire-form-page .sire-form-filters select,
+.fhor-sire-form-page .sire-form-filters input[type="date"] {
+  width: 100%;
+  border: 1px solid var(--rd-line);
+  border-radius: 10px;
+  background: var(--rd-bg);
+  color: var(--rd-tx);
+  padding: 9px 10px;
+  font-size: 13px;
+}
+
+.fhor-sire-form-page .sire-form-filter-actions {
+  margin-bottom: 12px;
+}
+
+.fhor-sire-form-page .sire-form-filter-actions .filter-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fhor-sire-form-page .sire-form-legend {
+  margin-bottom: 12px;
+}
+
+.fhor-sire-form-page .sire-form-sort-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: var(--rd-s1);
+  border: 1px solid var(--rd-line);
+  border-radius: 14px;
+}
+
+.fhor-sire-form-page .sire-form-sort-btn {
+  appearance: none;
+  border: 1px solid var(--rd-line);
+  background: var(--rd-bg);
+  color: var(--rd-mu);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.fhor-sire-form-page .sire-form-sort-btn:hover {
+  color: var(--rd-tx);
+  border-color: var(--rd-ac2);
+}
+
+.fhor-sire-form-page .sire-form-sort-btn.sorted-desc,
+.fhor-sire-form-page .sire-form-sort-btn.sorted-asc {
+  background: color-mix(in srgb, var(--rd-ac2) 12%, var(--rd-s1));
+  border-color: var(--rd-ac2);
+  color: var(--rd-tx);
+}
+
+.fhor-sire-form-page .sire-form-sort-btn .sort-indicator {
+  margin-left: 4px;
+  font-size: 10px;
+  opacity: 0.85;
+}
+
+.fhor-sire-form-page .sire-form-card__rank {
+  background: var(--rd-s2);
+  color: var(--rd-tx);
+  border: 1px solid var(--rd-line);
+  font-size: 12px;
+  font-weight: 800;
+  min-width: 2rem;
+  text-align: center;
+}
+
+.fhor-sire-form-page .sire-form-card__race {
+  margin: 10px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fhor-sire-form-page .sire-form-card__race .sire-race-link {
+  color: var(--rd-ac2);
+  text-decoration: none;
+}
+
+.fhor-sire-form-page .sire-form-card__race .sire-race-link:hover {
+  text-decoration: underline;
+}
+
+.fhor-sire-form-page .sire-form-card__rate {
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+}
+
+.fhor-sire-form-page .sire-form-empty,
+.fhor-sire-form-page .sire-form-loading {
+  text-align: center;
+  padding: 28px 16px;
+  color: var(--rd-mu);
+  background: var(--rd-s1);
+  border: 1px solid var(--rd-line);
+  border-radius: 16px;
+  font-size: 14px;
+}
+
+.fhor-sire-form-page .sire-form-results-meta {
+  margin-top: 12px;
+  text-align: right;
+}
+
+.fhor-sire-form-page .sire-form-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.fhor-sire-form-page .sire-pagination-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--rd-line);
+  background: var(--rd-s1);
+  color: var(--rd-tx);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.fhor-sire-form-page .sire-pagination-btn.is-active {
+  background: var(--rd-ac);
+  border-color: var(--rd-ac);
+  color: #04130c;
+}
+
+.fhor-sire-form-page .sire-filters-toggle {
+  display: none;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.fhor-sire-form-page .sire-mobile-toolbar {
+  display: none;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 768px) {
+  .fhor-sire-form-page .sire-filters-toggle {
+    display: flex;
+  }
+
+  .fhor-sire-form-page .sire-form-filters:not(.is-open) {
+    display: none;
+  }
+
+  .fhor-sire-form-page .sire-form-filters.is-open {
+    display: grid;
+  }
+
+  .fhor-sire-form-page .sire-form-sort-bar {
+    display: none;
+  }
+
+  .fhor-sire-form-page .sire-mobile-toolbar {
+    display: flex;
+  }
+
+  .fhor-sire-form-page .sire-form-legend {
+    display: none;
+  }
+}

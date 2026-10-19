@@ -123,6 +123,16 @@ function bricks_sire_insights_enqueue_scripts() {
 
     wp_enqueue_script('jquery');
 
+    $rd_premium_css = get_stylesheet_directory() . '/race-detail-premium.css';
+    if (file_exists($rd_premium_css)) {
+        wp_enqueue_style(
+            'fhor-race-detail-premium',
+            get_stylesheet_directory_uri() . '/race-detail-premium.css',
+            ['fhor-ui'],
+            (string) filemtime($rd_premium_css)
+        );
+    }
+
     $js_file = get_stylesheet_directory() . '/sire-insights.js';
     if (file_exists($js_file)) {
         wp_enqueue_script(

@@ -66,7 +66,7 @@ jQuery(document).ready(function($) {
     }
 
     function loadTable() {
-        $container.html('<div style="text-align:center;padding:28px;color:#6b7280;">Loading...</div>');
+        $container.html('<div class="sire-form-loading">Loading sire form…</div>');
         $.ajax({
             url: sire_insights_ajax_obj.ajax_url,
             type: 'POST',
@@ -140,7 +140,8 @@ jQuery(document).ready(function($) {
         loadFilterOptions();
     });
 
-    $(document).on('click', '.sire-insights-table th.sortable-sire', function() {
+    $(document).on('click', '.sortable-sire', function(e) {
+        e.preventDefault();
         const nextColumn = $(this).data('sort');
         if (!nextColumn) {
             return;
