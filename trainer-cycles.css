@@ -163,8 +163,7 @@
   border-radius: 2px;
 }
 
-.fhor-tc-profile.is-loading,
-.fhor-tc-dashboard.is-loading {
+.fhor-tc-profile.is-loading {
   opacity: 0.92;
   pointer-events: none;
 }
@@ -183,25 +182,57 @@
   max-width: 42rem;
 }
 
-/* —— Macro dashboard (mock-aligned layout) —— */
+/* —— Macro dashboard (mock-aligned layout, light theme) —— */
 
-.fhor-tc-dashboard-page .content-container {
-  max-width: 1280px;
+.main-content.fhor-tc-dashboard-page,
+#brx-content.fhor-tc-dashboard-page {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
   margin: 0 auto;
+  background: #f4f6fa;
+}
+
+.fhor-tc-dashboard-page .race-detail-page-shell,
+.race-detail-page-shell:has(.fhor-tc-dashboard) {
+  --rd-bg: #f4f6fa;
+  --rd-s1: #ffffff;
+  --rd-s2: #eef2f8;
+  --rd-line: #dbe2ee;
+  --rd-tx: #111827;
+  --rd-mu: #5b667a;
+  --rd-ac: #2fd08a;
+  --rd-ac2: #4c8dff;
+  --rd-warn: #f5b84b;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1280px;
+  margin-left: auto;
+  margin-right: auto;
   padding-left: 16px;
   padding-right: 16px;
+  background: transparent;
+  color: var(--rd-tx);
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.fhor-tc-dashboard-page .fhor-race-premium.fhor-tc-dashboard {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0;
 }
 
 .fhor-tc-dashboard {
-  --fhor-tc-dash-bg: var(--rd-bg, #0b0f14);
-  --fhor-tc-dash-s1: var(--rd-s1, #121821);
-  --fhor-tc-dash-s2: var(--rd-s2, #182130);
-  --fhor-tc-dash-line: var(--rd-line, #243044);
-  --fhor-tc-dash-tx: var(--rd-tx, #e8edf5);
-  --fhor-tc-dash-mu: color-mix(in srgb, var(--fhor-tc-dash-tx) 55%, transparent);
+  --fhor-tc-dash-bg: var(--rd-bg, #f4f6fa);
+  --fhor-tc-dash-s1: var(--rd-s1, #ffffff);
+  --fhor-tc-dash-s2: var(--rd-s2, #eef2f8);
+  --fhor-tc-dash-line: var(--rd-line, #dbe2ee);
+  --fhor-tc-dash-tx: var(--rd-tx, #111827);
+  --fhor-tc-dash-mu: var(--rd-mu, #5b667a);
   --fhor-tc-dash-ac: var(--rd-ac, #2fd08a);
   --fhor-tc-dash-ac2: var(--rd-ac2, #4c8dff);
-  --fhor-tc-dash-warn: #f5b84b;
+  --fhor-tc-dash-warn: var(--rd-warn, #f5b84b);
   --fhor-tc-hot: var(--fhor-tc-dash-ac);
   --fhor-tc-cold: var(--fhor-tc-dash-ac2);
   --fhor-tc-muted: var(--fhor-tc-dash-mu);
@@ -347,6 +378,105 @@
 
 .fhor-tc-dashboard-sections {
   display: block;
+  position: relative;
+}
+
+.fhor-tc-dashboard-sections.is-switching {
+  min-height: 12rem;
+}
+
+.fhor-tc-dashboard-sections.is-switching > :not(.fhor-tc-dash-loading) {
+  opacity: 0.38;
+  pointer-events: none;
+  user-select: none;
+  transition: opacity 0.2s ease;
+}
+
+.fhor-tc-dash-loading {
+  display: none;
+}
+
+.fhor-tc-dashboard-sections.is-switching .fhor-tc-dash-loading {
+  display: flex;
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 16px 24px;
+  background: color-mix(in srgb, var(--fhor-tc-dash-bg, #f4f6fa) 72%, transparent);
+  backdrop-filter: blur(3px);
+  pointer-events: none;
+}
+
+.fhor-tc-dash-loading__card {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--fhor-tc-dash-line);
+  background: var(--fhor-tc-dash-s1);
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--fhor-tc-dash-tx) 8%, transparent);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fhor-tc-dash-tx);
+}
+
+.fhor-tc-dash-loading__spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--fhor-tc-dash-mu) 35%, transparent);
+  border-top-color: var(--fhor-tc-dash-ac);
+  animation: fhor-tc-dash-spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes fhor-tc-dash-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.fhor-tc-dash-switch-status {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--fhor-tc-dash-ac);
+  white-space: nowrap;
+}
+
+.fhor-tc-dash-switch-status[hidden] {
+  display: none !important;
+}
+
+.fhor-tc-dash-loading[hidden] {
+  display: none !important;
+}
+
+.fhor-tc-code-toggle__btn.is-pending {
+  position: relative;
+  color: transparent !important;
+  pointer-events: none;
+}
+
+.fhor-tc-code-toggle__btn.is-pending::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--fhor-tc-dash-mu) 35%, transparent);
+  border-top-color: #04130c;
+  animation: fhor-tc-dash-spin 0.75s linear infinite;
+}
+
+.fhor-tc-dash-hero.is-loading-kpis [data-fhor-tc-ui="trainerCount"],
+.fhor-tc-dash-hero.is-loading-kpis [data-fhor-tc-ui="heroMeta"] {
+  opacity: 0.35;
+  transition: opacity 0.2s ease;
 }
 
 .fhor-tc-dash-cols {
@@ -747,5 +877,11 @@
 
   .fhor-tc-code-toggle__btn {
     transition: none;
+  }
+
+  .fhor-tc-dash-loading__spinner,
+  .fhor-tc-code-toggle__btn.is-pending::after {
+    animation: none;
+    border-top-color: var(--fhor-tc-dash-ac);
   }
 }

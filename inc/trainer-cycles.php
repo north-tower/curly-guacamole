@@ -2208,7 +2208,7 @@ if (!function_exists('fhor_tc_render_dashboard_shell')) {
         ob_start();
         ?>
         <div
-            class="fhor-tc-dashboard is-bootstrapping"
+            class="fhor-race-premium fhor-tc-dashboard is-bootstrapping"
             data-fhor-tc-dashboard="<?php echo esc_attr($bootstrap_json); ?>"
             data-code="<?php echo esc_attr($code); ?>"
         >
@@ -2241,6 +2241,7 @@ if (!function_exists('fhor_tc_render_dashboard_shell')) {
                         ><?php echo esc_html(fhor_tc_code_label($toggle_code)); ?></button>
                         <?php endforeach; ?>
                     </div>
+                    <span class="fhor-tc-dash-switch-status" data-fhor-tc-dashboard-switch-status hidden></span>
                     <?php endif; ?>
                 </div>
             </div>
@@ -2279,6 +2280,12 @@ if (!function_exists('fhor_tc_render_dashboard_shell')) {
                 ></p>
 
                 <div class="fhor-tc-dashboard-sections" data-fhor-tc-dashboard-sections aria-busy="true">
+                    <div class="fhor-tc-dash-loading" data-fhor-tc-dashboard-loading hidden>
+                        <div class="fhor-tc-dash-loading__card" role="status">
+                            <span class="fhor-tc-dash-loading__spinner" aria-hidden="true"></span>
+                            <span data-fhor-tc-dashboard-loading-label><?php esc_html_e('Loading macro pool…', 'bricks'); ?></span>
+                        </div>
+                    </div>
                     <div class="fhor-tc-dash-sec" aria-labelledby="fhor-tc-hot-cold-heading">
                         <div>
                             <h2 class="fhor-tc-dash-h2" id="fhor-tc-hot-cold-heading">🔥 <?php esc_html_e('Hot & cold this month', 'bricks'); ?></h2>
@@ -2853,7 +2860,7 @@ if (!function_exists('fhor_tc_template_redirect')) {
             $footer = ob_get_clean();
 
             echo $header;
-            echo '<main class="main-content fhor-tc-dashboard-page"><div class="content-container">';
+            echo '<main id="brx-content" class="main-content fhor-tc-dashboard-page"><div class="race-detail-page-shell">';
             echo do_shortcode('[trainer_cycles_dashboard]');
             echo '</div></main>';
             echo $footer;

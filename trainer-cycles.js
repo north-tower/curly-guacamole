@@ -1183,6 +1183,112 @@
         renderDashboardVolatility(root, data, volMode);
     }
 
+    var DASHBOARD_REGION_SKELETON_ROWS = {
+        hot: 5,
+        cold: 5,
+        early_birds: 4,
+        late_surge: 4,
+        cold_start: 4,
+        volatility: 6,
+    };
+
+    function dashboardListSkeletonHtml(rowCount) {
+        var rows = Math.max(1, Math.min(8, rowCount || 5));
+        var html = '<div class="fhor-tc-dashboard-list fhor-tc-dashboard-list--skeleton" aria-hidden="true">';
+        for (var i = 0; i < rows; i++) {
+            html += (
+                '<div class="fhor-tc-dashboard-skeleton-row">'
+                + '<span class="fhor-tc-dashboard-skeleton-line fhor-tc-dashboard-skeleton-line--rank"></span>'
+                + '<span class="fhor-tc-dashboard-skeleton-line fhor-tc-dashboard-skeleton-line--name"></span>'
+                + '<span class="fhor-tc-dashboard-skeleton-line fhor-tc-dashboard-skeleton-line--delta"></span>'
+                + '</div>'
+            );
+        }
+        html += '</div>';
+        return html;
+    }
+
+    function populateDashboardSkeletons(root) {
+        if (!root) {
+            return;
+        }
+        Object.keys(DASHBOARD_REGION_SKELETON_ROWS).forEach(function (key) {
+            var region = root.querySelector('[data-fhor-tc-dashboard-region="' + key + '"]');
+            if (!region) {
+                return;
+            }
+            region.innerHTML = dashboardListSkeletonHtml(DASHBOARD_REGION_SKELETON_ROWS[key]);
+        });
+    }
+
+    function codeLabelFromButton(btn) {
+        if (!btn) {
+            return 'macro pool';
+        }
+        var label = (btn.textContent || '').trim();
+        return label || 'macro pool';
+    }
+
+    function setDashboardCodeSwitchLoading(root, active, options) {
+        if (!root) {
+            return;
+        }
+        options = options || {};
+        var sections = root.querySelector('[data-fhor-tc-dashboard-sections]');
+        var loading = root.querySelector('[data-fhor-tc-dashboard-loading]');
+        var loadingLabel = root.querySelector('[data-fhor-tc-dashboard-loading-label]');
+        var switchStatus = root.querySelector('[data-fhor-tc-dashboard-switch-status]');
+        var hero = root.querySelector('.fhor-tc-dash-hero');
+        var codeLabel = options.codeLabel || 'macro pool';
+        var pendingBtn = options.pendingBtn || null;
+
+        if (active) {
+            root.classList.add('is-code-switching');
+            if (sections) {
+                sections.classList.add('is-switching');
+                sections.setAttribute('aria-busy', 'true');
+            }
+            if (loading) {
+                loading.hidden = false;
+            }
+            if (loadingLabel) {
+                loadingLabel.textContent = 'Loading ' + codeLabel + ' macro pool…';
+            }
+            if (switchStatus) {
+                switchStatus.hidden = false;
+                switchStatus.textContent = 'Loading ' + codeLabel + '…';
+            }
+            if (hero) {
+                hero.classList.add('is-loading-kpis');
+            }
+            if (pendingBtn) {
+                pendingBtn.classList.add('is-pending');
+            }
+            populateDashboardSkeletons(root);
+            announceDashboardLive(root, 'Loading ' + codeLabel + ' trainer cycles.');
+            return;
+        }
+
+        root.classList.remove('is-code-switching');
+        if (sections) {
+            sections.classList.remove('is-switching');
+            sections.setAttribute('aria-busy', 'false');
+        }
+        if (loading) {
+            loading.hidden = true;
+        }
+        if (switchStatus) {
+            switchStatus.hidden = true;
+            switchStatus.textContent = '';
+        }
+        if (hero) {
+            hero.classList.remove('is-loading-kpis');
+        }
+        root.querySelectorAll('.fhor-tc-code-toggle__btn.is-pending').forEach(function (b) {
+            b.classList.remove('is-pending');
+        });
+    }
+
     function bindDashboardCodeToggle(root) {
         var toggle = root.querySelector('[data-fhor-tc-dashboard-code-toggle]');
         if (!toggle || toggle.getAttribute('data-fhor-tc-bound') === '1') {
@@ -1207,12 +1313,11 @@
                 return;
             }
 
-            var sections = root.querySelector('[data-fhor-tc-dashboard-sections]');
-            root.classList.add('is-loading');
-            announceDashboardLive(root, 'Loading dashboard data.');
-            if (sections) {
-                sections.setAttribute('aria-busy', 'true');
-            }
+            var codeLabel = codeLabelFromButton(btn);
+            setDashboardCodeSwitchLoading(root, true, {
+                codeLabel: codeLabel,
+                pendingBtn: btn,
+            });
             toggle.querySelectorAll('.fhor-tc-code-toggle__btn').forEach(function (b) {
                 b.disabled = true;
             });
@@ -1232,13 +1337,11 @@
                     if (data && data.code) {
                         setDashboardToggleActive(root, data.code);
                     }
+                    refreshDashboardPanels(root, data);
                     announceDashboardLive(root, 'Could not update dashboard. Showing previous data.');
                 })
                 .finally(function () {
-                    root.classList.remove('is-loading');
-                    if (sections) {
-                        sections.setAttribute('aria-busy', 'false');
-                    }
+                    setDashboardCodeSwitchLoading(root, false);
                     toggle.querySelectorAll('.fhor-tc-code-toggle__btn').forEach(function (b) {
                         b.disabled = false;
                     });
