@@ -158,7 +158,7 @@ add_action('wp_enqueue_scripts', 'bricks_sire_insights_enqueue_scripts');
 function bricks_trainer_cycles_enqueue_scripts() {
     $is_trainer_route = (bool) get_query_var('fhor_trainer_slug')
         || bricks_request_uri_contains(['/trainers/']);
-    $has_tc_shortcode = bricks_current_post_has_shortcode(['trainer_cycles_profile', 'trainer_cycles']);
+    $has_tc_shortcode = bricks_current_post_has_shortcode(['trainer_cycles_profile', 'trainer_cycles', 'trainer_cycles_summary']);
     if (!$is_trainer_route && !$has_tc_shortcode) {
         return;
     }

@@ -38,6 +38,12 @@ if (!function_exists('get_option')) {
     }
 }
 
+if (!function_exists('number_format_i18n')) {
+    function number_format_i18n($number) {
+        return number_format((float) $number);
+    }
+}
+
 require dirname(__DIR__) . '/inc/trainer-cycles.php';
 
 tc_eq('normalize code flat', 'flat', fhor_tc_normalize_code('FLAT'));
@@ -150,6 +156,41 @@ tc_eq('profile invalid error', 'invalid_trainer', $profile['error']);
 $profile_nf = fhor_tc_get_profile_data('Nobody Here', 'flat');
 tc_eq('profile not found ok', false, $profile_nf['ok']);
 tc_eq('profile not found error', 'not_found', $profile_nf['error']);
+
+$pool = [
+    ['trainer_name' => 'Peer A', 'baseline_pct' => 8.0],
+    ['trainer_name' => 'Peer B', 'baseline_pct' => 12.0],
+    ['trainer_name' => 'Peer C', 'baseline_pct' => 15.0],
+];
+
+tc_eq('summary yards below strike', 2, fhor_tc_summary_yards_below_baseline($pool, 13.0, 'Subject'));
+
+$peak_summary = fhor_tc_build_summary([
+    'trainer_name' => 'Peak Yard',
+    'best_month' => ['cal_month' => 4, 'delta' => 5.0, 'strike_pct' => 15.0],
+    'worst_month' => ['cal_month' => 9, 'delta' => 1.0, 'strike_pct' => 11.0],
+    'gap_pts' => 4.0,
+], $pool);
+tc_eq('summary peak heat kind', 'peak_heat', $peak_summary['kind']);
+tc_assert('summary peak heat mentions April', strpos($peak_summary['text'], 'April') !== false);
+
+$floor_summary = fhor_tc_build_summary([
+    'trainer_name' => 'Floor Yard',
+    'best_month' => ['cal_month' => 5, 'delta' => 2.0, 'strike_pct' => 12.0],
+    'worst_month' => ['cal_month' => 9, 'delta' => 0.5, 'strike_pct' => 13.0],
+    'gap_pts' => 6.0,
+], $pool);
+tc_eq('summary high floor kind', 'high_floor', $floor_summary['kind']);
+tc_assert('summary high floor counts peers', strpos($floor_summary['text'], '2 other yards') !== false);
+
+$flat_summary = fhor_tc_build_summary([
+    'trainer_name' => 'Flat Yard',
+    'best_month' => ['cal_month' => 1, 'delta' => 1.5, 'strike_pct' => 11.5],
+    'worst_month' => ['cal_month' => 7, 'delta' => 0.5, 'strike_pct' => 10.5],
+    'gap_pts' => 1.0,
+], $pool);
+tc_eq('summary steady kind', 'steady', $flat_summary['kind']);
+tc_assert('summary steady mentions Flatliner', strpos($flat_summary['text'], 'Flatliner') !== false);
 
 if ($failures > 0) {
     echo "\n{$failures} failure(s)\n";

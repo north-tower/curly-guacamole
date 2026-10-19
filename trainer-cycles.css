@@ -143,3 +143,17 @@
   opacity: 0.92;
   pointer-events: none;
 }
+
+.fhor-tc-profile-summary {
+  margin: 0 0 1rem;
+}
+
+.fhor-tc-profile-summary__text {
+  margin: 0.45rem 0 0;
+  line-height: 1.55;
+  font-size: 0.92rem;
+}
+
+.fhor-tc-profile-summary--standalone {
+  max-width: 42rem;
+}

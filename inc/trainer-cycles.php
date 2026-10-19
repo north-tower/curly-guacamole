@@ -797,6 +797,232 @@ if (!function_exists('fhor_tc_apply_metrics_to_trainers')) {
     }
 }
 
+if (!function_exists('fhor_tc_summary_yards_below_baseline')) {
+    /**
+     * Macro pool trainers whose lifetime baseline sits below a monthly strike rate.
+     *
+     * @param array<int, array<string, mixed>> $pool_trainers
+     */
+    function fhor_tc_summary_yards_below_baseline(array $pool_trainers, $strike_pct, $exclude_name = '') {
+        $exclude = strtolower(trim((string) $exclude_name));
+        $strike = (float) $strike_pct;
+        $count = 0;
+
+        foreach ($pool_trainers as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $name = strtolower(trim((string) ($row['trainer_name'] ?? '')));
+            if ($name === '' || ($exclude !== '' && $name === $exclude)) {
+                continue;
+            }
+            $baseline = $row['baseline_pct'] ?? null;
+            if ($baseline === null) {
+                continue;
+            }
+            if ((float) $baseline < $strike) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+}
+
+if (!function_exists('fhor_tc_build_summary')) {
+    /**
+     * Automated one-line profile summary (Phase 2.5).
+     *
+     * @param array<string, mixed> $trainer_row Metrics row (best/worst/gap_pts, etc.)
+     * @param array<int, array<string, mixed>> $pool_trainers Macro pool rows for the same code
+     * @return array{kind: string, text: string}
+     */
+    function fhor_tc_build_summary(array $trainer_row, array $pool_trainers) {
+        $name = trim((string) ($trainer_row['trainer_name'] ?? ''));
+        if ($name === '') {
+            return [
+                'kind' => 'none',
+                'text' => '',
+            ];
+        }
+
+        $cfg = fhor_tc_config();
+        $spotlight = (float) $cfg['spotlight_delta_pts'];
+        $best = is_array($trainer_row['best_month'] ?? null) ? $trainer_row['best_month'] : null;
+        $worst = is_array($trainer_row['worst_month'] ?? null) ? $trainer_row['worst_month'] : null;
+        $gap_pts = $trainer_row['gap_pts'] ?? null;
+
+        $candidates = [];
+
+        if ($best !== null) {
+            $delta = (float) ($best['delta'] ?? 0);
+            $month = fhor_tc_cal_month_name((int) ($best['cal_month'] ?? 0));
+            if ($month !== '' && $delta >= $spotlight) {
+                $candidates[] = [
+                    'kind' => 'peak_heat',
+                    'score' => $delta,
+                    'text' => sprintf(
+                        '%s runs %+.1f pts above their own average in %s—their strongest seasonal peak.',
+                        $name,
+                        $delta,
+                        $month
+                    ),
+                ];
+            }
+        }
+
+        if ($worst !== null) {
+            $strike = $worst['strike_pct'] ?? null;
+            $month = fhor_tc_cal_month_name((int) ($worst['cal_month'] ?? 0));
+            if ($strike !== null && $month !== '') {
+                $yards_below = fhor_tc_summary_yards_below_baseline($pool_trainers, $strike, $name);
+                if ($yards_below > 0) {
+                    $candidates[] = [
+                        'kind' => 'high_floor',
+                        'score' => (float) $yards_below,
+                        'text' => sprintf(
+                            '%s\'s weakest month (%s, %s) is still above the overall baseline of %s other yards in this code.',
+                            $name,
+                            $month,
+                            fhor_tc_format_pct($strike),
+                            number_format_i18n($yards_below)
+                        ),
+                    ];
+                }
+            }
+        }
+
+        if ($gap_pts !== null) {
+            $gap = (float) $gap_pts;
+            if ($gap <= $spotlight) {
+                $candidates[] = [
+                    'kind' => 'steady',
+                    'score' => max(0.1, $spotlight - $gap + 1),
+                    'text' => sprintf(
+                        '%s is a Flatliner: only %.1f pts between best and worst eligible months.',
+                        $name,
+                        $gap
+                    ),
+                ];
+            }
+        }
+
+        if ($candidates !== []) {
+            usort($candidates, static function ($left, $right) {
+                return ($right['score'] ?? 0) <=> ($left['score'] ?? 0);
+            });
+            $winner = $candidates[0];
+            return [
+                'kind' => (string) ($winner['kind'] ?? 'none'),
+                'text' => (string) ($winner['text'] ?? ''),
+            ];
+        }
+
+        if ($best !== null) {
+            $delta = (float) ($best['delta'] ?? 0);
+            $month = fhor_tc_cal_month_name((int) ($best['cal_month'] ?? 0));
+            if ($month !== '') {
+                return [
+                    'kind' => 'peak_heat',
+                    'text' => sprintf(
+                        '%s runs %+.1f pts above their own average in %s—their strongest seasonal peak.',
+                        $name,
+                        $delta,
+                        $month
+                    ),
+                ];
+            }
+        }
+
+        if ($worst !== null) {
+            $strike = $worst['strike_pct'] ?? null;
+            $month = fhor_tc_cal_month_name((int) ($worst['cal_month'] ?? 0));
+            if ($strike !== null && $month !== '') {
+                $yards_below = fhor_tc_summary_yards_below_baseline($pool_trainers, $strike, $name);
+                if ($yards_below > 0) {
+                    return [
+                        'kind' => 'high_floor',
+                        'text' => sprintf(
+                            '%s\'s weakest month (%s, %s) is still above the overall baseline of %s other yards in this code.',
+                            $name,
+                            $month,
+                            fhor_tc_format_pct($strike),
+                            number_format_i18n($yards_below)
+                        ),
+                    ];
+                }
+            }
+        }
+
+        if ($gap_pts !== null) {
+            return [
+                'kind' => 'steady',
+                'text' => sprintf(
+                    '%s is a Flatliner: only %.1f pts between best and worst eligible months.',
+                    $name,
+                    (float) $gap_pts
+                ),
+            ];
+        }
+
+        $baseline = $trainer_row['baseline_pct'] ?? null;
+        return [
+            'kind' => 'baseline',
+            'text' => sprintf(
+                '%s has a %s lifetime win rate in this code.',
+                $name,
+                fhor_tc_format_pct($baseline)
+            ),
+        ];
+    }
+}
+
+if (!function_exists('fhor_tc_profile_summary')) {
+    /**
+     * @param array<string, mixed> $profile fhor_tc_get_profile_data() success payload
+     * @return array{kind: string, text: string}
+     */
+    function fhor_tc_profile_summary(array $profile) {
+        $code = fhor_tc_normalize_code($profile['code'] ?? 'jumps');
+        $ref = $profile['reference_month'] ?? null;
+        $pool = fhor_tc_query_macro_trainers_with_metrics($code, $ref);
+        return fhor_tc_build_summary($profile, $pool);
+    }
+}
+
+if (!function_exists('fhor_tc_render_summary_block')) {
+    /**
+     * @param array{kind?: string, text?: string} $summary
+     * @param array<string, mixed> $options standalone (wrap for shortcode-only embed)
+     */
+    function fhor_tc_render_summary_block(array $summary, array $options = []) {
+        $text = trim((string) ($summary['text'] ?? ''));
+        if ($text === '') {
+            return '';
+        }
+
+        $kind = preg_replace('/[^a-z0-9_-]/', '', (string) ($summary['kind'] ?? 'none'));
+        if ($kind === '') {
+            $kind = 'none';
+        }
+
+        $standalone = !empty($options['standalone']);
+        $class = 'track-advice-box fhor-tc-profile-summary fhor-tc-profile-summary--' . $kind;
+        if ($standalone) {
+            $class .= ' fhor-tc-profile-summary--standalone';
+        }
+
+        ob_start();
+        ?>
+        <div class="<?php echo esc_attr($class); ?>" data-fhor-tc-summary-kind="<?php echo esc_attr($kind); ?>">
+            <strong><?php esc_html_e('At a glance', 'bricks'); ?></strong>
+            <p class="fhor-tc-profile-summary__text" data-fhor-tc-ui="summary"><?php echo esc_html($text); ?></p>
+        </div>
+        <?php
+        return (string) ob_get_clean();
+    }
+}
+
 if (!function_exists('fhor_tc_cache_key_parts')) {
     /**
      * Shared tunables embedded in transient keys (plus optional date floor).
@@ -1410,6 +1636,7 @@ if (!function_exists('fhor_tc_profile_ui_snapshot')) {
         $current_delta = $profile['current_month_delta'] ?? null;
         $gap_pts = $profile['gap_pts'] ?? null;
         $extremes = fhor_tc_profile_best_worst_lines($profile);
+        $summary = fhor_tc_profile_summary($profile);
 
         return [
             'code' => $code,
@@ -1430,6 +1657,8 @@ if (!function_exists('fhor_tc_profile_ui_snapshot')) {
             'worstMonthClass' => $extremes['worst_class'],
             'profileUrl' => fhor_tc_trainer_url($name, $code),
             'chartAriaLabel' => sprintf('%s seasonal win-rate deltas chart', $name),
+            'summary' => (string) ($summary['text'] ?? ''),
+            'summaryKind' => (string) ($summary['kind'] ?? 'none'),
         ];
     }
 }
@@ -1638,6 +1867,7 @@ if (!function_exists('fhor_tc_render_profile_shell')) {
         $extremes = fhor_tc_profile_best_worst_lines($profile);
         $best_line = $extremes['best'];
         $worst_line = $extremes['worst'];
+        $summary = fhor_tc_profile_summary($profile);
         $available_codes = fhor_tc_profile_available_codes($name);
         $show_code_toggle = count($available_codes) >= 2;
 
@@ -1730,6 +1960,8 @@ if (!function_exists('fhor_tc_render_profile_shell')) {
                         </div>
                     </div>
                 </div>
+
+                <?php echo fhor_tc_render_summary_block($summary); ?>
 
                 <div class="runners-card fhor-tc-profile-stats-card">
                     <div class="runners-header">
@@ -1858,6 +2090,45 @@ if (!function_exists('fhor_tc_trainer_cycles_embed_shortcode')) {
     }
 }
 add_shortcode('trainer_cycles', 'fhor_tc_trainer_cycles_embed_shortcode');
+
+if (!function_exists('fhor_tc_trainer_cycles_summary_shortcode')) {
+    /**
+     * One-line seasonal summary for Bricks embeds: [trainer_cycles_summary trainer="" code="jumps"].
+     */
+    function fhor_tc_trainer_cycles_summary_shortcode($atts = []) {
+        $atts = shortcode_atts(
+            [
+                'trainer' => '',
+                'code' => 'jumps',
+            ],
+            $atts,
+            'trainer_cycles_summary'
+        );
+
+        $name = trim((string) $atts['trainer']);
+        if ($name === '') {
+            return '';
+        }
+
+        $code = fhor_tc_normalize_code($atts['code']);
+        $profile = fhor_tc_get_profile_data($name, $code);
+        if (empty($profile['ok'])) {
+            $error = (string) ($profile['error'] ?? 'unavailable');
+            if ($error === 'not_found') {
+                return fhor_tc_render_profile_unavailable('No historic results found for this trainer in the selected code.');
+            }
+            if ($error === 'invalid_trainer') {
+                return '';
+            }
+            return fhor_tc_render_profile_unavailable('Trainer cycle data is temporarily unavailable. Please try again later.');
+        }
+
+        $summary = fhor_tc_profile_summary($profile);
+
+        return fhor_tc_render_summary_block($summary, ['standalone' => true]);
+    }
+}
+add_shortcode('trainer_cycles_summary', 'fhor_tc_trainer_cycles_summary_shortcode');
 
 if (!function_exists('fhor_tc_add_rewrite')) {
     function fhor_tc_add_rewrite() {
