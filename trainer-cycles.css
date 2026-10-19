@@ -814,8 +814,13 @@
   font-weight: 600;
 }
 
+.fhor-tc-volatility-rail-wrap {
+  min-width: 0;
+}
+
 .fhor-tc-volatility-rail {
   min-width: 0;
+  width: 100%;
 }
 
 .fhor-tc-volatility-rail--empty {
@@ -844,9 +849,9 @@
 }
 
 .fhor-tc-volatility-rail__labels {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.35rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr);
+  column-gap: 6px;
   margin-top: 6px;
   font-size: 11px;
   line-height: 1.25;
@@ -854,19 +859,61 @@
   color: var(--fhor-tc-dash-mu);
 }
 
+.fhor-tc-volatility-rail__labels span:nth-child(1) {
+  text-align: left;
+  justify-self: start;
+}
+
+.fhor-tc-volatility-rail__labels span:nth-child(2) {
+  text-align: center;
+  justify-self: center;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.fhor-tc-volatility-rail__labels span:nth-child(3) {
+  text-align: right;
+  justify-self: end;
+}
+
 .fhor-tc-volatility-rail__labels b {
   color: var(--fhor-tc-dash-tx);
   font-weight: 700;
 }
 
-@media (max-width: 600px) {
+.fhor-tc-dash-panel[data-fhor-tc-dashboard-region="volatility"] {
+  overflow-x: clip;
+}
+
+@media (max-width: 720px) {
   .fhor-tc-dashboard-row--volatility {
-    grid-template-columns: 1fr 70px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name gap"
+      "rail rail";
+    gap: 8px 10px;
+    align-items: start;
   }
 
-  .fhor-tc-volatility-rail {
-    grid-column: 1 / -1;
-    order: 3;
+  .fhor-tc-dashboard-row--volatility .fhor-tc-dashboard-row__name {
+    grid-area: name;
+    min-width: 0;
+  }
+
+  .fhor-tc-dashboard-row--volatility .fhor-tc-volatility-rail-wrap {
+    grid-area: rail;
+    width: 100%;
+  }
+
+  .fhor-tc-dashboard-row--volatility .fhor-tc-dashboard-row__gap {
+    grid-area: gap;
+    align-self: start;
+    font-size: 15px;
+  }
+
+  .fhor-tc-volatility-rail__labels {
+    font-size: 10px;
+    column-gap: 4px;
   }
 }
 

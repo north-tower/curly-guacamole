@@ -951,7 +951,7 @@
             + '<div class="fhor-tc-dashboard-row__name"><a href="' + escapeHtml(url) + '">'
             + escapeHtml(name)
             + '</a></div>'
-            + '<div>' + buildVolatilityRailHtml(trainer, data) + '</div>'
+            + '<div class="fhor-tc-volatility-rail-wrap">' + buildVolatilityRailHtml(trainer, data) + '</div>'
             + gapHtml
             + '</div>'
         );
