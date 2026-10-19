@@ -139,7 +139,8 @@
   cursor: wait;
 }
 
-.fhor-tc-profile.is-loading {
+.fhor-tc-profile.is-loading,
+.fhor-tc-dashboard.is-loading {
   opacity: 0.92;
   pointer-events: none;
 }
@@ -369,6 +370,20 @@
   opacity: 0.96;
 }
 
+.fhor-tc-dashboard-spotlight__hint {
+  margin: 0 0 0.55rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--fhor-tc-muted);
+}
+
+.fhor-tc-dashboard-spotlight__scroll {
+  max-height: min(22rem, 52vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 0.2rem;
+}
+
 .fhor-tc-dashboard-spotlight-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -384,6 +399,116 @@
 .fhor-tc-code-toggle--dashboard .fhor-tc-code-toggle__btn:disabled {
   opacity: 1;
   cursor: default;
+}
+
+.fhor-tc-dashboard-volatility-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.fhor-tc-code-toggle--volatility {
+  flex-shrink: 0;
+}
+
+.fhor-tc-dashboard-row--volatility {
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.65fr) minmax(52px, 0.45fr);
+  gap: 0.45rem 0.65rem;
+}
+
+.fhor-tc-dashboard-row__gap {
+  justify-self: end;
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--fhor-tc-muted);
+}
+
+.fhor-tc-volatility-rail {
+  min-width: 0;
+}
+
+.fhor-tc-volatility-rail--empty {
+  min-height: 1.35rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--fhor-tc-muted) 12%, transparent);
+}
+
+.fhor-tc-volatility-rail__track {
+  position: relative;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fhor-tc-muted) 16%, transparent);
+  overflow: visible;
+}
+
+.fhor-tc-volatility-rail__span {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--fhor-tc-cold) 55%, transparent),
+    color-mix(in srgb, var(--fhor-tc-hot) 55%, transparent)
+  );
+}
+
+.fhor-tc-volatility-rail__tick {
+  position: absolute;
+  top: 50%;
+  left: var(--fhor-tc-vol-tick, 50%);
+  width: 2px;
+  height: calc(100% + 0.35rem);
+  transform: translate(-50%, -50%);
+  border-radius: 1px;
+  background: var(--rd-tx, #0f172a);
+  box-shadow: 0 0 0 1px color-mix(in srgb, #fff 70%, transparent);
+  pointer-events: none;
+}
+
+.fhor-tc-volatility-rail__labels {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 0.35rem;
+  margin-top: 0.28rem;
+  font-size: 0.68rem;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  color: var(--fhor-tc-muted);
+}
+
+.fhor-tc-volatility-rail__min {
+  justify-self: start;
+}
+
+.fhor-tc-volatility-rail__gap {
+  justify-self: center;
+  font-weight: 650;
+  color: var(--rd-tx, #0f172a);
+}
+
+.fhor-tc-volatility-rail__max {
+  justify-self: end;
+  text-align: right;
+}
+
+@media (max-width: 640px) {
+  .fhor-tc-dashboard-row--volatility {
+    grid-template-columns: minmax(0, 1fr) minmax(52px, 0.35fr);
+  }
+
+  .fhor-tc-volatility-rail {
+    grid-column: 1 / -1;
+  }
+
+  .fhor-tc-dashboard-row__gap {
+    grid-row: 1;
+    grid-column: 2;
+    align-self: start;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

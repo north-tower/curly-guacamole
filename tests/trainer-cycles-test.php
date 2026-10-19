@@ -164,6 +164,17 @@ tc_eq('dashboard bootstrap code', 'jumps', $dash_boot['code']);
 tc_eq('dashboard bootstrap trainer count', 1, $dash_boot['trainerCount']);
 tc_eq('dashboard bootstrap trainer name', 'Hot Yard', $dash_boot['trainers'][0]['trainerName']);
 tc_assert('dashboard bootstrap has month deltas', isset($dash_boot['trainers'][0]['months'][9]['delta']));
+tc_assert('dashboard bootstrap spotlight windows', is_array($dash_boot['spotlightWindows'] ?? null));
+tc_eq('dashboard bootstrap early birds flag', true, $dash_boot['trainers'][0]['spotlights']['early_birds']);
+tc_assert('dashboard bootstrap month labels', is_array($dash_boot['monthLabels'] ?? null) && count($dash_boot['monthLabels']) === 12);
+tc_assert('dashboard bootstrap best month strike', isset($dash_boot['trainers'][0]['bestMonth']['strikePct']));
+tc_assert('dashboard bootstrap worst month strike', isset($dash_boot['trainers'][0]['worstMonth']['strikePct']));
+
+$dash_ui = fhor_tc_dashboard_ui_snapshot($fixture_pool);
+tc_eq('dashboard ui code', 'jumps', $dash_ui['code']);
+tc_assert('dashboard ui hero meta', strpos($dash_ui['heroMeta'], 'macro yard cycles') !== false);
+tc_assert('dashboard ui spotlight hints', is_array($dash_ui['spotlightHints'] ?? null));
+tc_assert('dashboard ui early birds hint', strpos($dash_ui['spotlightHints']['early_birds'], 'Oct') !== false);
 
 $profile = fhor_tc_get_profile_data('', 'jumps');
 tc_eq('profile invalid ok', false, $profile['ok']);

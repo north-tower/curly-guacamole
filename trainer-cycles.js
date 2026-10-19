@@ -1,6 +1,6 @@
 /**
  * Trainer Cycles profile delta chart (Chart.js 4) + Jumps / Flat AJAX toggle (Phase 2.4–2.5).
- * Macro dashboard hot/cold lists (Phase 3.2); spotlights/volatility in 3.3+.
+ * Macro dashboard hot/cold (Phase 3.2), pattern spotlights (3.3), volatility rail (3.4), AJAX code toggle (3.5).
  */
 (function () {
     'use strict';
@@ -613,24 +613,503 @@
         );
     }
 
-    function initDashboard(root) {
-        if (!root) {
+    var SPOTLIGHT_REGIONS = [
+        {
+            key: 'early_birds',
+            tone: 'hot',
+            emptyCopy: 'No Early Bird yards match this window yet.',
+        },
+        {
+            key: 'late_surge',
+            tone: 'hot',
+            emptyCopy: 'No Late Surge yards match this window yet.',
+        },
+        {
+            key: 'cold_start',
+            tone: 'cold',
+            emptyCopy: 'No Cold Start yards match this window yet.',
+        },
+    ];
+
+    function spotlightWindowMonths(data, key) {
+        var windows = data && data.spotlightWindows;
+        if (!windows || !windows[key] || !windows[key].length) {
+            if (key === 'late_surge') {
+                return [11, 12];
+            }
+            return (data && data.code) === 'flat' ? [4, 5, 6] : [10, 11, 12];
+        }
+        return windows[key].map(function (m) {
+            return Number(m);
+        });
+    }
+
+    function spotlightWindowAvg(trainer, windowMonths) {
+        var lookup = {};
+        windowMonths.forEach(function (m) {
+            lookup[m] = true;
+        });
+
+        var deltas = [];
+        (trainer.months || []).forEach(function (row) {
+            if (!row || !row.eligible) {
+                return;
+            }
+            var cal = Number(row.cal_month);
+            if (!lookup[cal]) {
+                return;
+            }
+            if (row.delta === null || row.delta === undefined) {
+                return;
+            }
+            deltas.push(Number(row.delta));
+        });
+
+        if (!deltas.length) {
+            return null;
+        }
+        return deltas.reduce(function (sum, value) {
+            return sum + value;
+        }, 0) / deltas.length;
+    }
+
+    function pickSpotlightList(trainers, data, key, tone) {
+        return (trainers || [])
+            .filter(function (trainer) {
+                var flags = trainer.spotlights || {};
+                return !!flags[key];
+            })
+            .map(function (trainer) {
+                return {
+                    trainer: trainer,
+                    windowAvg: spotlightWindowAvg(trainer, spotlightWindowMonths(data, key)),
+                };
+            })
+            .sort(function (a, b) {
+                var left = a.windowAvg;
+                var right = b.windowAvg;
+                if (left === null && right === null) {
+                    return (a.trainer.trainerName || '').localeCompare(b.trainer.trainerName || '');
+                }
+                if (left === null) {
+                    return 1;
+                }
+                if (right === null) {
+                    return -1;
+                }
+                if (tone === 'cold') {
+                    return left - right;
+                }
+                return right - left;
+            })
+            .map(function (entry) {
+                return entry.trainer;
+            });
+    }
+
+    function renderDashboardSpotlights(root, data) {
+        if (!root || !data || !data.trainers) {
             return;
         }
+
+        SPOTLIGHT_REGIONS.forEach(function (section) {
+            var trainers = pickSpotlightList(data.trainers, data, section.key, section.tone);
+            renderDashboardListRegion(
+                root.querySelector('[data-fhor-tc-dashboard-region="' + section.key + '"]'),
+                trainers,
+                data,
+                section.tone,
+                section.emptyCopy
+            );
+        });
+    }
+
+    var VOLATILITY_LIST_LIMIT = 10;
+
+    function dashboardMonthLabel(data, calMonth) {
+        var labels = data && data.monthLabels;
+        var idx = Number(calMonth) - 1;
+        if (labels && labels[idx]) {
+            return labels[idx];
+        }
+        return calMonth ? String(calMonth) : '';
+    }
+
+    function formatStrikePct(value) {
+        if (value === null || value === undefined) {
+            return '—';
+        }
+        var num = Number(value);
+        if (Number.isNaN(num)) {
+            return '—';
+        }
+        return num.toFixed(1) + '%';
+    }
+
+    function volatilityBaselineTickPct(trainer) {
+        var worst = trainer.worstMonth;
+        var best = trainer.bestMonth;
+        if (!worst || !best) {
+            return 50;
+        }
+        var minStrike = Number(worst.strikePct);
+        var maxStrike = Number(best.strikePct);
+        var baseline = Number(trainer.baselinePct);
+        if (Number.isNaN(minStrike) || Number.isNaN(maxStrike)) {
+            return 50;
+        }
+        var span = maxStrike - minStrike;
+        if (span < 0.05) {
+            return 50;
+        }
+        var pct = ((baseline - minStrike) / span) * 100;
+        return Math.max(0, Math.min(100, pct));
+    }
+
+    function buildVolatilityRailHtml(trainer, data) {
+        var worst = trainer.worstMonth;
+        var best = trainer.bestMonth;
+        var gap = trainer.gapPts;
+
+        if (!worst || !best || gap === null || gap === undefined) {
+            return '<div class="fhor-tc-volatility-rail fhor-tc-volatility-rail--empty" aria-hidden="true"></div>';
+        }
+
+        var minLabel = dashboardMonthLabel(data, worst.calMonth) + ' ' + formatStrikePct(worst.strikePct);
+        var maxLabel = dashboardMonthLabel(data, best.calMonth) + ' ' + formatStrikePct(best.strikePct);
+        var tickPct = volatilityBaselineTickPct(trainer);
+        var gapLabel = Number(gap).toFixed(1) + ' pts gap';
+        var aria = 'Win rate from ' + minLabel + ' to ' + maxLabel + ', baseline ' + formatStrikePct(trainer.baselinePct);
+
+        return (
+            '<div class="fhor-tc-volatility-rail" role="img" aria-label="' + escapeHtml(aria) + '">'
+            + '<div class="fhor-tc-volatility-rail__track">'
+            + '<span class="fhor-tc-volatility-rail__span"></span>'
+            + '<span class="fhor-tc-volatility-rail__tick" style="--fhor-tc-vol-tick:' + tickPct.toFixed(2) + '%" title="Lifetime baseline ' + escapeHtml(formatStrikePct(trainer.baselinePct)) + '"></span>'
+            + '</div>'
+            + '<div class="fhor-tc-volatility-rail__labels">'
+            + '<span class="fhor-tc-volatility-rail__min">' + escapeHtml(minLabel) + '</span>'
+            + '<span class="fhor-tc-volatility-rail__gap">' + escapeHtml(gapLabel) + '</span>'
+            + '<span class="fhor-tc-volatility-rail__max">' + escapeHtml(maxLabel) + '</span>'
+            + '</div>'
+            + '</div>'
+        );
+    }
+
+    function buildVolatilityRowHtml(trainer, data) {
+        var name = trainer.trainerName || 'Trainer';
+        var url = trainer.url || '#';
+        var gap = trainer.gapPts;
+        var gapHtml = (
+            '<span class="fhor-tc-dashboard-row__gap">'
+            + escapeHtml(gap === null || gap === undefined ? '—' : Number(gap).toFixed(1) + ' pts')
+            + '</span>'
+        );
+
+        return (
+            '<li class="fhor-tc-dashboard-row fhor-tc-dashboard-row--volatility">'
+            + '<a class="fhor-tc-dashboard-row__name" href="' + escapeHtml(url) + '">'
+            + escapeHtml(name)
+            + '</a>'
+            + buildVolatilityRailHtml(trainer, data)
+            + gapHtml
+            + '</li>'
+        );
+    }
+
+    function pickVolatilityList(trainers, mode) {
+        var eligible = (trainers || []).filter(function (trainer) {
+            return trainer.gapPts !== null && trainer.gapPts !== undefined
+                && trainer.bestMonth && trainer.worstMonth;
+        });
+
+        eligible.sort(function (a, b) {
+            var left = Number(a.gapPts);
+            var right = Number(b.gapPts);
+            if (mode === 'wavemakers') {
+                return right - left;
+            }
+            return left - right;
+        });
+
+        return eligible.slice(0, VOLATILITY_LIST_LIMIT);
+    }
+
+    function renderDashboardVolatility(root, data, mode) {
+        if (!root || !data || !data.trainers) {
+            return;
+        }
+
+        var container = root.querySelector('[data-fhor-tc-dashboard-region="volatility"]');
+        if (!container) {
+            return;
+        }
+
+        var sortMode = mode || root.getAttribute('data-volatility-mode') || 'flatliners';
+        var trainers = pickVolatilityList(data.trainers, sortMode);
+        var emptyCopy = sortMode === 'wavemakers'
+            ? 'No yards with enough eligible months to rank wavemakers yet.'
+            : 'No yards with enough eligible months to rank flatliners yet.';
+
+        if (!trainers.length) {
+            container.innerHTML = '<p class="fhor-tc-dashboard-empty">' + escapeHtml(emptyCopy) + '</p>';
+            return;
+        }
+
+        var items = trainers.map(function (trainer) {
+            return buildVolatilityRowHtml(trainer, data);
+        });
+
+        container.innerHTML = '<ul class="fhor-tc-dashboard-list fhor-tc-dashboard-list--volatility">' + items.join('') + '</ul>';
+    }
+
+    function setVolatilityToggleActive(root, mode) {
+        var toggle = root.querySelector('[data-fhor-tc-volatility-toggle]');
+        if (!toggle) {
+            return;
+        }
+        toggle.querySelectorAll('.fhor-tc-code-toggle__btn').forEach(function (btn) {
+            var isActive = btn.getAttribute('data-volatility-mode') === mode;
+            btn.classList.toggle('is-active', isActive);
+            btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            btn.tabIndex = isActive ? 0 : -1;
+        });
+        root.setAttribute('data-volatility-mode', mode);
+    }
+
+    function bindVolatilityToggle(root) {
+        var toggle = root.querySelector('[data-fhor-tc-volatility-toggle]');
+        if (!toggle || toggle.getAttribute('data-fhor-tc-bound') === '1') {
+            return;
+        }
+        toggle.setAttribute('data-fhor-tc-bound', '1');
+
+        toggle.addEventListener('click', function (event) {
+            var btn = event.target.closest('.fhor-tc-code-toggle__btn');
+            if (!btn || btn.classList.contains('is-active')) {
+                return;
+            }
+            var mode = btn.getAttribute('data-volatility-mode');
+            if (!mode) {
+                return;
+            }
+
+            var data = readDashboardData(root);
+            setVolatilityToggleActive(root, mode);
+            renderDashboardVolatility(root, data, mode);
+        });
+    }
+
+    function readDashboardData(root) {
         var data = window.fhorTcDashboard;
-        if (!data && root.getAttribute('data-fhor-tc-dashboard')) {
+        if (!data && root && root.getAttribute('data-fhor-tc-dashboard')) {
             try {
                 data = JSON.parse(root.getAttribute('data-fhor-tc-dashboard'));
             } catch (err) {
                 data = null;
             }
         }
-        if (data && data.code) {
+        return data;
+    }
+
+    function setDashboardData(root, data) {
+        if (!root || !data) {
+            return;
+        }
+        window.fhorTcDashboard = data;
+        try {
+            root.setAttribute('data-fhor-tc-dashboard', JSON.stringify(data));
+        } catch (err) {
+            /* ignore */
+        }
+        if (data.code) {
             root.setAttribute('data-code', data.code);
         }
-        if (data) {
-            renderDashboardHotCold(root, data);
+    }
+
+    function applyDashboardUi(root, ui) {
+        if (!root || !ui) {
+            return;
         }
+
+        var heroMeta = root.querySelector('[data-fhor-tc-ui="heroMeta"]');
+        if (heroMeta && ui.heroMeta) {
+            heroMeta.textContent = ui.heroMeta;
+        }
+
+        if (ui.referenceMonthLabel) {
+            root.querySelectorAll('[data-fhor-tc-ui="referenceMonthLabel"]').forEach(function (el) {
+                el.textContent = ui.referenceMonthLabel;
+            });
+        }
+
+        var trainerCount = root.querySelector('[data-fhor-tc-ui="trainerCount"]');
+        if (trainerCount && ui.trainerCount) {
+            trainerCount.textContent = ui.trainerCount;
+        }
+
+        var macroRule = root.querySelector('[data-fhor-tc-ui="macroPoolRule"]');
+        if (macroRule && ui.macroPoolRule) {
+            macroRule.textContent = ui.macroPoolRule;
+        }
+
+        if (ui.spotlightHints) {
+            Object.keys(ui.spotlightHints).forEach(function (key) {
+                var region = root.querySelector('[data-fhor-tc-dashboard-region="' + key + '"]');
+                if (!region) {
+                    return;
+                }
+                var spotlight = region.closest('.fhor-tc-dashboard-spotlight');
+                if (!spotlight) {
+                    return;
+                }
+                var hint = spotlight.querySelector('.fhor-tc-dashboard-spotlight__hint');
+                if (hint) {
+                    hint.textContent = ui.spotlightHints[key];
+                }
+            });
+        }
+    }
+
+    function setDashboardToggleActive(root, code) {
+        var toggle = root.querySelector('[data-fhor-tc-dashboard-code-toggle]');
+        if (!toggle) {
+            return;
+        }
+        toggle.querySelectorAll('.fhor-tc-code-toggle__btn').forEach(function (btn) {
+            var isActive = btn.getAttribute('data-code') === code;
+            btn.classList.toggle('is-active', isActive);
+            btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            btn.tabIndex = isActive ? 0 : -1;
+            btn.disabled = false;
+        });
+    }
+
+    function syncDashboardUrl(code) {
+        if (!window.history || !window.history.replaceState) {
+            return;
+        }
+        var next = '/trainer-cycles/';
+        if (code === 'flat') {
+            next = '/trainer-cycles/?code=flat';
+        }
+        window.history.replaceState(null, '', next);
+    }
+
+    function fetchDashboard(code) {
+        var ajax = window.fhorTcAjax || {};
+        var action = ajax.dashboardAction || 'fhor_tc_dashboard';
+        var nonce = ajax.dashboardNonce || ajax.nonce;
+        if (!ajax.url || !action || !nonce) {
+            return Promise.reject(new Error('ajax_unconfigured'));
+        }
+
+        var body = new URLSearchParams();
+        body.set('action', action);
+        body.set('nonce', nonce);
+        body.set('code', code);
+
+        return fetch(ajax.url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            },
+            body: body.toString(),
+        }).then(function (response) {
+            return response.json().then(function (payload) {
+                if (!response.ok || !payload || payload.success !== true) {
+                    var err = new Error('dashboard_fetch_failed');
+                    err.payload = payload;
+                    throw err;
+                }
+                return payload.data;
+            });
+        });
+    }
+
+    function refreshDashboardPanels(root, data) {
+        if (!root || !data) {
+            return;
+        }
+        renderDashboardHotCold(root, data);
+        renderDashboardSpotlights(root, data);
+        var volMode = root.getAttribute('data-volatility-mode') || 'flatliners';
+        renderDashboardVolatility(root, data, volMode);
+    }
+
+    function bindDashboardCodeToggle(root) {
+        var toggle = root.querySelector('[data-fhor-tc-dashboard-code-toggle]');
+        if (!toggle || toggle.getAttribute('data-fhor-tc-bound') === '1') {
+            return;
+        }
+        toggle.setAttribute('data-fhor-tc-bound', '1');
+
+        toggle.addEventListener('click', function (event) {
+            var btn = event.target.closest('.fhor-tc-code-toggle__btn');
+            if (!btn || btn.disabled || btn.classList.contains('is-active')) {
+                return;
+            }
+
+            var code = btn.getAttribute('data-code');
+            if (!code) {
+                return;
+            }
+
+            var data = readDashboardData(root);
+            if (data && data.code === code) {
+                return;
+            }
+
+            var sections = root.querySelector('[data-fhor-tc-dashboard-sections]');
+            root.classList.add('is-loading');
+            if (sections) {
+                sections.setAttribute('aria-busy', 'true');
+            }
+            toggle.querySelectorAll('.fhor-tc-code-toggle__btn').forEach(function (b) {
+                b.disabled = true;
+            });
+
+            fetchDashboard(code)
+                .then(function (payload) {
+                    var nextData = payload.bootstrap || payload;
+                    var ui = payload.ui || {};
+                    setDashboardData(root, nextData);
+                    applyDashboardUi(root, ui);
+                    setDashboardToggleActive(root, code);
+                    refreshDashboardPanels(root, nextData);
+                    syncDashboardUrl(code);
+                })
+                .catch(function () {
+                    if (data && data.code) {
+                        setDashboardToggleActive(root, data.code);
+                    }
+                })
+                .finally(function () {
+                    root.classList.remove('is-loading');
+                    if (sections) {
+                        sections.setAttribute('aria-busy', 'false');
+                    }
+                    toggle.querySelectorAll('.fhor-tc-code-toggle__btn').forEach(function (b) {
+                        b.disabled = false;
+                    });
+                });
+        });
+    }
+
+    function initDashboard(root) {
+        if (!root) {
+            return;
+        }
+        var data = readDashboardData(root);
+        if (data) {
+            setDashboardData(root, data);
+            setVolatilityToggleActive(root, root.getAttribute('data-volatility-mode') || 'flatliners');
+            refreshDashboardPanels(root, data);
+        }
+        setDashboardToggleActive(root, (data && data.code) || root.getAttribute('data-code') || 'jumps');
+        bindVolatilityToggle(root);
+        bindDashboardCodeToggle(root);
         root.classList.remove('is-bootstrapping');
         var sections = root.querySelector('[data-fhor-tc-dashboard-sections]');
         if (sections) {
@@ -673,6 +1152,8 @@
 
     window.fhorTcInitDashboard = bootDashboard;
     window.fhorTcRenderDashboardHotCold = renderDashboardHotCold;
+    window.fhorTcRenderDashboardSpotlights = renderDashboardSpotlights;
+    window.fhorTcRenderDashboardVolatility = renderDashboardVolatility;
     window.fhorTcInitProfileCharts = boot;
     window.fhorTcDestroyProfileChart = destroyProfileChart;
     window.fhorTcInitProfileChart = initProfileChart;

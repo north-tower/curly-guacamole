@@ -1689,6 +1689,26 @@ if (!function_exists('fhor_tc_cal_month_short')) {
     }
 }
 
+if (!function_exists('fhor_tc_format_calendar_month_window')) {
+    /**
+     * @param array<int, int> $months Calendar month indexes (1–12)
+     */
+    function fhor_tc_format_calendar_month_window(array $months) {
+        $months = array_values(array_filter(array_map('intval', $months), static function ($m) {
+            return $m >= 1 && $m <= 12;
+        }));
+        sort($months);
+        if ($months === []) {
+            return '';
+        }
+        $labels = array_map('fhor_tc_cal_month_short', $months);
+        if (count($labels) === 1) {
+            return $labels[0];
+        }
+        return $labels[0] . '–' . $labels[count($labels) - 1];
+    }
+}
+
 if (!function_exists('fhor_tc_build_profile_client_bootstrap')) {
     /**
      * Chart.js payload for profile / embed widgets (Phase 2.3).
@@ -1810,7 +1830,7 @@ if (!function_exists('fhor_tc_is_dashboard_request')) {
 
 if (!function_exists('fhor_tc_dashboard_request_code')) {
     /**
-     * Jumps default; flat when ?code=flat (Phase 3.5 wires AJAX toggle).
+     * Jumps default; flat when ?code=flat (SSR + history after AJAX toggle).
      */
     function fhor_tc_dashboard_request_code() {
         $raw = isset($_GET['code']) ? (string) wp_unslash($_GET['code']) : '';
@@ -1834,6 +1854,34 @@ if (!function_exists('fhor_tc_dashboard_available_codes')) {
             }
         }
         return $codes === [] ? ['jumps'] : $codes;
+    }
+}
+
+if (!function_exists('fhor_tc_dashboard_month_extreme_json')) {
+    /**
+     * Best / worst eligible month for dashboard volatility rail (Phase 3.4).
+     *
+     * @param array<string, mixed>|null $month
+     * @return array{calMonth: int, strikePct: float, delta: float}|null
+     */
+    function fhor_tc_dashboard_month_extreme_json($month) {
+        if (!is_array($month)) {
+            return null;
+        }
+        $cal = (int) ($month['cal_month'] ?? 0);
+        if ($cal < 1 || $cal > 12) {
+            return null;
+        }
+        $strike = $month['strike_pct'] ?? null;
+        $delta = $month['delta'] ?? null;
+        if ($strike === null || $strike === '' || $delta === null || $delta === '') {
+            return null;
+        }
+        return [
+            'calMonth' => $cal,
+            'strikePct' => (float) $strike,
+            'delta' => (float) $delta,
+        ];
     }
 }
 
@@ -1889,6 +1937,8 @@ if (!function_exists('fhor_tc_trainer_row_for_dashboard_json')) {
             'gapPts' => isset($trainer['gap_pts']) && $trainer['gap_pts'] !== null && $trainer['gap_pts'] !== ''
                 ? (float) $trainer['gap_pts']
                 : null,
+            'bestMonth' => fhor_tc_dashboard_month_extreme_json($trainer['best_month'] ?? null),
+            'worstMonth' => fhor_tc_dashboard_month_extreme_json($trainer['worst_month'] ?? null),
             'spotlights' => [
                 'early_birds' => !empty($spotlights['early_birds']),
                 'cold_start' => !empty($spotlights['cold_start']),
@@ -1915,16 +1965,79 @@ if (!function_exists('fhor_tc_build_dashboard_client_bootstrap')) {
             $trainers_out[] = fhor_tc_trainer_row_for_dashboard_json($row, $code, $ref);
         }
 
+        $cfg = fhor_tc_config();
+        $spot_windows = fhor_tc_spotlight_month_windows($code);
+        $month_labels = [];
+        for ($m = 1; $m <= 12; $m++) {
+            $month_labels[] = fhor_tc_cal_month_short($m);
+        }
+
         return [
             'ok' => !empty($pool['ok']),
             'code' => $code,
             'availableCodes' => fhor_tc_dashboard_available_codes(),
             'referenceMonth' => $ref,
             'referenceMonthLabel' => fhor_tc_cal_month_name($ref),
+            'monthLabels' => $month_labels,
             'trainerCount' => count($trainers_out),
-            'minMonthRunners' => (int) fhor_tc_config()['min_month_runners'],
+            'minMonthRunners' => (int) $cfg['min_month_runners'],
+            'spotlightDeltaPts' => (float) $cfg['spotlight_delta_pts'],
+            'spotlightMinMonths' => (int) $cfg['spotlight_min_months'],
+            'spotlightWindows' => $spot_windows,
             'trainers' => $trainers_out,
             'meta' => is_array($pool['meta'] ?? null) ? $pool['meta'] : [],
+        ];
+    }
+}
+
+if (!function_exists('fhor_tc_dashboard_ui_snapshot')) {
+    /**
+     * Pre-formatted strings for dashboard AJAX / client DOM swaps (Phase 3.5).
+     *
+     * @param array<string, mixed> $pool
+     * @return array<string, mixed>
+     */
+    function fhor_tc_dashboard_ui_snapshot(array $pool) {
+        $code = fhor_tc_normalize_code($pool['code'] ?? 'jumps');
+        $code_label = fhor_tc_code_label($code);
+        $cfg = fhor_tc_config();
+        $ref = (int) ($pool['reference_month'] ?? fhor_tc_reference_cal_month());
+        $trainers = is_array($pool['trainers'] ?? null) ? $pool['trainers'] : [];
+        $spot_delta = (float) $cfg['spotlight_delta_pts'];
+        $spot_windows = fhor_tc_spotlight_month_windows($code);
+        $early_window_label = fhor_tc_format_calendar_month_window($spot_windows['early_birds'] ?? []);
+        $late_window_label = fhor_tc_format_calendar_month_window($spot_windows['late_surge'] ?? []);
+
+        return [
+            'code' => $code,
+            'codeLabel' => $code_label,
+            'codeLabelLower' => strtolower($code_label),
+            'heroMeta' => $code_label . ' · macro yard cycles',
+            'referenceMonthLabel' => fhor_tc_cal_month_name($ref),
+            'trainerCount' => number_format_i18n(count($trainers)),
+            'macroPoolRule' => sprintf(
+                'top %s %s trainers by lifetime resulted runs (minimum %s).',
+                number_format_i18n((int) $cfg['macro_top_n']),
+                strtolower($code_label),
+                number_format_i18n((int) $cfg['macro_min_lifetime_runners'])
+            ),
+            'spotlightHints' => [
+                'early_birds' => sprintf(
+                    'Hot %s window (avg delta ≥ +%.1f pts).',
+                    $early_window_label,
+                    $spot_delta
+                ),
+                'late_surge' => sprintf(
+                    'Hot %s window (avg delta ≥ +%.1f pts).',
+                    $late_window_label,
+                    $spot_delta
+                ),
+                'cold_start' => sprintf(
+                    'Cold %s window (avg delta ≤ −%.1f pts).',
+                    $early_window_label,
+                    $spot_delta
+                ),
+            ],
         ];
     }
 }
@@ -2007,6 +2120,11 @@ if (!function_exists('fhor_tc_render_dashboard_shell')) {
         $show_code_toggle = count($available_codes) >= 2;
         $cfg = fhor_tc_config();
         $min_month = (int) $cfg['min_month_runners'];
+        $spot_delta = (float) $cfg['spotlight_delta_pts'];
+        $spot_min_months = (int) $cfg['spotlight_min_months'];
+        $spot_windows = fhor_tc_spotlight_month_windows($code);
+        $early_window_label = fhor_tc_format_calendar_month_window($spot_windows['early_birds'] ?? []);
+        $late_window_label = fhor_tc_format_calendar_month_window($spot_windows['late_surge'] ?? []);
 
         ob_start();
         ?>
@@ -2094,20 +2212,46 @@ if (!function_exists('fhor_tc_render_dashboard_shell')) {
                     <section class="runners-card fhor-tc-dashboard-panel fhor-tc-dashboard-panel--spotlights" aria-labelledby="fhor-tc-spotlights-heading">
                         <div class="runners-header">
                             <h2 class="runners-title" id="fhor-tc-spotlights-heading"><span>✨</span> Pattern spotlights</h2>
-                            <p class="runners-subtitle">Early Birds, Late Surge, and Cold Start yards (Phase 3.3).</p>
+                            <p class="runners-subtitle">
+                                Yards whose average delta in a calendar window is at least <?php echo esc_html(number_format($spot_delta, 1)); ?> pts above or below baseline (<?php echo esc_html(number_format_i18n($spot_min_months)); ?>+ eligible months).
+                            </p>
                         </div>
                         <div class="fhor-tc-dashboard-spotlight-grid">
                             <?php
-                            $spotlight_labels = [
-                                'early_birds' => 'Early Birds',
-                                'late_surge' => 'Late Surge',
-                                'cold_start' => 'Cold Start',
+                            $spotlight_sections = [
+                                'early_birds' => [
+                                    'title' => 'Early Birds',
+                                    'hint' => sprintf(
+                                        'Hot %s window (avg delta ≥ +%.1f pts).',
+                                        $early_window_label,
+                                        $spot_delta
+                                    ),
+                                ],
+                                'late_surge' => [
+                                    'title' => 'Late Surge',
+                                    'hint' => sprintf(
+                                        'Hot %s window (avg delta ≥ +%.1f pts).',
+                                        $late_window_label,
+                                        $spot_delta
+                                    ),
+                                ],
+                                'cold_start' => [
+                                    'title' => 'Cold Start',
+                                    'hint' => sprintf(
+                                        'Cold %s window (avg delta ≤ −%.1f pts).',
+                                        $early_window_label,
+                                        $spot_delta
+                                    ),
+                                ],
                             ];
-                            foreach ($spotlight_labels as $spot_key => $spot_label) :
+                            foreach ($spotlight_sections as $spot_key => $spot_section) :
                                 ?>
-                            <div class="fhor-tc-dashboard-spotlight" data-fhor-tc-dashboard-region="<?php echo esc_attr($spot_key); ?>">
-                                <h3 class="fhor-tc-dashboard-spotlight__title"><?php echo esc_html($spot_label); ?></h3>
-                                <?php echo fhor_tc_render_dashboard_list_skeleton(4); ?>
+                            <div class="fhor-tc-dashboard-spotlight">
+                                <h3 class="fhor-tc-dashboard-spotlight__title"><?php echo esc_html($spot_section['title']); ?></h3>
+                                <p class="fhor-tc-dashboard-spotlight__hint"><?php echo esc_html($spot_section['hint']); ?></p>
+                                <div class="fhor-tc-dashboard-spotlight__scroll" data-fhor-tc-dashboard-region="<?php echo esc_attr($spot_key); ?>">
+                                    <?php echo fhor_tc_render_dashboard_list_skeleton(4); ?>
+                                </div>
                             </div>
                             <?php endforeach; ?>
                         </div>
@@ -2115,10 +2259,39 @@ if (!function_exists('fhor_tc_render_dashboard_shell')) {
 
                     <section class="runners-card fhor-tc-dashboard-panel fhor-tc-dashboard-panel--volatility" aria-labelledby="fhor-tc-volatility-heading">
                         <div class="runners-header">
-                            <h2 class="runners-title" id="fhor-tc-volatility-heading"><span>📊</span> Flatliners &amp; Wavemakers</h2>
-                            <p class="runners-subtitle">Volatility range rail (Phase 3.4).</p>
+                            <div class="fhor-tc-dashboard-volatility-head">
+                                <div>
+                                    <h2 class="runners-title" id="fhor-tc-volatility-heading"><span>📊</span> Flatliners &amp; Wavemakers</h2>
+                                    <p class="runners-subtitle">
+                                        Eligible-month win-rate spread (lowest vs highest calendar month); baseline tick marks lifetime strike rate.
+                                    </p>
+                                </div>
+                                <div
+                                    class="fhor-tc-code-toggle fhor-tc-code-toggle--volatility"
+                                    role="tablist"
+                                    aria-label="<?php esc_attr_e('Volatility sort', 'bricks'); ?>"
+                                    data-fhor-tc-volatility-toggle
+                                >
+                                    <button
+                                        type="button"
+                                        class="fhor-tc-code-toggle__btn is-active"
+                                        role="tab"
+                                        data-volatility-mode="flatliners"
+                                        aria-selected="true"
+                                        tabindex="0"
+                                    ><?php esc_html_e('Flatliners', 'bricks'); ?></button>
+                                    <button
+                                        type="button"
+                                        class="fhor-tc-code-toggle__btn"
+                                        role="tab"
+                                        data-volatility-mode="wavemakers"
+                                        aria-selected="false"
+                                        tabindex="-1"
+                                    ><?php esc_html_e('Wavemakers', 'bricks'); ?></button>
+                                </div>
+                            </div>
                         </div>
-                        <div class="fhor-tc-dashboard-volatility-skeleton" data-fhor-tc-dashboard-region="volatility">
+                        <div class="fhor-tc-dashboard-volatility-body" data-fhor-tc-dashboard-region="volatility">
                             <?php echo fhor_tc_render_dashboard_list_skeleton(6); ?>
                         </div>
                     </section>
@@ -2127,9 +2300,9 @@ if (!function_exists('fhor_tc_render_dashboard_shell')) {
                 <div class="track-advice-box fhor-tc-dashboard-rules">
                     <strong>How to read this dashboard</strong>
                     <ul class="fhor-tc-profile-rules__list">
-                        <li><strong>Macro pool</strong> = top <?php echo esc_html(number_format_i18n((int) $cfg['macro_top_n'])); ?> <?php echo esc_html(strtolower($code_label)); ?> trainers by lifetime resulted runs (minimum <?php echo esc_html(number_format_i18n((int) $cfg['macro_min_lifetime_runners'])); ?>).</li>
+                        <li><strong>Macro pool</strong> = <span data-fhor-tc-ui="macroPoolRule">top <?php echo esc_html(number_format_i18n((int) $cfg['macro_top_n'])); ?> <?php echo esc_html(strtolower($code_label)); ?> trainers by lifetime resulted runs (minimum <?php echo esc_html(number_format_i18n((int) $cfg['macro_min_lifetime_runners'])); ?>).</span></li>
                         <li><strong>Delta</strong> = calendar-month win % minus that yard’s lifetime win % (percentage points).</li>
-                        <li>Lists and spotlights hydrate from the embedded dataset; interactive Jumps / Flat switching lands in Phase 3.5.</li>
+                        <li>Use the Jumps / Flat control to swap the macro pool without leaving the page; hot, cold, spotlight, and volatility lists refresh from the server dataset.</li>
                     </ul>
                 </div>
             </div>
@@ -2696,3 +2869,37 @@ if (!function_exists('fhor_tc_ajax_profile')) {
 }
 add_action('wp_ajax_fhor_tc_profile', 'fhor_tc_ajax_profile');
 add_action('wp_ajax_nopriv_fhor_tc_profile', 'fhor_tc_ajax_profile');
+
+if (!function_exists('fhor_tc_ajax_dashboard')) {
+    /**
+     * Macro dashboard JSON for hero Jumps / Flat toggle (Phase 3.5).
+     */
+    function fhor_tc_ajax_dashboard() {
+        check_ajax_referer('fhor_tc_dashboard', 'nonce');
+
+        $code = isset($_POST['code']) ? fhor_tc_normalize_code(wp_unslash($_POST['code'])) : 'jumps';
+        $available = fhor_tc_dashboard_available_codes();
+        if ($available !== [] && !in_array($code, $available, true)) {
+            wp_send_json_error([
+                'ok' => false,
+                'error' => 'invalid_code',
+                'availableCodes' => $available,
+            ], 400);
+        }
+
+        $pool = fhor_tc_get_macro_pool($code);
+        if (empty($pool['ok'])) {
+            $error = (string) ($pool['error'] ?? 'unavailable');
+            $status = $error === 'not_found' ? 404 : 503;
+            wp_send_json_error($pool, $status);
+        }
+
+        wp_send_json_success([
+            'bootstrap' => fhor_tc_build_dashboard_client_bootstrap($pool),
+            'ui' => fhor_tc_dashboard_ui_snapshot($pool),
+            'meta' => $pool['meta'] ?? [],
+        ]);
+    }
+}
+add_action('wp_ajax_fhor_tc_dashboard', 'fhor_tc_ajax_dashboard');
+add_action('wp_ajax_nopriv_fhor_tc_dashboard', 'fhor_tc_ajax_dashboard');

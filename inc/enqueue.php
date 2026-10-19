@@ -212,6 +212,8 @@ function bricks_trainer_cycles_enqueue_scripts() {
             'url' => admin_url('admin-ajax.php'),
             'action' => 'fhor_tc_profile',
             'nonce' => wp_create_nonce('fhor_tc_profile'),
+            'dashboardAction' => 'fhor_tc_dashboard',
+            'dashboardNonce' => wp_create_nonce('fhor_tc_dashboard'),
         ]);
     }
 }
