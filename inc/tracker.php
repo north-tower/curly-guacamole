@@ -574,7 +574,7 @@ function bricks_tracker_floating_quick_link() {
             <a class="fhor-fab__link fhor-fab__link--picks" href="<?php echo esc_url(home_url('/today-picks/')); ?>" title="Open Today's Picks (audit sheet)">📋 Today's Picks</a>
             <a class="fhor-fab__link fhor-fab__link--backtest" href="<?php echo esc_url(home_url('/points-backtest/')); ?>" title="Open Points Backtest">📊 Points Backtest</a>
             <?php endif; ?>
-            <a class="fhor-fab__link fhor-fab__link--sires" href="<?php echo esc_url(home_url('/daily_sires_insights/')); ?>" title="Open Daily Sires Insights">🧬 Daily Sires</a>
+            <a class="fhor-fab__link fhor-fab__link--sires" href="<?php echo esc_url(home_url('/daily_sires_insights/')); ?>" title="Sire PRB form for today's card">🧬 Sire form</a>
             <?php if (current_user_can('manage_options')): ?>
             <a class="fhor-fab__link fhor-fab__link--admin" href="<?php echo esc_url(home_url('/admin-pnl/')); ?>" title="Open Admin P&L">💷 Admin P&amp;L</a>
             <?php endif; ?>

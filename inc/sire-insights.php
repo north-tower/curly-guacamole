@@ -109,7 +109,7 @@ if (!function_exists('bricks_sire_insights_config')) {
         $age_col = bricks_sire_insights_pick_column(['age']);
         $handicap_col = bricks_sire_insights_pick_column(['handicap']);
         $sire_col = bricks_sire_insights_pick_column(['sire_name', 'sire']);
-        $horse_col = bricks_sire_insights_pick_column(['name', 'horse_name', 'runner_name', 'runner_id']);
+        $horse_col = bricks_sire_insights_pick_column(['name', 'horse_name', 'runner_name']);
         $prb_col = bricks_sire_insights_pick_column(['rt_5Y_prb', 'rc_5Y_prb', 'mean_prb', 'prb', 'avg_prb']);
         $rc_21d_prb_col = bricks_sire_insights_pick_column(['rc_21D_prb']);
         $course_prb_col = bricks_sire_insights_pick_column(['rt_5Y_course_prb']);
@@ -138,11 +138,20 @@ if (!function_exists('bricks_sire_insights_config')) {
     }
 }
 
+if (!function_exists('bricks_sire_insights_default_meeting_date')) {
+    function bricks_sire_insights_default_meeting_date() {
+        if (function_exists('bricks_daily_archive_today')) {
+            return bricks_daily_archive_today();
+        }
+        return wp_date('Y-m-d', current_time('timestamp'));
+    }
+}
+
 if (!function_exists('bricks_sire_insights_parse_date_for_query')) {
     function bricks_sire_insights_parse_date_for_query($value) {
         $value = trim((string) $value);
         if ($value === '') {
-            return wp_date('Y-m-d', current_time('timestamp'));
+            return bricks_sire_insights_default_meeting_date();
         }
 
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
@@ -154,7 +163,131 @@ if (!function_exists('bricks_sire_insights_parse_date_for_query')) {
             return gmdate('Y-m-d', $ts);
         }
 
-        return wp_date('Y-m-d', current_time('timestamp'));
+        return bricks_sire_insights_default_meeting_date();
+    }
+}
+
+if (!function_exists('bricks_sire_insights_format_scheduled_time')) {
+    function bricks_sire_insights_format_scheduled_time($value) {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return '';
+        }
+        if (preg_match('/^(\d{1,2}:\d{2})/', $value, $m)) {
+            return $m[1];
+        }
+        $ts = strtotime($value);
+        if ($ts !== false) {
+            return wp_date('H:i', $ts);
+        }
+        return $value;
+    }
+}
+
+if (!function_exists('bricks_sire_insights_enrich_rows')) {
+    /**
+     * Attach horse names and race labels from daily runner/race tables (no internal IDs in UI).
+     *
+     * @param object[] $rows
+     * @return object[]
+     */
+    function bricks_sire_insights_enrich_rows(array $rows, $meeting_date = '') {
+        global $wpdb;
+        if (empty($rows)) {
+            return $rows;
+        }
+
+        $runner_ids = [];
+        $race_ids = [];
+        foreach ($rows as $row) {
+            $rid = isset($row->runner_id) ? intval($row->runner_id) : 0;
+            if ($rid > 0) {
+                $runner_ids[$rid] = true;
+            }
+            $race_id = isset($row->race_id) ? intval($row->race_id) : 0;
+            if ($race_id > 0) {
+                $race_ids[$race_id] = true;
+            }
+        }
+
+        $runner_names = [];
+        $race_meta = [];
+        if (!empty($runner_ids) || !empty($race_ids)) {
+            $tables = null;
+            if ($meeting_date !== '' && function_exists('bricks_race_tables_for_date')) {
+                $tables = bricks_race_tables_for_date($meeting_date);
+            }
+            if (!is_array($tables)) {
+                $tables = [
+                    'races' => 'advance_daily_races_beta',
+                    'runners' => 'advance_daily_runners_beta',
+                ];
+            }
+
+            $runners_table = preg_replace('/[^a-zA-Z0-9_]/', '', (string) ($tables['runners'] ?? ''));
+            $races_table = preg_replace('/[^a-zA-Z0-9_]/', '', (string) ($tables['races'] ?? ''));
+
+            if (!empty($runner_ids) && $runners_table !== '' && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $runners_table)) === $runners_table) {
+                $runner_cols = $wpdb->get_col("SHOW COLUMNS FROM `$runners_table`");
+                $name_col = in_array('name', (array) $runner_cols, true) ? 'name' : (in_array('horse_name', (array) $runner_cols, true) ? 'horse_name' : '');
+                if ($name_col !== '') {
+                    $ids = array_keys($runner_ids);
+                    $placeholders = implode(',', array_fill(0, count($ids), '%d'));
+                    $sql = "SELECT runner_id, `$name_col` AS horse_name FROM `$runners_table` WHERE runner_id IN ($placeholders)";
+                    $name_rows = $wpdb->get_results($wpdb->prepare($sql, ...$ids));
+                    foreach ((array) $name_rows as $name_row) {
+                        $key = intval($name_row->runner_id ?? 0);
+                        $label = trim((string) ($name_row->horse_name ?? ''));
+                        if ($key > 0 && $label !== '') {
+                            $runner_names[$key] = $label;
+                        }
+                    }
+                }
+            }
+
+            if (!empty($race_ids) && $races_table !== '' && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $races_table)) === $races_table) {
+                $ids = array_keys($race_ids);
+                $placeholders = implode(',', array_fill(0, count($ids), '%d'));
+                $sql = "SELECT race_id, course, scheduled_time, race_title FROM `$races_table` WHERE race_id IN ($placeholders)";
+                $race_rows = $wpdb->get_results($wpdb->prepare($sql, ...$ids));
+                foreach ((array) $race_rows as $race_row) {
+                    $key = intval($race_row->race_id ?? 0);
+                    if ($key > 0) {
+                        $race_meta[$key] = $race_row;
+                    }
+                }
+            }
+        }
+
+        foreach ($rows as $row) {
+            $runner_id = isset($row->runner_id) ? intval($row->runner_id) : 0;
+            $horse_from_row = trim((string) ($row->horse_name ?? ''));
+            if ($horse_from_row !== '' && !preg_match('/^\d+$/', $horse_from_row)) {
+                $row->horse_display = $horse_from_row;
+            } elseif ($runner_id > 0 && isset($runner_names[$runner_id])) {
+                $row->horse_display = $runner_names[$runner_id];
+            } else {
+                $row->horse_display = '';
+            }
+
+            $race_id = isset($row->race_id) ? intval($row->race_id) : 0;
+            $meta = ($race_id > 0 && isset($race_meta[$race_id])) ? $race_meta[$race_id] : null;
+            $course = trim((string) ($meta->course ?? $row->course ?? ''));
+            $time = $meta ? bricks_sire_insights_format_scheduled_time($meta->scheduled_time ?? '') : '';
+            $label_parts = [];
+            if ($time !== '') {
+                $label_parts[] = $time;
+            }
+            if ($course !== '') {
+                $label_parts[] = $course;
+            }
+            $row->race_label = implode(' · ', $label_parts);
+            if ($row->race_label === '' && $meta && !empty($meta->race_title)) {
+                $row->race_label = trim((string) $meta->race_title);
+            }
+        }
+
+        return $rows;
     }
 }
 
@@ -330,23 +463,68 @@ if (!function_exists('bricks_sire_insights_render_pagination')) {
     }
 }
 
+if (!function_exists('bricks_sire_insights_render_horse_cell')) {
+    function bricks_sire_insights_render_horse_cell($row) {
+        $horse_label = trim((string) ($row->horse_display ?? $row->horse_name ?? ''));
+        if ($horse_label === '' || preg_match('/^\d+$/', $horse_label)) {
+            $horse_label = '';
+        }
+        $runner_id = isset($row->runner_id) ? intval($row->runner_id) : 0;
+        if ($horse_label === '' && $runner_id <= 0) {
+            echo '-';
+            return;
+        }
+        if ($horse_label === '') {
+            $horse_label = 'View runner';
+        }
+        if ($runner_id > 0 && function_exists('bricks_horse_history_url')) {
+            echo '<a class="sire-horse-link horse-name" href="' . esc_url(bricks_horse_history_url($runner_id)) . '">' . esc_html($horse_label) . '</a>';
+            return;
+        }
+        echo esc_html($horse_label);
+    }
+}
+
+if (!function_exists('bricks_sire_insights_render_race_cell')) {
+    function bricks_sire_insights_render_race_cell($row) {
+        $race_id = isset($row->race_id) ? intval($row->race_id) : 0;
+        $race_label = trim((string) ($row->race_label ?? ''));
+        if ($race_label === '') {
+            $course = trim((string) ($row->course ?? ''));
+            if ($course !== '') {
+                $race_label = $course;
+            }
+        }
+        if ($race_id <= 0) {
+            echo esc_html($race_label !== '' ? $race_label : '-');
+            return;
+        }
+        $link_text = $race_label !== '' ? $race_label : 'Open race card';
+        if (function_exists('bricks_race_url')) {
+            echo '<a class="sire-race-link" href="' . esc_url(bricks_race_url($race_id)) . '">' . esc_html($link_text) . '</a>';
+            return;
+        }
+        echo esc_html($link_text);
+    }
+}
+
 if (!function_exists('bricks_sire_insights_render_table_html')) {
     function bricks_sire_insights_render_table_html($rows, $meta = []) {
         $current_page = intval($meta['page'] ?? 1);
         $total_pages = intval($meta['total_pages'] ?? 1);
         $total_rows = intval($meta['total_rows'] ?? count((array) $rows));
+        $colspan = 13;
         ob_start();
         ?>
         <div class="sire-insights-table-wrap">
             <table class="sire-insights-table">
                 <thead>
                     <tr>
-                        <th class="sortable-sire" data-sort="race_id">Race ID <span class="sort-indicator"></span></th>
-                        <th class="sortable-sire" data-sort="runner_id">Runner ID <span class="sort-indicator"></span></th>
+                        <th class="sortable-sire" data-sort="horse_name">Horse <span class="sort-indicator"></span></th>
+                        <th class="sortable-sire" data-sort="course">Race <span class="sort-indicator"></span></th>
                         <th class="sortable-sire" data-sort="sire_name">Sire <span class="sort-indicator"></span></th>
-                        <th class="sortable-sire" data-sort="course">Course <span class="sort-indicator"></span></th>
-                        <th class="sortable-sire" data-sort="race_code">Code <span class="sort-indicator"></span></th>
                         <th class="sortable-sire" data-sort="race_type">Type <span class="sort-indicator"></span></th>
+                        <th class="sortable-sire" data-sort="going">Going <span class="sort-indicator"></span></th>
                         <th class="sortable-sire" data-sort="distance_band">Dist (f) <span class="sort-indicator"></span></th>
                         <th class="sortable-sire" data-sort="age">Age <span class="sort-indicator"></span></th>
                         <th class="sortable-sire" data-sort="handicap">Hcap <span class="sort-indicator"></span></th>
@@ -354,13 +532,13 @@ if (!function_exists('bricks_sire_insights_render_table_html')) {
                         <th class="sortable-sire ta-right" data-sort="rc_21d_prb">RC 21D PRB <span class="sort-indicator"></span></th>
                         <th class="sortable-sire ta-right" data-sort="course_prb">Course PRB <span class="sort-indicator"></span></th>
                         <th class="sortable-sire ta-right" data-sort="distance_prb">Dist PRB <span class="sort-indicator"></span></th>
-                        <th class="sortable-sire ta-right" data-sort="candd_prb">C&D PRB <span class="sort-indicator"></span></th>
+                        <th class="sortable-sire ta-right" data-sort="candd_prb">C&amp;D PRB <span class="sort-indicator"></span></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($rows)): ?>
                         <tr class="sire-row sire-row--empty">
-                            <td colspan="15" class="sire-empty-cell">No sire insights found for current filters.</td>
+                            <td colspan="<?php echo esc_attr($colspan); ?>" class="sire-empty-cell">No sire form rows for this date and filter set. Try another date or reset filters.</td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($rows as $row): ?>
@@ -378,12 +556,11 @@ if (!function_exists('bricks_sire_insights_render_table_html')) {
                             }
                             ?>
                             <tr class="sire-row">
-                                <td class="sire-cell" data-label="Race ID"><?php echo esc_html($row->race_id ?? '-'); ?></td>
-                                <td class="sire-cell horse-name" data-label="Runner ID"><?php echo esc_html($row->runner_id ?? '-'); ?></td>
+                                <td class="sire-cell horse-name" data-label="Horse"><?php bricks_sire_insights_render_horse_cell($row); ?></td>
+                                <td class="sire-cell" data-label="Race"><?php bricks_sire_insights_render_race_cell($row); ?></td>
                                 <td class="sire-cell sire-cell--sire sire-name" data-label="Sire"><?php echo esc_html($row->sire_name ?? '-'); ?></td>
-                                <td class="sire-cell" data-label="Course"><?php echo bricks_sire_insights_badge($row->course ?? '', 'blue'); ?></td>
-                                <td class="sire-cell" data-label="Code"><?php echo bricks_sire_insights_badge($row->race_code ?? '', 'slate'); ?></td>
                                 <td class="sire-cell" data-label="Type"><?php echo bricks_sire_insights_badge($row->race_type ?? '', 'violet'); ?></td>
+                                <td class="sire-cell" data-label="Going"><?php echo esc_html($row->going ?? '-'); ?></td>
                                 <td class="sire-cell" data-label="Dist (f)"><?php echo esc_html($row->distance_band ?? '-'); ?></td>
                                 <td class="sire-cell" data-label="Age"><?php echo esc_html($row->age ?? '-'); ?></td>
                                 <td class="sire-cell" data-label="Hcap"><?php echo esc_html(isset($row->handicap) ? intval($row->handicap) : '-'); ?></td>
@@ -552,6 +729,7 @@ if (!function_exists('bricks_ajax_load_sire_insights_table')) {
                     LIMIT %d OFFSET %d";
             $rows = $wpdb->get_results($wpdb->prepare($fallback_sql, ...array_merge($fallback_params, [$per_page, $offset])));
         }
+        $rows = bricks_sire_insights_enrich_rows((array) $rows, $use_date_scope ? $effective_date : '');
         echo bricks_sire_insights_render_table_html($rows, [
             'page' => $page,
             'total_pages' => $total_pages,
@@ -569,16 +747,16 @@ if (!function_exists('bricks_daily_sires_insights_shortcode')) {
             return '<div style="padding:16px;color:#991b1b;background:#fee2e2;border-radius:8px;">Sire insights data table is not available on the current WP DB connection yet. If the table exists in another schema, copy/sync it into this site DB.</div>';
         }
 
-        $default_date = bricks_sire_insights_get_latest_date();
-        if ($default_date === '') {
-            $default_date = wp_date('Y-m-d', current_time('timestamp'));
-        }
+        $default_date = bricks_sire_insights_default_meeting_date();
         ob_start();
         ?>
         <div class="daily-sires-insights-wrapper">
             <div class="sire-header-row">
-                <h3>Daily Sire Insights</h3>
-                <div class="sire-date-label">Date: <span id="sire-display-date"><?php echo esc_html($default_date); ?></span></div>
+                <div class="sire-header-copy">
+                    <h3>Sire form today</h3>
+                    <p class="sire-intro">Runners on the selected card with sire PRB angles (race type, course, distance and recent form). Sorted by RT 5Y PRB by default — use filters to narrow by course or sire.</p>
+                </div>
+                <div class="sire-date-label">Card date: <span id="sire-display-date"><?php echo esc_html($default_date); ?></span></div>
             </div>
 
             <button type="button" class="race-filters-toggle sire-filters-toggle" id="sireFiltersToggle" aria-expanded="false" aria-controls="sireFiltersPanel">
@@ -622,11 +800,11 @@ if (!function_exists('bricks_daily_sires_insights_shortcode')) {
                 <label class="race-mobile-toolbar__label" for="sireMobileSort">Sort by</label>
                 <select id="sireMobileSort" class="race-mobile-toolbar__select" aria-label="Sort sire insights">
                     <option value="mean_prb">RT 5Y PRB</option>
+                    <option value="horse_name">Horse</option>
                     <option value="sire_name">Sire</option>
-                    <option value="race_id">Race ID</option>
-                    <option value="runner_id">Runner ID</option>
-                    <option value="course">Course</option>
+                    <option value="course">Race (course)</option>
                     <option value="race_type">Type</option>
+                    <option value="going">Going</option>
                     <option value="distance_band">Distance</option>
                     <option value="rc_21d_prb">RC 21D PRB</option>
                     <option value="course_prb">Course PRB</option>
