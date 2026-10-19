@@ -2,6 +2,7 @@
  * Trainer Cycles profile delta chart (Chart.js 4) + Jumps / Flat AJAX toggle (Phase 2.4–2.5).
  * Macro dashboard hot/cold (Phase 3.2), pattern spotlights (3.3), volatility rail (3.4), AJAX code toggle (3.5).
  * Phase 4.1: aria-live dashboard updates, keyboard tablists, reduced-motion charts.
+ * Phase 4.2: dashboard bootstrap carries server meta (cache, ms, sql_ms on cold load).
  */
 (function () {
     'use strict';

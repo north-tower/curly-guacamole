@@ -176,6 +176,19 @@ tc_assert('dashboard ui hero meta', strpos($dash_ui['heroMeta'], 'macro yard cyc
 tc_assert('dashboard ui spotlight hints', is_array($dash_ui['spotlightHints'] ?? null));
 tc_assert('dashboard ui early birds hint', strpos($dash_ui['spotlightHints']['early_birds'], 'Oct') !== false);
 
+fhor_tc_sql_timing_reset();
+$fake_start = microtime(true) - 0.02;
+fhor_tc_sql_timing_record('macro_baselines', $fake_start);
+$sql_snap = fhor_tc_sql_timing_snapshot();
+tc_assert('sql snapshot has sql_ms', isset($sql_snap['sql_ms']) && $sql_snap['sql_ms'] > 0);
+tc_assert('sql snapshot has macro_baselines', isset($sql_snap['sql']['macro_baselines']));
+
+$meta_with_sql = fhor_tc_response_meta(microtime(true), 'miss', $sql_snap);
+tc_assert('response meta merges sql', isset($meta_with_sql['sql_ms']) && $meta_with_sql['cache'] === 'miss');
+
+tc_eq('default macro top_n tuned', 40, (int) FHOR_TC_MACRO_TOP_N);
+tc_eq('default macro cache ttl 12h', 12 * HOUR_IN_SECONDS, (int) FHOR_TC_MACRO_CACHE_TTL);
+
 $profile = fhor_tc_get_profile_data('', 'jumps');
 tc_eq('profile invalid ok', false, $profile['ok']);
 tc_eq('profile invalid error', 'invalid_trainer', $profile['error']);

@@ -3,6 +3,13 @@
  * Trainer Cycles (hot vs cold seasonal win-rate deltas).
  *
  * Phase 1: data layer only — no public routes until Phase 2+.
+ *
+ * Performance (Phase 4.2):
+ * - Override tunables in wp-config.php before require (see TRAINER_CYCLES_DEPLOY.md).
+ * - Optional date floor when uncached macro SQL is slow:
+ *   define('FHOR_TC_DATE_FROM', '2018-01-01');
+ * - After changing SQL, merge logic, or response shape, bump transients:
+ *   fhor_tc_bump_cache_ver() (or wp option fhor_tc_cache_ver).
  */
 
 if (!defined('FHOR_TC_MIN_MONTH_RUNNERS')) {
@@ -12,7 +19,8 @@ if (!defined('FHOR_TC_MACRO_MIN_LIFETIME_RUNNERS')) {
     define('FHOR_TC_MACRO_MIN_LIFETIME_RUNNERS', 200);
 }
 if (!defined('FHOR_TC_MACRO_TOP_N')) {
-    define('FHOR_TC_MACRO_TOP_N', 48);
+    /** Macro pool size (Query A LIMIT); lower = faster Query B. */
+    define('FHOR_TC_MACRO_TOP_N', 40);
 }
 if (!defined('FHOR_TC_SPOTLIGHT_DELTA_PTS')) {
     define('FHOR_TC_SPOTLIGHT_DELTA_PTS', 3.0);
@@ -21,10 +29,10 @@ if (!defined('FHOR_TC_SPOTLIGHT_MIN_MONTHS')) {
     define('FHOR_TC_SPOTLIGHT_MIN_MONTHS', 2);
 }
 if (!defined('FHOR_TC_MACRO_CACHE_TTL')) {
-    define('FHOR_TC_MACRO_CACHE_TTL', 6 * HOUR_IN_SECONDS);
+    define('FHOR_TC_MACRO_CACHE_TTL', 12 * HOUR_IN_SECONDS);
 }
 if (!defined('FHOR_TC_PROFILE_CACHE_TTL')) {
-    define('FHOR_TC_PROFILE_CACHE_TTL', 6 * HOUR_IN_SECONDS);
+    define('FHOR_TC_PROFILE_CACHE_TTL', 12 * HOUR_IN_SECONDS);
 }
 if (!defined('FHOR_TC_SLUG_INDEX_MIN_RUNS')) {
     define('FHOR_TC_SLUG_INDEX_MIN_RUNS', 50);
@@ -213,7 +221,9 @@ if (!function_exists('fhor_tc_query_macro_baselines')) {
             LIMIT %d";
 
         $params = array_merge($frag['params'], [$macro_min, $top_n]);
+        $sql_started = microtime(true);
         $rows = $wpdb->get_results($wpdb->prepare($sql, ...$params));
+        fhor_tc_sql_timing_record('macro_baselines', $sql_started);
         if (!is_array($rows)) {
             return [];
         }
@@ -277,7 +287,9 @@ if (!function_exists('fhor_tc_query_monthly_buckets')) {
             GROUP BY hrunb.trainer_name, MONTH(hracb.meeting_date)";
 
         $params = array_merge($frag['params'], $trainer_names);
+        $sql_started = microtime(true);
         $rows = $wpdb->get_results($wpdb->prepare($sql, ...$params));
+        fhor_tc_sql_timing_record('monthly_buckets', $sql_started);
         if (!is_array($rows)) {
             return [];
         }
@@ -451,7 +463,9 @@ if (!function_exists('fhor_tc_query_trainer_baseline')) {
             GROUP BY hrunb.trainer_name";
 
         $params = array_merge($frag['params'], [$name]);
+        $sql_started = microtime(true);
         $row = $wpdb->get_row($wpdb->prepare($sql, ...$params));
+        fhor_tc_sql_timing_record('trainer_baseline', $sql_started);
         if (!$row) {
             return null;
         }
@@ -1113,6 +1127,19 @@ if (!function_exists('fhor_tc_profile_cache_set')) {
 }
 
 if (!function_exists('fhor_tc_bump_cache_ver')) {
+    /**
+     * Invalidate all Trainer Cycles transients (macro, profile, slug index).
+     *
+     * Bump after deploy when you change any of:
+     * - SQL in fhor_tc_sql_from_where() or Query A/B
+     * - PHP merge/metrics/spotlight/volatility logic (if not already keyed)
+     * - Public JSON/bootstrap field shapes consumed by trainer-cycles.js
+     *
+     * Tunable constants (TOP_N, min runners, spotlight thresholds) are already
+     * embedded in transient keys; bump is optional for those-only changes.
+     *
+     * WP-CLI: wp eval 'echo fhor_tc_bump_cache_ver();'
+     */
     function fhor_tc_bump_cache_ver() {
         $next = (int) get_option('fhor_tc_cache_ver', 1) + 1;
         update_option('fhor_tc_cache_ver', $next, false);
@@ -1280,6 +1307,7 @@ if (!function_exists('fhor_tc_build_macro_trainers_with_metrics')) {
      * @return array<int, array>
      */
     function fhor_tc_build_macro_trainers_with_metrics($code, $reference_month = null) {
+        fhor_tc_sql_timing_reset();
         $merged = fhor_tc_query_macro_trainers_with_months($code);
         return fhor_tc_apply_metrics_to_trainers($merged, $code, $reference_month);
     }
@@ -1314,15 +1342,61 @@ if (!function_exists('fhor_tc_elapsed_ms')) {
     }
 }
 
+if (!function_exists('fhor_tc_sql_timing_reset')) {
+    function fhor_tc_sql_timing_reset() {
+        $GLOBALS['fhor_tc_sql_timing'] = [];
+    }
+}
+
+if (!function_exists('fhor_tc_sql_timing_record')) {
+    /**
+     * @param string $label Query bucket name (macro_baselines, monthly_buckets, trainer_baseline, …).
+     */
+    function fhor_tc_sql_timing_record($label, $started_at) {
+        $label = preg_replace('/[^a-z0-9_]/', '', strtolower((string) $label));
+        if ($label === '') {
+            return;
+        }
+        if (!isset($GLOBALS['fhor_tc_sql_timing']) || !is_array($GLOBALS['fhor_tc_sql_timing'])) {
+            $GLOBALS['fhor_tc_sql_timing'] = [];
+        }
+        $ms = fhor_tc_elapsed_ms($started_at);
+        $GLOBALS['fhor_tc_sql_timing'][$label] = ($GLOBALS['fhor_tc_sql_timing'][$label] ?? 0) + $ms;
+    }
+}
+
+if (!function_exists('fhor_tc_sql_timing_snapshot')) {
+    /**
+     * @return array{sql_ms: float, sql: array<string, float>}
+     */
+    function fhor_tc_sql_timing_snapshot() {
+        $parts = isset($GLOBALS['fhor_tc_sql_timing']) && is_array($GLOBALS['fhor_tc_sql_timing'])
+            ? $GLOBALS['fhor_tc_sql_timing']
+            : [];
+        $total = 0.0;
+        foreach ($parts as $ms) {
+            $total += (float) $ms;
+        }
+        return [
+            'sql_ms' => round($total, 1),
+            'sql' => $parts,
+        ];
+    }
+}
+
 if (!function_exists('fhor_tc_response_meta')) {
     /**
-     * @return array{cache: string, ms: float}
+     * @param array<string, mixed> $extra
+     * @return array<string, mixed>
      */
-    function fhor_tc_response_meta($started_at, $cache_status) {
-        return [
-            'cache' => (string) $cache_status,
-            'ms' => fhor_tc_elapsed_ms($started_at),
-        ];
+    function fhor_tc_response_meta($started_at, $cache_status, array $extra = []) {
+        return array_merge(
+            [
+                'cache' => (string) $cache_status,
+                'ms' => fhor_tc_elapsed_ms($started_at),
+            ],
+            $extra
+        );
     }
 }
 
@@ -1357,6 +1431,7 @@ if (!function_exists('fhor_tc_build_profile_data')) {
             return null;
         }
 
+        fhor_tc_sql_timing_reset();
         $merged = fhor_tc_query_trainer_with_months($code, $trainer_name);
         if ($merged === null) {
             return null;
@@ -1412,6 +1487,7 @@ if (!function_exists('fhor_tc_get_profile_data')) {
             $cache_status = 'bypass';
         }
 
+        $sql_meta = [];
         if (!is_array($body)) {
             $body = fhor_tc_build_profile_data($name, $code, $reference_month);
             if ($body === null) {
@@ -1420,14 +1496,15 @@ if (!function_exists('fhor_tc_get_profile_data')) {
                     'error' => 'not_found',
                     'code' => $code,
                     'reference_month' => $ref,
-                    'meta' => fhor_tc_response_meta($started, $cache_status),
+                    'meta' => fhor_tc_response_meta($started, $cache_status, fhor_tc_sql_timing_snapshot()),
                 ];
             }
             fhor_tc_profile_cache_set($name, $code, $body, $reference_month);
+            $sql_meta = fhor_tc_sql_timing_snapshot();
         }
 
         return array_merge(['ok' => true], $body, [
-            'meta' => fhor_tc_response_meta($started, $cache_status),
+            'meta' => fhor_tc_response_meta($started, $cache_status, $sql_meta),
         ]);
     }
 }
@@ -1468,8 +1545,10 @@ if (!function_exists('fhor_tc_get_macro_pool')) {
             }
         }
 
+        $sql_meta = [];
         if (!is_array($trainers)) {
             $trainers = fhor_tc_query_macro_trainers_with_metrics($code, $reference_month);
+            $sql_meta = fhor_tc_sql_timing_snapshot();
         }
 
         return [
@@ -1478,7 +1557,7 @@ if (!function_exists('fhor_tc_get_macro_pool')) {
             'reference_month' => $ref,
             'trainers' => $trainers,
             'meta' => array_merge(
-                fhor_tc_response_meta($started, $cache_status),
+                fhor_tc_response_meta($started, $cache_status, $sql_meta),
                 ['count' => count($trainers)]
             ),
         ];

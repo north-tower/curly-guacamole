@@ -81,6 +81,7 @@ require_once __DIR__ . '/inc/points-today-picks.php';
 require_once __DIR__ . '/inc/system-builder.php';
 require_once __DIR__ . '/inc/trainer-cycles.php';
 require_once __DIR__ . '/inc/system-builder-qa.php';
+require_once __DIR__ . '/inc/trainer-cycles-qa.php';
 require_once __DIR__ . '/inc/bet-tracker.php';
 
 
