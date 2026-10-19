@@ -2102,17 +2102,17 @@ if (!function_exists('fhor_tc_dashboard_ui_snapshot')) {
             ),
             'spotlightHints' => [
                 'early_birds' => sprintf(
-                    'Hot %s window (avg delta ≥ +%.1f pts).',
+                    'Hot %s · avg delta ≥ +%.1f',
                     $early_window_label,
                     $spot_delta
                 ),
                 'late_surge' => sprintf(
-                    'Hot %s window (avg delta ≥ +%.1f pts).',
+                    'Hot %s · avg delta ≥ +%.1f',
                     $late_window_label,
                     $spot_delta
                 ),
                 'cold_start' => sprintf(
-                    'Cold %s window (avg delta ≤ −%.1f pts).',
+                    'Cold %s · avg delta ≤ −%.1f',
                     $early_window_label,
                     $spot_delta
                 ),
@@ -2162,15 +2162,15 @@ if (!function_exists('fhor_tc_render_dashboard_list_skeleton')) {
         $rows = max(1, min(8, (int) $rows));
         ob_start();
         ?>
-        <ul class="fhor-tc-dashboard-list fhor-tc-dashboard-list--skeleton" aria-hidden="true">
+        <div class="fhor-tc-dashboard-list fhor-tc-dashboard-list--skeleton" aria-hidden="true">
             <?php for ($i = 0; $i < $rows; $i++) : ?>
-            <li class="fhor-tc-dashboard-skeleton-row">
+            <div class="fhor-tc-dashboard-skeleton-row">
+                <span class="fhor-tc-dashboard-skeleton-line fhor-tc-dashboard-skeleton-line--rank"></span>
                 <span class="fhor-tc-dashboard-skeleton-line fhor-tc-dashboard-skeleton-line--name"></span>
-                <span class="fhor-tc-dashboard-skeleton-line fhor-tc-dashboard-skeleton-line--spark"></span>
                 <span class="fhor-tc-dashboard-skeleton-line fhor-tc-dashboard-skeleton-line--delta"></span>
-            </li>
+            </div>
             <?php endfor; ?>
-        </ul>
+        </div>
         <?php
         return (string) ob_get_clean();
     }
@@ -2208,63 +2208,67 @@ if (!function_exists('fhor_tc_render_dashboard_shell')) {
         ob_start();
         ?>
         <div
-            class="fhor-race-premium fhor-tc-dashboard is-bootstrapping"
+            class="fhor-tc-dashboard is-bootstrapping"
             data-fhor-tc-dashboard="<?php echo esc_attr($bootstrap_json); ?>"
             data-code="<?php echo esc_attr($code); ?>"
         >
-            <div class="race-detail-page-shell fhor-tc-dashboard-shell">
-                <div class="race-header-card fhor-tc-dashboard-hero">
-                    <div class="race-header-top">
-                        <div class="fhor-tc-profile-hero__meta-row">
-                            <div class="race-meta-time" data-fhor-tc-ui="heroMeta">
-                                <?php echo esc_html($code_label); ?> · macro yard cycles
-                            </div>
-                            <?php if ($show_code_toggle) : ?>
-                            <div
-                                class="fhor-tc-code-toggle fhor-tc-code-toggle--dashboard"
-                                role="tablist"
-                                aria-label="<?php esc_attr_e('Race code', 'bricks'); ?>"
-                                data-fhor-tc-dashboard-code-toggle
-                            >
-                                <?php foreach (['jumps', 'flat'] as $toggle_code) :
-                                    if (!in_array($toggle_code, $available_codes, true)) {
-                                        continue;
-                                    }
-                                    $is_active = $toggle_code === $code;
-                                    ?>
-                                <button
-                                    type="button"
-                                    class="fhor-tc-code-toggle__btn<?php echo $is_active ? ' is-active' : ''; ?>"
-                                    role="tab"
-                                    data-code="<?php echo esc_attr($toggle_code); ?>"
-                                    aria-selected="<?php echo $is_active ? 'true' : 'false'; ?>"
-                                    <?php echo $is_active ? ' tabindex="0"' : ' tabindex="-1"'; ?>
-                                    disabled
-                                ><?php echo esc_html(fhor_tc_code_label($toggle_code)); ?></button>
-                                <?php endforeach; ?>
-                            </div>
-                            <?php endif; ?>
+            <div class="fhor-tc-dash-top">
+                <div class="fhor-tc-dash-top__in">
+                    <a class="fhor-tc-dash-logo" href="<?php echo esc_url(home_url('/')); ?>">FHORSITE</a>
+                    <span class="fhor-tc-dash-sub"><?php esc_html_e('Macro yard cycles', 'bricks'); ?></span>
+                    <span class="fhor-tc-dash-sp"></span>
+                    <?php if ($show_code_toggle) : ?>
+                    <div
+                        class="fhor-tc-dash-seg fhor-tc-code-toggle fhor-tc-code-toggle--dashboard"
+                        role="tablist"
+                        aria-label="<?php esc_attr_e('Race code', 'bricks'); ?>"
+                        data-fhor-tc-dashboard-code-toggle
+                    >
+                        <?php foreach (['jumps', 'flat'] as $toggle_code) :
+                            if (!in_array($toggle_code, $available_codes, true)) {
+                                continue;
+                            }
+                            $is_active = $toggle_code === $code;
+                            ?>
+                        <button
+                            type="button"
+                            class="fhor-tc-code-toggle__btn<?php echo $is_active ? ' is-active' : ''; ?>"
+                            role="tab"
+                            data-code="<?php echo esc_attr($toggle_code); ?>"
+                            aria-selected="<?php echo $is_active ? 'true' : 'false'; ?>"
+                            <?php echo $is_active ? ' tabindex="0"' : ' tabindex="-1"'; ?>
+                            disabled
+                        ><?php echo esc_html(fhor_tc_code_label($toggle_code)); ?></button>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <div class="fhor-tc-dash-wrap">
+                <section class="fhor-tc-dash-hero">
+                    <div class="fhor-tc-dash-eyebrow" data-fhor-tc-ui="heroMeta">
+                        <?php echo esc_html(strtoupper($code_label)); ?> · <?php esc_html_e('MACRO YARD CYCLES', 'bricks'); ?>
+                    </div>
+                    <h1 class="fhor-tc-dash-title"><?php esc_html_e('Trainer cycles', 'bricks'); ?></h1>
+                    <p class="fhor-tc-dash-sub fhor-tc-dash-hero__lede">
+                        <?php esc_html_e('Which yards run hot or cold in each calendar month: win-rate delta vs lifetime baseline across the macro pool.', 'bricks'); ?>
+                    </p>
+                    <div class="fhor-tc-dash-kpis">
+                        <div class="fhor-tc-dash-k">
+                            <small><?php esc_html_e('Reference month', 'bricks'); ?></small>
+                            <b data-fhor-tc-ui="referenceMonthLabel"><?php echo esc_html($ref_label); ?></b>
                         </div>
-                        <h1 class="race-title"><?php esc_html_e('Trainer cycles', 'bricks'); ?></h1>
-                        <p class="runners-subtitle fhor-tc-dashboard-hero__lede">
-                            Discover which yards run hot or cold in each calendar month — win-rate deltas vs lifetime baseline across the macro pool.
-                        </p>
-                        <div class="race-details-grid">
-                            <div class="race-detail-item">
-                                <span class="race-detail-label">Reference month</span>
-                                <span class="race-detail-value" data-fhor-tc-ui="referenceMonthLabel"><?php echo esc_html($ref_label); ?></span>
-                            </div>
-                            <div class="race-detail-item">
-                                <span class="race-detail-label">Yards in pool</span>
-                                <span class="race-detail-value" data-fhor-tc-ui="trainerCount"><?php echo esc_html(number_format_i18n($trainer_count)); ?></span>
-                            </div>
-                            <div class="race-detail-item">
-                                <span class="race-detail-label">Eligible month rule</span>
-                                <span class="race-detail-value">≥ <?php echo esc_html(number_format_i18n($min_month)); ?> runs</span>
-                            </div>
+                        <div class="fhor-tc-dash-k">
+                            <small><?php esc_html_e('Yards in pool', 'bricks'); ?></small>
+                            <b data-fhor-tc-ui="trainerCount"><?php echo esc_html(number_format_i18n($trainer_count)); ?></b>
+                        </div>
+                        <div class="fhor-tc-dash-k">
+                            <small><?php esc_html_e('Eligible month rule', 'bricks'); ?></small>
+                            <b>≥ <?php echo esc_html(number_format_i18n($min_month)); ?> <?php esc_html_e('runs', 'bricks'); ?></b>
                         </div>
                     </div>
-                </div>
+                </section>
 
                 <p
                     class="fhor-tc-sr-only"
@@ -2275,123 +2279,147 @@ if (!function_exists('fhor_tc_render_dashboard_shell')) {
                 ></p>
 
                 <div class="fhor-tc-dashboard-sections" data-fhor-tc-dashboard-sections aria-busy="true">
-                    <section class="runners-card fhor-tc-dashboard-panel fhor-tc-dashboard-panel--hot-cold" aria-labelledby="fhor-tc-hot-cold-heading">
-                        <div class="runners-header">
-                            <h2 class="runners-title" id="fhor-tc-hot-cold-heading"><span>🔥</span> Hot &amp; cold this month</h2>
-                            <p class="runners-subtitle">Top yards by <span data-fhor-tc-ui="referenceMonthLabel"><?php echo esc_html($ref_label); ?></span> delta vs lifetime baseline (min <?php echo esc_html(number_format_i18n($min_month)); ?> runs).</p>
-                        </div>
-                        <div class="fhor-tc-dashboard-hot-cold-grid">
-                            <div class="fhor-tc-dashboard-col fhor-tc-dashboard-col--hot">
-                                <h3 class="fhor-tc-dashboard-col__title">Hot yards</h3>
-                                <div data-fhor-tc-dashboard-region="hot">
-                                    <?php echo fhor_tc_render_dashboard_list_skeleton(); ?>
-                                </div>
-                            </div>
-                            <div class="fhor-tc-dashboard-col fhor-tc-dashboard-col--cold">
-                                <h3 class="fhor-tc-dashboard-col__title">Cold yards</h3>
-                                <div data-fhor-tc-dashboard-region="cold">
-                                    <?php echo fhor_tc_render_dashboard_list_skeleton(); ?>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="runners-card fhor-tc-dashboard-panel fhor-tc-dashboard-panel--spotlights" aria-labelledby="fhor-tc-spotlights-heading">
-                        <div class="runners-header">
-                            <h2 class="runners-title" id="fhor-tc-spotlights-heading"><span>✨</span> Pattern spotlights</h2>
-                            <p class="runners-subtitle">
-                                Yards whose average delta in a calendar window is at least <?php echo esc_html(number_format($spot_delta, 1)); ?> pts above or below baseline (<?php echo esc_html(number_format_i18n($spot_min_months)); ?>+ eligible months).
+                    <div class="fhor-tc-dash-sec" aria-labelledby="fhor-tc-hot-cold-heading">
+                        <div>
+                            <h2 class="fhor-tc-dash-h2" id="fhor-tc-hot-cold-heading">🔥 <?php esc_html_e('Hot & cold this month', 'bricks'); ?></h2>
+                            <p class="fhor-tc-dash-sub">
+                                <?php esc_html_e('Top yards by', 'bricks'); ?>
+                                <span data-fhor-tc-ui="referenceMonthLabel"><?php echo esc_html($ref_label); ?></span>
+                                <?php
+                                echo esc_html(
+                                    sprintf(
+                                        /* translators: %s: minimum runs count */
+                                        __(' delta vs lifetime baseline (min %s runs). Bars show each month\'s delta; the reference month is highlighted.', 'bricks'),
+                                        number_format_i18n($min_month)
+                                    )
+                                );
+                                ?>
                             </p>
                         </div>
-                        <div class="fhor-tc-dashboard-spotlight-grid">
-                            <?php
-                            $spotlight_sections = [
-                                'early_birds' => [
-                                    'title' => 'Early Birds',
-                                    'hint' => sprintf(
-                                        'Hot %s window (avg delta ≥ +%.1f pts).',
-                                        $early_window_label,
-                                        $spot_delta
-                                    ),
-                                ],
-                                'late_surge' => [
-                                    'title' => 'Late Surge',
-                                    'hint' => sprintf(
-                                        'Hot %s window (avg delta ≥ +%.1f pts).',
-                                        $late_window_label,
-                                        $spot_delta
-                                    ),
-                                ],
-                                'cold_start' => [
-                                    'title' => 'Cold Start',
-                                    'hint' => sprintf(
-                                        'Cold %s window (avg delta ≤ −%.1f pts).',
-                                        $early_window_label,
-                                        $spot_delta
-                                    ),
-                                ],
-                            ];
-                            foreach ($spotlight_sections as $spot_key => $spot_section) :
+                    </div>
+                    <div class="fhor-tc-dash-cols">
+                        <div class="fhor-tc-dash-panel fhor-tc-dash-panel--hot">
+                            <h3 class="fhor-tc-dashboard-col__title"><?php esc_html_e('Hot yards', 'bricks'); ?></h3>
+                            <div data-fhor-tc-dashboard-region="hot">
+                                <?php echo fhor_tc_render_dashboard_list_skeleton(); ?>
+                            </div>
+                        </div>
+                        <div class="fhor-tc-dash-panel fhor-tc-dash-panel--cold">
+                            <h3 class="fhor-tc-dashboard-col__title"><?php esc_html_e('Cold yards', 'bricks'); ?></h3>
+                            <div data-fhor-tc-dashboard-region="cold">
+                                <?php echo fhor_tc_render_dashboard_list_skeleton(); ?>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="fhor-tc-dash-sec" aria-labelledby="fhor-tc-spotlights-heading">
+                        <div>
+                            <h2 class="fhor-tc-dash-h2" id="fhor-tc-spotlights-heading">✨ <?php esc_html_e('Pattern spotlights', 'bricks'); ?></h2>
+                            <p class="fhor-tc-dash-sub">
+                                <?php
+                                printf(
+                                    esc_html__('Average delta in a calendar window at least %1$s pts above or below baseline (%2$s+ eligible months).', 'bricks'),
+                                    esc_html(number_format($spot_delta, 1)),
+                                    esc_html(number_format_i18n($spot_min_months))
+                                );
                                 ?>
-                            <div class="fhor-tc-dashboard-spotlight">
-                                <h3 class="fhor-tc-dashboard-spotlight__title"><?php echo esc_html($spot_section['title']); ?></h3>
-                                <p class="fhor-tc-dashboard-spotlight__hint"><?php echo esc_html($spot_section['hint']); ?></p>
-                                <div class="fhor-tc-dashboard-spotlight__scroll" data-fhor-tc-dashboard-region="<?php echo esc_attr($spot_key); ?>">
-                                    <?php echo fhor_tc_render_dashboard_list_skeleton(4); ?>
-                                </div>
-                            </div>
-                            <?php endforeach; ?>
+                            </p>
                         </div>
-                    </section>
-
-                    <section class="runners-card fhor-tc-dashboard-panel fhor-tc-dashboard-panel--volatility" aria-labelledby="fhor-tc-volatility-heading">
-                        <div class="runners-header">
-                            <div class="fhor-tc-dashboard-volatility-head">
-                                <div>
-                                    <h2 class="runners-title" id="fhor-tc-volatility-heading"><span>📊</span> Flatliners &amp; Wavemakers</h2>
-                                    <p class="runners-subtitle">
-                                        Eligible-month win-rate spread (lowest vs highest calendar month); baseline tick marks lifetime strike rate.
-                                    </p>
-                                </div>
-                                <div
-                                    class="fhor-tc-code-toggle fhor-tc-code-toggle--volatility"
-                                    role="tablist"
-                                    aria-label="<?php esc_attr_e('Volatility sort', 'bricks'); ?>"
-                                    data-fhor-tc-volatility-toggle
-                                >
-                                    <button
-                                        type="button"
-                                        class="fhor-tc-code-toggle__btn is-active"
-                                        role="tab"
-                                        data-volatility-mode="flatliners"
-                                        aria-selected="true"
-                                        tabindex="0"
-                                    ><?php esc_html_e('Flatliners', 'bricks'); ?></button>
-                                    <button
-                                        type="button"
-                                        class="fhor-tc-code-toggle__btn"
-                                        role="tab"
-                                        data-volatility-mode="wavemakers"
-                                        aria-selected="false"
-                                        tabindex="-1"
-                                    ><?php esc_html_e('Wavemakers', 'bricks'); ?></button>
-                                </div>
+                    </div>
+                    <div class="fhor-tc-dash-spot">
+                        <?php
+                        $spotlight_sections = [
+                            'early_birds' => [
+                                'title' => 'Early Birds',
+                                'hint' => sprintf(
+                                    'Hot %s · avg delta ≥ +%.1f',
+                                    $early_window_label,
+                                    $spot_delta
+                                ),
+                            ],
+                            'late_surge' => [
+                                'title' => 'Late Surge',
+                                'hint' => sprintf(
+                                    'Hot %s · avg delta ≥ +%.1f',
+                                    $late_window_label,
+                                    $spot_delta
+                                ),
+                            ],
+                            'cold_start' => [
+                                'title' => 'Cold Start',
+                                'hint' => sprintf(
+                                    'Cold %s · avg delta ≤ −%.1f',
+                                    $early_window_label,
+                                    $spot_delta
+                                ),
+                            ],
+                        ];
+                        foreach ($spotlight_sections as $spot_key => $spot_section) :
+                            ?>
+                        <div class="fhor-tc-dashboard-spotlight fhor-tc-dash-panel">
+                            <b class="fhor-tc-dashboard-spotlight__title"><?php echo esc_html($spot_section['title']); ?></b>
+                            <span class="fhor-tc-dashboard-spotlight__hint fhor-tc-dash-win"><?php echo esc_html($spot_section['hint']); ?></span>
+                            <div data-fhor-tc-dashboard-region="<?php echo esc_attr($spot_key); ?>">
+                                <?php echo fhor_tc_render_dashboard_list_skeleton(4); ?>
                             </div>
                         </div>
-                        <div class="fhor-tc-dashboard-volatility-body" data-fhor-tc-dashboard-region="volatility">
-                            <?php echo fhor_tc_render_dashboard_list_skeleton(6); ?>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <div class="fhor-tc-dash-sec fhor-tc-dash-sec--vol" aria-labelledby="fhor-tc-volatility-heading">
+                        <div>
+                            <h2 class="fhor-tc-dash-h2" id="fhor-tc-volatility-heading">📊 <?php esc_html_e('Flatliners & Wavemakers', 'bricks'); ?></h2>
+                            <p class="fhor-tc-dash-sub">
+                                <?php esc_html_e('Lowest vs highest calendar-month win rate; the tick marks the lifetime strike rate.', 'bricks'); ?>
+                            </p>
                         </div>
-                    </section>
+                        <span class="fhor-tc-dash-sp"></span>
+                        <div
+                            class="fhor-tc-dash-seg fhor-tc-code-toggle fhor-tc-code-toggle--volatility"
+                            role="tablist"
+                            aria-label="<?php esc_attr_e('Volatility sort', 'bricks'); ?>"
+                            data-fhor-tc-volatility-toggle
+                        >
+                            <button
+                                type="button"
+                                class="fhor-tc-code-toggle__btn is-active"
+                                role="tab"
+                                data-volatility-mode="flatliners"
+                                aria-selected="true"
+                                tabindex="0"
+                            ><?php esc_html_e('Flatliners', 'bricks'); ?></button>
+                            <button
+                                type="button"
+                                class="fhor-tc-code-toggle__btn"
+                                role="tab"
+                                data-volatility-mode="wavemakers"
+                                aria-selected="false"
+                                tabindex="-1"
+                            ><?php esc_html_e('Wavemakers', 'bricks'); ?></button>
+                        </div>
+                    </div>
+                    <div class="fhor-tc-dash-panel" data-fhor-tc-dashboard-region="volatility">
+                        <?php echo fhor_tc_render_dashboard_list_skeleton(6); ?>
+                    </div>
                 </div>
 
-                <div class="track-advice-box fhor-tc-dashboard-rules">
-                    <strong>How to read this dashboard</strong>
-                    <ul class="fhor-tc-profile-rules__list">
-                        <li><strong>Macro pool</strong> = <span data-fhor-tc-ui="macroPoolRule">top <?php echo esc_html(number_format_i18n((int) $cfg['macro_top_n'])); ?> <?php echo esc_html(strtolower($code_label)); ?> trainers by lifetime resulted runs (minimum <?php echo esc_html(number_format_i18n((int) $cfg['macro_min_lifetime_runners'])); ?>).</span></li>
-                        <li><strong>Delta</strong> = calendar-month win % minus that yard’s lifetime win % (percentage points).</li>
-                        <li>Use the Jumps / Flat control to swap the macro pool without leaving the page; hot, cold, spotlight, and volatility lists refresh from the server dataset.</li>
-                    </ul>
-                </div>
+                <details class="fhor-tc-dash-details">
+                    <summary><?php esc_html_e('How to read this page', 'bricks'); ?></summary>
+                    <p>
+                        <strong><?php esc_html_e('Macro pool', 'bricks'); ?></strong>
+                        =
+                        <span data-fhor-tc-ui="macroPoolRule"><?php
+                        printf(
+                            esc_html__('top %1$s %2$s trainers by lifetime resulted runs (minimum %3$s).', 'bricks'),
+                            esc_html(number_format_i18n((int) $cfg['macro_top_n'])),
+                            esc_html(strtolower($code_label)),
+                            esc_html(number_format_i18n((int) $cfg['macro_min_lifetime_runners']))
+                        );
+                        ?></span>
+                    </p>
+                    <p><strong><?php esc_html_e('Delta', 'bricks'); ?></strong> = <?php esc_html_e('calendar-month win % minus the yard\'s lifetime win % (percentage points).', 'bricks'); ?></p>
+                    <p><?php esc_html_e('Use Jumps / Flat to swap the pool; hot, cold, spotlight and volatility lists refresh together.', 'bricks'); ?></p>
+                </details>
             </div>
         </div>
         <?php

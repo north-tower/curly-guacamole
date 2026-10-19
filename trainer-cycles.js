@@ -545,103 +545,137 @@
         });
     }
 
-    function buildSparklineHtml(trainer, referenceMonth, minMonthRunners) {
+    function sparkScaleMax() {
+        return 8;
+    }
+
+    function monthLetterLabels(data) {
+        var labels = data && data.monthLabels;
+        if (labels && labels.length === 12) {
+            return labels.map(function (label) {
+                return String(label).charAt(0);
+            });
+        }
+        return 'JFMAMJJASOND'.split('');
+    }
+
+    function formatDashboardDeltaMain(delta) {
+        if (delta === null || delta === undefined) {
+            return '—';
+        }
+        var num = Number(delta);
+        if (Number.isNaN(num)) {
+            return '—';
+        }
+        var sign = num > 0 ? '+' : '';
+        return sign + num.toFixed(1);
+    }
+
+    function buildSparklineHtml(trainer, data) {
+        var referenceMonth = data.referenceMonth || 0;
+        var minMonthRunners = data.minMonthRunners || 0;
         var rows = sortedMonthRows(trainer);
         if (!rows.length) {
             return '<div class="fhor-tc-dashboard-sparkline fhor-tc-dashboard-sparkline--empty" aria-hidden="true"></div>';
         }
 
-        var maxAbs = 0;
-        rows.forEach(function (row) {
-            if (row.eligible && row.delta !== null && row.delta !== undefined) {
-                maxAbs = Math.max(maxAbs, Math.abs(Number(row.delta)));
-            }
-        });
-        if (maxAbs < 0.05) {
-            maxAbs = 1;
-        }
+        var scaleMax = sparkScaleMax();
+        var letters = monthLetterLabels(data);
 
-        var bars = rows.map(function (row) {
+        var cells = rows.map(function (row) {
             var cal = row.cal_month || 0;
             var isRef = cal === referenceMonth;
-            var classes = ['fhor-tc-dashboard-sparkline__bar'];
-            var heightPct = 8;
+            var cellClasses = ['fhor-tc-dashboard-sparkline__cell'];
+            var barHtml = '';
             var titleParts = ['Month ' + cal];
 
             if (!row.eligible) {
-                classes.push('fhor-tc-dashboard-sparkline__bar--small');
                 if (row.runs > 0) {
                     titleParts.push('Small sample (' + row.runs + ' runs, min ' + minMonthRunners + ')');
                 } else {
                     titleParts.push('No runs');
                 }
+                barHtml = (
+                    '<b class="fhor-tc-dashboard-sparkline__bar fhor-tc-dashboard-sparkline__bar--small" '
+                    + 'style="top:50%;height:18%" title="' + escapeHtml(titleParts.join(' · ')) + '"></b>'
+                );
             } else if (row.delta === null || row.delta === undefined) {
-                classes.push('fhor-tc-dashboard-sparkline__bar--neutral');
                 titleParts.push('Delta n/a');
+                barHtml = (
+                    '<b class="fhor-tc-dashboard-sparkline__bar fhor-tc-dashboard-sparkline__bar--neutral" '
+                    + 'style="top:50%;height:8%" title="' + escapeHtml(titleParts.join(' · ')) + '"></b>'
+                );
             } else {
                 var delta = Number(row.delta);
-                if (delta > 0) {
-                    classes.push('fhor-tc-dashboard-sparkline__bar--hot');
-                } else if (delta < 0) {
-                    classes.push('fhor-tc-dashboard-sparkline__bar--cold');
-                } else {
-                    classes.push('fhor-tc-dashboard-sparkline__bar--neutral');
-                }
-                heightPct = Math.max(14, Math.round((Math.abs(delta) / maxAbs) * 100));
+                var toneClass = delta > 0
+                    ? 'fhor-tc-dashboard-sparkline__bar--hot'
+                    : (delta < 0 ? 'fhor-tc-dashboard-sparkline__bar--cold' : 'fhor-tc-dashboard-sparkline__bar--neutral');
+                var heightPct = Math.min(50, (Math.abs(delta) / scaleMax) * 50);
+                var anchor = delta >= 0 ? 'bottom:50%' : 'top:50%';
                 titleParts.push(formatDeltaPts(delta));
+                barHtml = (
+                    '<b class="fhor-tc-dashboard-sparkline__bar ' + toneClass + '" '
+                    + 'style="' + anchor + ';height:' + heightPct.toFixed(1) + '%" title="'
+                    + escapeHtml(titleParts.join(' · ')) + '"></b>'
+                );
             }
 
             if (isRef) {
-                classes.push('fhor-tc-dashboard-sparkline__bar--ref');
+                cellClasses.push('fhor-tc-dashboard-sparkline__cell--ref');
             }
 
-            return (
-                '<span class="' + classes.join(' ') + '" style="--fhor-tc-spark-h:' + heightPct + '%" title="'
-                + escapeHtml(titleParts.join(' · '))
-                + '" aria-hidden="true"></span>'
-            );
+            return '<i class="' + cellClasses.join(' ') + '">' + barHtml + '</i>';
         });
+
+        var monthRow = letters.map(function (letter, idx) {
+            var cal = idx + 1;
+            var refClass = cal === referenceMonth ? ' class="ref"' : '';
+            return '<span' + refClass + '>' + escapeHtml(letter) + '</span>';
+        }).join('');
 
         return (
             '<div class="fhor-tc-dashboard-sparkline" role="img" aria-label="12-month delta sparkline">'
-            + bars.join('')
+            + cells.join('')
             + '</div>'
+            + '<div class="fhor-tc-dashboard-sparkline__months">' + monthRow + '</div>'
         );
     }
 
-    function buildDashboardRowHtml(trainer, data, tone) {
-        var refMonth = data.referenceMonth || 0;
-        var minRuns = data.minMonthRunners || 0;
+    function buildDashboardRowHtml(trainer, data, tone, rank) {
+        var refLabel = data.referenceMonthLabel || 'Ref';
         var delta = trainer.currentMonthDelta;
         var deltaHtml;
         var badgeHtml = '';
 
         if (trainer.currentMonthEligible === false) {
             badgeHtml = '<span class="fhor-tc-dashboard-badge">Small sample</span>';
-            deltaHtml = '<span class="fhor-tc-dashboard-row__delta fhor-tc-delta--neutral">—</span>';
+            deltaHtml = '<div class="fhor-tc-dashboard-row__delta fhor-tc-delta--neutral">—<small>pts · '
+                + escapeHtml(refLabel) + '</small></div>';
         } else {
             deltaHtml = (
-                '<span class="fhor-tc-dashboard-row__delta '
+                '<div class="fhor-tc-dashboard-row__delta '
                 + deltaClassFor(delta)
                 + '">'
-                + escapeHtml(formatDeltaPts(delta))
-                + '</span>'
+                + escapeHtml(formatDashboardDeltaMain(delta))
+                + '<small>pts · ' + escapeHtml(refLabel) + '</small></div>'
             );
         }
 
         var name = trainer.trainerName || 'Trainer';
         var url = trainer.url || '#';
-        var spark = buildSparklineHtml(trainer, refMonth, minRuns);
+        var spark = buildSparklineHtml(trainer, data);
 
         return (
-            '<li class="fhor-tc-dashboard-row fhor-tc-dashboard-row--' + tone + '">'
-            + '<a class="fhor-tc-dashboard-row__name" href="' + escapeHtml(url) + '">'
+            '<div class="fhor-tc-dashboard-row fhor-tc-dashboard-row--' + tone + '">'
+            + '<span class="fhor-tc-dashboard-row__rank">' + (rank + 1) + '</span>'
+            + '<div><a class="fhor-tc-dashboard-row__name" href="' + escapeHtml(url) + '">'
             + escapeHtml(name)
             + '</a>'
             + spark
-            + deltaHtml
             + badgeHtml
-            + '</li>'
+            + '</div>'
+            + deltaHtml
+            + '</div>'
         );
     }
 
@@ -681,11 +715,11 @@
             return;
         }
 
-        var items = trainers.map(function (trainer) {
-            return buildDashboardRowHtml(trainer, data, tone);
+        var items = trainers.map(function (trainer, index) {
+            return buildDashboardRowHtml(trainer, data, tone, index);
         });
 
-        container.innerHTML = '<ul class="fhor-tc-dashboard-list">' + items.join('') + '</ul>';
+        container.innerHTML = '<div class="fhor-tc-dashboard-list">' + items.join('') + '</div>';
     }
 
     function renderDashboardHotCold(root, data) {
@@ -875,22 +909,28 @@
             return '<div class="fhor-tc-volatility-rail fhor-tc-volatility-rail--empty" aria-hidden="true"></div>';
         }
 
-        var minLabel = dashboardMonthLabel(data, worst.calMonth) + ' ' + formatStrikePct(worst.strikePct);
-        var maxLabel = dashboardMonthLabel(data, best.calMonth) + ' ' + formatStrikePct(best.strikePct);
+        var minMonth = dashboardMonthLabel(data, worst.calMonth);
+        var maxMonth = dashboardMonthLabel(data, best.calMonth);
+        var minStrike = Number(worst.strikePct);
+        var maxStrike = Number(best.strikePct);
         var tickPct = volatilityBaselineTickPct(trainer);
-        var gapLabel = Number(gap).toFixed(1) + ' pts gap';
-        var aria = 'Win rate from ' + minLabel + ' to ' + maxLabel + ', baseline ' + formatStrikePct(trainer.baselinePct);
+        var span = maxStrike - minStrike;
+        var baselineMid = span > 0.05
+            ? minStrike + (tickPct / 100) * span
+            : Number(trainer.baselinePct);
+        var aria = 'Win rate from ' + minMonth + ' ' + formatStrikePct(minStrike)
+            + ' to ' + maxMonth + ' ' + formatStrikePct(maxStrike)
+            + ', baseline ' + formatStrikePct(trainer.baselinePct);
 
         return (
             '<div class="fhor-tc-volatility-rail" role="img" aria-label="' + escapeHtml(aria) + '">'
             + '<div class="fhor-tc-volatility-rail__track">'
-            + '<span class="fhor-tc-volatility-rail__span"></span>'
-            + '<span class="fhor-tc-volatility-rail__tick" style="--fhor-tc-vol-tick:' + tickPct.toFixed(2) + '%" title="Lifetime baseline ' + escapeHtml(formatStrikePct(trainer.baselinePct)) + '"></span>'
+            + '<u class="fhor-tc-volatility-rail__tick" style="--fhor-tc-vol-tick:' + tickPct.toFixed(2) + '%" title="Lifetime baseline ' + escapeHtml(formatStrikePct(trainer.baselinePct)) + '"></u>'
             + '</div>'
             + '<div class="fhor-tc-volatility-rail__labels">'
-            + '<span class="fhor-tc-volatility-rail__min">' + escapeHtml(minLabel) + '</span>'
-            + '<span class="fhor-tc-volatility-rail__gap">' + escapeHtml(gapLabel) + '</span>'
-            + '<span class="fhor-tc-volatility-rail__max">' + escapeHtml(maxLabel) + '</span>'
+            + '<span>' + escapeHtml(minMonth) + ' <b>' + escapeHtml(formatStrikePct(minStrike)) + '</b></span>'
+            + '<span>baseline <b>' + escapeHtml(baselineMid.toFixed(1) + '%') + '</b></span>'
+            + '<span>' + escapeHtml(maxMonth) + ' <b>' + escapeHtml(formatStrikePct(maxStrike)) + '</b></span>'
             + '</div>'
             + '</div>'
         );
@@ -901,19 +941,19 @@
         var url = trainer.url || '#';
         var gap = trainer.gapPts;
         var gapHtml = (
-            '<span class="fhor-tc-dashboard-row__gap">'
-            + escapeHtml(gap === null || gap === undefined ? '—' : Number(gap).toFixed(1) + ' pts')
-            + '</span>'
+            '<div class="fhor-tc-dashboard-row__gap">'
+            + escapeHtml(gap === null || gap === undefined ? '—' : Number(gap).toFixed(1))
+            + '<div class="fhor-tc-dash-sub">pts gap</div></div>'
         );
 
         return (
-            '<li class="fhor-tc-dashboard-row fhor-tc-dashboard-row--volatility">'
-            + '<a class="fhor-tc-dashboard-row__name" href="' + escapeHtml(url) + '">'
+            '<div class="fhor-tc-dashboard-row fhor-tc-dashboard-row--volatility">'
+            + '<div class="fhor-tc-dashboard-row__name"><a href="' + escapeHtml(url) + '">'
             + escapeHtml(name)
-            + '</a>'
-            + buildVolatilityRailHtml(trainer, data)
+            + '</a></div>'
+            + '<div>' + buildVolatilityRailHtml(trainer, data) + '</div>'
             + gapHtml
-            + '</li>'
+            + '</div>'
         );
     }
 
@@ -960,7 +1000,7 @@
             return buildVolatilityRowHtml(trainer, data);
         });
 
-        container.innerHTML = '<ul class="fhor-tc-dashboard-list fhor-tc-dashboard-list--volatility">' + items.join('') + '</ul>';
+        container.innerHTML = '<div class="fhor-tc-dashboard-list fhor-tc-dashboard-list--volatility">' + items.join('') + '</div>';
     }
 
     function setVolatilityToggleActive(root, mode) {

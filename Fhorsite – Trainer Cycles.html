@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fhorsite – Trainer Cycles</title>
+<style>
+:root{--bg:#0b0f14;--s1:#121821;--s2:#182130;--line:#243044;--tx:#e8edf5;--mu:#8b97ab;--ac:#2fd08a;--ac2:#4c8dff;--warn:#f5b84b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:light){:root{--bg:#f4f6fa;--s1:#fff;--s2:#eef2f8;--line:#dbe2ee;--tx:#111827;--mu:#5b667a}}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 Inter,system-ui,-apple-system,Segoe UI,sans-serif}
+.wrap{max-width:1280px;margin:0 auto;padding:0 16px 80px}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top .in{max-width:1280px;margin:0 auto;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.logo{font-weight:800;color:var(--ac)}.sp{flex:1}.sub{color:var(--mu);font-size:12px}
+.seg{display:inline-flex;background:var(--s1);border:1px solid var(--line);border-radius:999px;padding:3px}
+.seg button{border:0;background:none;color:var(--mu);padding:7px 16px;border-radius:999px;font-weight:600;cursor:pointer}
+.seg button.on{background:var(--ac);color:#04130c}
+.hero{margin:18px 0;background:linear-gradient(135deg,var(--s2),var(--s1));border:1px solid var(--line);border-radius:18px;padding:22px}
+.eyebrow{color:var(--ac);font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase}
+h1{margin:6px 0 8px;font-size:clamp(24px,3.4vw,34px)}h2{margin:0;font-size:18px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:16px}
+.k{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 14px}.k small{display:block;color:var(--mu);font-size:10.5px;text-transform:uppercase;letter-spacing:.6px}.k b{font-size:20px}
+.sec{margin:28px 0 12px;display:flex;align-items:end;gap:12px;flex-wrap:wrap}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:14px}
+.panel{background:var(--s1);border:1px solid var(--line);border-radius:16px;padding:14px}
+.panel h3{margin:0 0 8px;font-size:12px;letter-spacing:1px;text-transform:uppercase}.hot h3{color:var(--ac)}.cold h3{color:var(--ac2)}
+.y{display:grid;grid-template-columns:24px 1fr auto;gap:12px;align-items:center;padding:10px 6px;border-top:1px solid var(--line)}
+.y:first-of-type{border-top:0}.rk{color:var(--mu);font-weight:700;font-size:12px}.nm{font-weight:700}
+.dl{font-weight:800;font-size:17px;text-align:right}.dl small{display:block;font-size:10px;color:var(--mu);font-weight:600}
+.pos{color:var(--ac)}.neg{color:var(--ac2)}
+.sp12{display:grid;grid-template-columns:repeat(12,1fr);gap:3px;height:34px;margin-top:6px;position:relative}
+.sp12:before{content:"";position:absolute;left:0;right:0;top:50%;border-top:1px dashed var(--line)}
+.sp12 i{position:relative;display:block}.sp12 i b{position:absolute;left:0;right:0;border-radius:2px}
+.sp12 i.ref{background:color-mix(in srgb,var(--warn) 18%,transparent);border-radius:3px}
+.ml{display:grid;grid-template-columns:repeat(12,1fr);gap:3px;font-size:8.5px;color:var(--mu);text-align:center}.ml .ref{color:var(--warn);font-weight:800}
+.spot{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.spot .panel .win{display:inline-block;margin:2px 0 8px;padding:2px 9px;border-radius:999px;background:var(--s2);color:var(--mu);font-size:11px}
+.empty{color:var(--mu);font-size:13px;padding:14px;border:1px dashed var(--line);border-radius:10px;text-align:center}
+.rng{display:grid;grid-template-columns:minmax(120px,200px) 1fr 80px;gap:16px;align-items:center;padding:12px 4px;border-top:1px solid var(--line)}
+.bar{position:relative;height:8px;border-radius:9px;background:linear-gradient(90deg,var(--ac2),var(--ac))}
+.bar u{position:absolute;top:-5px;width:2px;height:18px;background:var(--tx);border-radius:2px}
+.lb{display:flex;justify-content:space-between;font-size:11px;color:var(--mu);margin-top:6px}.lb b{color:var(--tx)}
+.gap{text-align:right;font-weight:800;font-size:16px}
+details{margin-top:24px;background:var(--s1);border:1px solid var(--line);border-radius:14px;padding:12px 16px}summary{cursor:pointer;font-weight:700}
+details p{color:var(--mu);margin:8px 0}details b{color:var(--tx)}
+@media(max-width:600px){.cols{grid-template-columns:1fr}.rng{grid-template-columns:1fr 70px}.rng>div:nth-child(2){grid-column:1/-1;order:3}}
+</style></head><body>
+<div class="top"><div class="in"><span class="logo">FHORSITE</span><span class="sub">Macro yard cycles</span><span class="sp"></span>
+<div class="seg" id="code"><button class="on" data-c="jumps">Jumps</button><button data-c="flat">Flat</button></div></div></div>
+<div class="wrap">
+<section class="hero"><div class="eyebrow" id="eb"></div><h1>Trainer cycles</h1>
+<div class="sub" style="max-width:640px">Which yards run hot or cold in each calendar month: win-rate delta vs lifetime baseline across the macro pool.</div>
+<div class="kpis"><div class="k"><small>Reference month</small><b>October</b></div><div class="k"><small>Yards in pool</small><b>40</b></div><div class="k"><small>Eligible month rule</small><b>≥ 50 runs</b></div></div></section>
+
+<div class="sec"><div><h2>🔥 Hot &amp; cold this month</h2><div class="sub">Top yards by October delta vs lifetime baseline (min 50 runs). Bars show each month's delta; October is highlighted.</div></div></div>
+<div class="cols"><div class="panel hot"><h3>Hot yards</h3><div id="hot"></div></div><div class="panel cold"><h3>Cold yards</h3><div id="cold"></div></div></div>
+
+<div class="sec"><div><h2>✨ Pattern spotlights</h2><div class="sub">Average delta in a calendar window at least 3.0 pts above or below baseline (2+ eligible months).</div></div></div>
+<div class="spot" id="spot"></div>
+
+<div class="sec"><div><h2>📊 Flatliners &amp; Wavemakers</h2><div class="sub">Lowest vs highest calendar-month win rate; the tick marks the lifetime strike rate.</div></div><span class="sp"></span>
+<div class="seg" id="vol"><button class="on" data-v="flat">Flatliners</button><button data-v="wave">Wavemakers</button></div></div>
+<div class="panel" id="rng"></div>
+
+<details><summary>How to read this page</summary>
+<p><b>Macro pool</b> = top 40 trainers for the selected code by lifetime resulted runs (minimum 200).</p>
+<p><b>Delta</b> = calendar-month win % minus the yard's lifetime win % (percentage points).</p>
+<p>Use Jumps / Flat to swap the pool; hot, cold, spotlight and volatility lists refresh together.</p></details>
+</div>
+<script>
+// Monthly bars are generated sample values (only the October delta is real, from your screenshots).
+const D={jumps:{hot:[['Noel Meade',7.6],['N A Twiston-Davies',6.9],['P F Nicholls',4.8],['K C Bailey',4.7],['Gordon Elliott',4.0]],cold:[['Miss Venetia Williams',-7.3],['P Bowen',-5.4],['T R George',-4.5],['Micky Hammond',-3.8],['A J Martin',-3.5]],
+spot:[['Early Birds','Hot Apr–Jun · avg delta ≥ +3.0',[]],['Late Surge','Hot Nov–Dec · avg delta ≥ +3.0',[]],['Cold Start','Cold Apr–Jun · avg delta ≤ −3.0',[]]],
+flat:[['P J Rothwell','Mar',4.6,'Jan',7.6,.50],['John Joseph Hanlon','Feb',4.8,'Dec',9.2,.50],['Michael Hourigan','Jan',5.1,'Jun',10.2,.56],['Miss Lucinda V Russell','Sep',10.4,'Mar',16.1,.62],['Evan Williams','Feb',12.3,'Jul',18.5,.40],['D E Pipe','Jul',14.0,'Feb',20.3,.48],['Gavin Cromwell','Nov',9.9,'Oct',16.3,.38],['N G Richards','Sep',15.7,'Dec',22.2,.73],["Fergal O'Brien",'Jan',14.8,'May',21.5,.50],['Olly Murphy','Jun',17.7,'Jan',25.1,.52]],wave:[]},
+flat:{hot:[['G M Lyons',1.3],['R M Beckett',.3],['M R Channon',.1]],cold:[['M Johnston',-4.9],['W J Haggas',-4.3],["D O'Meara",-3.7],['Mrs R A Carr',-3.7],['Sir Michael Stoute',-3.6]],
+spot:[['Early Birds','Hot Apr–Jun · avg delta ≥ +3.0',[]],['Late Surge','Hot Nov–Dec · avg delta ≥ +3.0',[['M W Easterby',-1.6],['M Halford',-1.0],['T D Easterby',-.5]]],['Cold Start','Cold Apr–Jun · avg delta ≤ −3.0',[['S C Williams',-3.6]]]],flat:[],wave:[]}};
+const M='JFMAMJJASOND',$=s=>document.querySelector(s);let code='jumps',vol='flat';
+function seed(n,o){let h=0;for(const c of n)h=(h*31+c.charCodeAt(0))>>>0;return Array.from({length:12},(_,i)=>{h=(h*1103515245+12345)>>>0;const v=((h>>8)%1400)/100-7;return i==9?o:Math.max(-8,Math.min(8,v*(o>0?.9:.9)))})}
+const dl=v=>`<div class="dl ${v>=0?'pos':'neg'}">${v>0?'+':''}${v.toFixed(1)}<small>pts · Oct</small></div>`;
+function yard(n,v,i){const s=seed(n,v);return `<div class="y"><span class="rk">${i+1}</span><div><div class="nm">${n}</div>
+<div class="sp12">${s.map((x,j)=>`<i class="${j==9?'ref':''}"><b style="${x>=0?'bottom':'top'}:50%;height:${Math.min(50,Math.abs(x)/8*50)}%;background:${x>=0?'var(--ac)':'var(--ac2)'}"></b></i>`).join('')}</div>
+<div class="ml">${[...M].map((m,j)=>`<span class="${j==9?'ref':''}">${m}</span>`).join('')}</div></div>${dl(v)}</div>`}
+const emp=t=>`<div class="empty">${t}</div>`;
+function render(){const d=D[code];$('#eb').textContent=code.toUpperCase()+' · MACRO YARD CYCLES';
+$('#hot').innerHTML=d.hot.map((a,i)=>yard(a[0],a[1],i)).join('')||emp('No hot yards this month');
+$('#cold').innerHTML=d.cold.map((a,i)=>yard(a[0],a[1],i)).join('')||emp('No cold yards this month');
+$('#spot').innerHTML=d.spot.map(s=>`<div class="panel"><b>${s[0]}</b><div><span class="win">${s[1]}</span></div>${s[2].length?s[2].map((a,i)=>yard(a[0],a[1],i)).join(''):emp('No yards match this window yet.')}</div>`).join('');
+const L=d[vol];$('#rng').innerHTML=L.length?L.map(r=>{const g=r[4]-r[2],bl=r[2]+r[5]*g;return `<div class="rng"><div class="nm">${r[0]}</div><div><div class="bar"><u style="left:${r[5]*100}%"></u></div>
+<div class="lb"><span>${r[1]} <b>${r[2]}%</b></span><span>baseline <b>${bl.toFixed(1)}%</b></span><span>${r[3]} <b>${r[4]}%</b></span></div></div><div class="gap">${g.toFixed(1)}<div class="sub">pts gap</div></div></div>`}).join(''):emp('No data for this selection in the sample. Wire this list to your dataset.')}
+$('#code').onclick=e=>{const b=e.target.closest('[data-c]');if(!b)return;code=b.dataset.c;document.querySelectorAll('#code button').forEach(x=>x.classList.toggle('on',x==b));render()};
+$('#vol').onclick=e=>{const b=e.target.closest('[data-v]');if(!b)return;vol=b.dataset.v;document.querySelectorAll('#vol button').forEach(x=>x.classList.toggle('on',x==b));render()};
+render();
+</script></body></html>
