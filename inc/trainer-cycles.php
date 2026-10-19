@@ -1779,6 +1779,366 @@ if (!function_exists('fhor_tc_print_profile_bootstrap_script')) {
     }
 }
 
+if (!function_exists('fhor_tc_dashboard_url')) {
+    function fhor_tc_dashboard_url($code = null) {
+        $path = '/trainer-cycles/';
+        if (!function_exists('home_url')) {
+            $url = $path;
+        } else {
+            $url = home_url($path);
+        }
+        if ($code !== null && fhor_tc_normalize_code($code) === 'flat') {
+            if (function_exists('add_query_arg')) {
+                $url = add_query_arg('code', 'flat', $url);
+            } else {
+                $url .= (strpos($url, '?') !== false ? '&' : '?') . 'code=flat';
+            }
+        }
+        return $url;
+    }
+}
+
+if (!function_exists('fhor_tc_is_dashboard_request')) {
+    function fhor_tc_is_dashboard_request() {
+        if ((string) get_query_var('fhor_trainer_cycles') === '1') {
+            return true;
+        }
+        $path = (string) (wp_parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '');
+        return (bool) preg_match('#/trainer-cycles/?$#i', $path);
+    }
+}
+
+if (!function_exists('fhor_tc_dashboard_request_code')) {
+    /**
+     * Jumps default; flat when ?code=flat (Phase 3.5 wires AJAX toggle).
+     */
+    function fhor_tc_dashboard_request_code() {
+        $raw = isset($_GET['code']) ? (string) wp_unslash($_GET['code']) : '';
+        return fhor_tc_normalize_code($raw !== '' ? $raw : 'jumps');
+    }
+}
+
+if (!function_exists('fhor_tc_dashboard_available_codes')) {
+    /**
+     * @return array<int, string>
+     */
+    function fhor_tc_dashboard_available_codes() {
+        if (!fhor_tc_tables_ok()) {
+            return ['jumps'];
+        }
+        $codes = [];
+        foreach (['jumps', 'flat'] as $code) {
+            $baselines = fhor_tc_query_macro_baselines($code);
+            if ($baselines !== []) {
+                $codes[] = $code;
+            }
+        }
+        return $codes === [] ? ['jumps'] : $codes;
+    }
+}
+
+if (!function_exists('fhor_tc_trainer_row_for_dashboard_json')) {
+    /**
+     * Slim trainer row for dashboard bootstrap / AJAX (Phase 3.1+).
+     *
+     * @param array<string, mixed> $trainer
+     * @return array<string, mixed>
+     */
+    function fhor_tc_trainer_row_for_dashboard_json(array $trainer, $code, $reference_month = null) {
+        $name = (string) ($trainer['trainer_name'] ?? '');
+        $code = fhor_tc_normalize_code($code);
+        $ref_month = fhor_tc_reference_cal_month($reference_month);
+        $months_out = [];
+        foreach ($trainer['months'] ?? [] as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $months_out[] = [
+                'cal_month' => (int) ($row['cal_month'] ?? 0),
+                'delta' => isset($row['delta']) && $row['delta'] !== null && $row['delta'] !== ''
+                    ? (float) $row['delta']
+                    : null,
+                'eligible' => !empty($row['eligible']),
+                'runs' => (int) ($row['runs'] ?? 0),
+            ];
+        }
+
+        $ref_eligible = false;
+        foreach ($months_out as $month_row) {
+            if ((int) ($month_row['cal_month'] ?? 0) === $ref_month) {
+                $ref_eligible = !empty($month_row['eligible']);
+                break;
+            }
+        }
+
+        $spotlights = $trainer['spotlights'] ?? [];
+        if (!is_array($spotlights)) {
+            $spotlights = [];
+        }
+
+        return [
+            'trainerName' => $name,
+            'slug' => fhor_tc_trainer_slug($name),
+            'url' => fhor_tc_trainer_url($name, $code),
+            'baselinePct' => (float) ($trainer['baseline_pct'] ?? 0),
+            'runs' => (int) ($trainer['runs'] ?? 0),
+            'currentMonthDelta' => isset($trainer['current_month_delta']) && $trainer['current_month_delta'] !== null && $trainer['current_month_delta'] !== ''
+                ? (float) $trainer['current_month_delta']
+                : null,
+            'currentMonthEligible' => $ref_eligible,
+            'gapPts' => isset($trainer['gap_pts']) && $trainer['gap_pts'] !== null && $trainer['gap_pts'] !== ''
+                ? (float) $trainer['gap_pts']
+                : null,
+            'spotlights' => [
+                'early_birds' => !empty($spotlights['early_birds']),
+                'cold_start' => !empty($spotlights['cold_start']),
+                'late_surge' => !empty($spotlights['late_surge']),
+            ],
+            'months' => $months_out,
+        ];
+    }
+}
+
+if (!function_exists('fhor_tc_build_dashboard_client_bootstrap')) {
+    /**
+     * @param array<string, mixed> $pool fhor_tc_get_macro_pool() payload
+     * @return array<string, mixed>
+     */
+    function fhor_tc_build_dashboard_client_bootstrap(array $pool) {
+        $code = fhor_tc_normalize_code($pool['code'] ?? 'jumps');
+        $ref = (int) ($pool['reference_month'] ?? fhor_tc_reference_cal_month());
+        $trainers_out = [];
+        foreach ($pool['trainers'] ?? [] as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $trainers_out[] = fhor_tc_trainer_row_for_dashboard_json($row, $code, $ref);
+        }
+
+        return [
+            'ok' => !empty($pool['ok']),
+            'code' => $code,
+            'availableCodes' => fhor_tc_dashboard_available_codes(),
+            'referenceMonth' => $ref,
+            'referenceMonthLabel' => fhor_tc_cal_month_name($ref),
+            'trainerCount' => count($trainers_out),
+            'minMonthRunners' => (int) fhor_tc_config()['min_month_runners'],
+            'trainers' => $trainers_out,
+            'meta' => is_array($pool['meta'] ?? null) ? $pool['meta'] : [],
+        ];
+    }
+}
+
+if (!function_exists('fhor_tc_register_dashboard_bootstrap')) {
+    /**
+     * @param array<string, mixed> $bootstrap
+     */
+    function fhor_tc_register_dashboard_bootstrap(array $bootstrap) {
+        $GLOBALS['fhor_tc_dashboard_bootstrap'] = $bootstrap;
+        if (!has_action('wp_footer', 'fhor_tc_print_dashboard_bootstrap_script')) {
+            add_action('wp_footer', 'fhor_tc_print_dashboard_bootstrap_script', 21);
+        }
+    }
+}
+
+if (!function_exists('fhor_tc_print_dashboard_bootstrap_script')) {
+    function fhor_tc_print_dashboard_bootstrap_script() {
+        $bootstrap = $GLOBALS['fhor_tc_dashboard_bootstrap'] ?? null;
+        if (!is_array($bootstrap)) {
+            return;
+        }
+        $json = wp_json_encode($bootstrap);
+        if ($json === false) {
+            return;
+        }
+        echo '<script id="fhor-tc-dashboard-bootstrap">';
+        echo 'window.fhorTcDashboard=' . $json . ';';
+        echo '</script>';
+    }
+}
+
+if (!function_exists('fhor_tc_render_dashboard_unavailable')) {
+    function fhor_tc_render_dashboard_unavailable($message) {
+        return '<div class="fhor-tc-dashboard-error" style="padding:16px;color:#991b1b;background:#fee2e2;border-radius:8px;">'
+            . esc_html($message)
+            . '</div>';
+    }
+}
+
+if (!function_exists('fhor_tc_render_dashboard_list_skeleton')) {
+    function fhor_tc_render_dashboard_list_skeleton($rows = 5) {
+        $rows = max(1, min(8, (int) $rows));
+        ob_start();
+        ?>
+        <ul class="fhor-tc-dashboard-list fhor-tc-dashboard-list--skeleton" aria-hidden="true">
+            <?php for ($i = 0; $i < $rows; $i++) : ?>
+            <li class="fhor-tc-dashboard-skeleton-row">
+                <span class="fhor-tc-dashboard-skeleton-line fhor-tc-dashboard-skeleton-line--name"></span>
+                <span class="fhor-tc-dashboard-skeleton-line fhor-tc-dashboard-skeleton-line--spark"></span>
+                <span class="fhor-tc-dashboard-skeleton-line fhor-tc-dashboard-skeleton-line--delta"></span>
+            </li>
+            <?php endfor; ?>
+        </ul>
+        <?php
+        return (string) ob_get_clean();
+    }
+}
+
+if (!function_exists('fhor_tc_render_dashboard_shell')) {
+    /**
+     * Macro dashboard SSR shell (Phase 3.1). Lists populate in Phase 3.2+.
+     *
+     * @param array<string, mixed> $pool fhor_tc_get_macro_pool() success payload
+     */
+    function fhor_tc_render_dashboard_shell(array $pool) {
+        $bootstrap = fhor_tc_build_dashboard_client_bootstrap($pool);
+        fhor_tc_register_dashboard_bootstrap($bootstrap);
+        $bootstrap_json = wp_json_encode($bootstrap);
+        if ($bootstrap_json === false) {
+            $bootstrap_json = '{}';
+        }
+
+        $code = fhor_tc_normalize_code($pool['code'] ?? 'jumps');
+        $code_label = fhor_tc_code_label($code);
+        $ref_month = (int) ($pool['reference_month'] ?? fhor_tc_reference_cal_month());
+        $ref_label = fhor_tc_cal_month_name($ref_month);
+        $trainer_count = (int) ($bootstrap['trainerCount'] ?? 0);
+        $available_codes = fhor_tc_dashboard_available_codes();
+        $show_code_toggle = count($available_codes) >= 2;
+        $cfg = fhor_tc_config();
+        $min_month = (int) $cfg['min_month_runners'];
+
+        ob_start();
+        ?>
+        <div
+            class="fhor-race-premium fhor-tc-dashboard is-bootstrapping"
+            data-fhor-tc-dashboard="<?php echo esc_attr($bootstrap_json); ?>"
+            data-code="<?php echo esc_attr($code); ?>"
+        >
+            <div class="race-detail-page-shell fhor-tc-dashboard-shell">
+                <div class="race-header-card fhor-tc-dashboard-hero">
+                    <div class="race-header-top">
+                        <div class="fhor-tc-profile-hero__meta-row">
+                            <div class="race-meta-time" data-fhor-tc-ui="heroMeta">
+                                <?php echo esc_html($code_label); ?> · macro yard cycles
+                            </div>
+                            <?php if ($show_code_toggle) : ?>
+                            <div
+                                class="fhor-tc-code-toggle fhor-tc-code-toggle--dashboard"
+                                role="tablist"
+                                aria-label="<?php esc_attr_e('Race code', 'bricks'); ?>"
+                                data-fhor-tc-dashboard-code-toggle
+                            >
+                                <?php foreach (['jumps', 'flat'] as $toggle_code) :
+                                    if (!in_array($toggle_code, $available_codes, true)) {
+                                        continue;
+                                    }
+                                    $is_active = $toggle_code === $code;
+                                    ?>
+                                <button
+                                    type="button"
+                                    class="fhor-tc-code-toggle__btn<?php echo $is_active ? ' is-active' : ''; ?>"
+                                    role="tab"
+                                    data-code="<?php echo esc_attr($toggle_code); ?>"
+                                    aria-selected="<?php echo $is_active ? 'true' : 'false'; ?>"
+                                    <?php echo $is_active ? ' tabindex="0"' : ' tabindex="-1"'; ?>
+                                    disabled
+                                ><?php echo esc_html(fhor_tc_code_label($toggle_code)); ?></button>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                        <h1 class="race-title"><?php esc_html_e('Trainer cycles', 'bricks'); ?></h1>
+                        <p class="runners-subtitle fhor-tc-dashboard-hero__lede">
+                            Discover which yards run hot or cold in each calendar month — win-rate deltas vs lifetime baseline across the macro pool.
+                        </p>
+                        <div class="race-details-grid">
+                            <div class="race-detail-item">
+                                <span class="race-detail-label">Reference month</span>
+                                <span class="race-detail-value" data-fhor-tc-ui="referenceMonthLabel"><?php echo esc_html($ref_label); ?></span>
+                            </div>
+                            <div class="race-detail-item">
+                                <span class="race-detail-label">Yards in pool</span>
+                                <span class="race-detail-value" data-fhor-tc-ui="trainerCount"><?php echo esc_html(number_format_i18n($trainer_count)); ?></span>
+                            </div>
+                            <div class="race-detail-item">
+                                <span class="race-detail-label">Eligible month rule</span>
+                                <span class="race-detail-value">≥ <?php echo esc_html(number_format_i18n($min_month)); ?> runs</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="fhor-tc-dashboard-sections" data-fhor-tc-dashboard-sections aria-busy="true">
+                    <section class="runners-card fhor-tc-dashboard-panel fhor-tc-dashboard-panel--hot-cold" aria-labelledby="fhor-tc-hot-cold-heading">
+                        <div class="runners-header">
+                            <h2 class="runners-title" id="fhor-tc-hot-cold-heading"><span>🔥</span> Hot &amp; cold this month</h2>
+                            <p class="runners-subtitle">Top yards by <span data-fhor-tc-ui="referenceMonthLabel"><?php echo esc_html($ref_label); ?></span> delta vs lifetime baseline (min <?php echo esc_html(number_format_i18n($min_month)); ?> runs).</p>
+                        </div>
+                        <div class="fhor-tc-dashboard-hot-cold-grid">
+                            <div class="fhor-tc-dashboard-col fhor-tc-dashboard-col--hot">
+                                <h3 class="fhor-tc-dashboard-col__title">Hot yards</h3>
+                                <div data-fhor-tc-dashboard-region="hot">
+                                    <?php echo fhor_tc_render_dashboard_list_skeleton(); ?>
+                                </div>
+                            </div>
+                            <div class="fhor-tc-dashboard-col fhor-tc-dashboard-col--cold">
+                                <h3 class="fhor-tc-dashboard-col__title">Cold yards</h3>
+                                <div data-fhor-tc-dashboard-region="cold">
+                                    <?php echo fhor_tc_render_dashboard_list_skeleton(); ?>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="runners-card fhor-tc-dashboard-panel fhor-tc-dashboard-panel--spotlights" aria-labelledby="fhor-tc-spotlights-heading">
+                        <div class="runners-header">
+                            <h2 class="runners-title" id="fhor-tc-spotlights-heading"><span>✨</span> Pattern spotlights</h2>
+                            <p class="runners-subtitle">Early Birds, Late Surge, and Cold Start yards (Phase 3.3).</p>
+                        </div>
+                        <div class="fhor-tc-dashboard-spotlight-grid">
+                            <?php
+                            $spotlight_labels = [
+                                'early_birds' => 'Early Birds',
+                                'late_surge' => 'Late Surge',
+                                'cold_start' => 'Cold Start',
+                            ];
+                            foreach ($spotlight_labels as $spot_key => $spot_label) :
+                                ?>
+                            <div class="fhor-tc-dashboard-spotlight" data-fhor-tc-dashboard-region="<?php echo esc_attr($spot_key); ?>">
+                                <h3 class="fhor-tc-dashboard-spotlight__title"><?php echo esc_html($spot_label); ?></h3>
+                                <?php echo fhor_tc_render_dashboard_list_skeleton(4); ?>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </section>
+
+                    <section class="runners-card fhor-tc-dashboard-panel fhor-tc-dashboard-panel--volatility" aria-labelledby="fhor-tc-volatility-heading">
+                        <div class="runners-header">
+                            <h2 class="runners-title" id="fhor-tc-volatility-heading"><span>📊</span> Flatliners &amp; Wavemakers</h2>
+                            <p class="runners-subtitle">Volatility range rail (Phase 3.4).</p>
+                        </div>
+                        <div class="fhor-tc-dashboard-volatility-skeleton" data-fhor-tc-dashboard-region="volatility">
+                            <?php echo fhor_tc_render_dashboard_list_skeleton(6); ?>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="track-advice-box fhor-tc-dashboard-rules">
+                    <strong>How to read this dashboard</strong>
+                    <ul class="fhor-tc-profile-rules__list">
+                        <li><strong>Macro pool</strong> = top <?php echo esc_html(number_format_i18n((int) $cfg['macro_top_n'])); ?> <?php echo esc_html(strtolower($code_label)); ?> trainers by lifetime resulted runs (minimum <?php echo esc_html(number_format_i18n((int) $cfg['macro_min_lifetime_runners'])); ?>).</li>
+                        <li><strong>Delta</strong> = calendar-month win % minus that yard’s lifetime win % (percentage points).</li>
+                        <li>Lists and spotlights hydrate from the embedded dataset; interactive Jumps / Flat switching lands in Phase 3.5.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <?php
+        return (string) ob_get_clean();
+    }
+}
+
 if (!function_exists('fhor_tc_format_pct')) {
     function fhor_tc_format_pct($value) {
         if ($value === null || $value === '') {
@@ -1871,7 +2231,7 @@ if (!function_exists('fhor_tc_render_profile_shell')) {
         $available_codes = fhor_tc_profile_available_codes($name);
         $show_code_toggle = count($available_codes) >= 2;
 
-        $dashboard_url = home_url('/trainer-cycles/');
+        $dashboard_url = fhor_tc_dashboard_url();
         $shell_class = 'race-detail-page-shell fhor-tc-profile-shell';
         if ($embed) {
             $shell_class .= ' fhor-tc-profile-shell--embed';
@@ -2130,12 +2490,47 @@ if (!function_exists('fhor_tc_trainer_cycles_summary_shortcode')) {
 }
 add_shortcode('trainer_cycles_summary', 'fhor_tc_trainer_cycles_summary_shortcode');
 
+if (!function_exists('fhor_tc_trainer_cycles_dashboard_shortcode')) {
+    /**
+     * Macro dashboard: [trainer_cycles_dashboard] or /trainer-cycles/ route.
+     */
+    function fhor_tc_trainer_cycles_dashboard_shortcode($atts = []) {
+        $atts = shortcode_atts(
+            [
+                'code' => '',
+            ],
+            $atts,
+            'trainer_cycles_dashboard'
+        );
+
+        $code = trim((string) $atts['code']) !== ''
+            ? fhor_tc_normalize_code($atts['code'])
+            : fhor_tc_dashboard_request_code();
+
+        $pool = fhor_tc_get_macro_pool($code);
+        if (empty($pool['ok'])) {
+            return fhor_tc_render_dashboard_unavailable(
+                'Trainer cycle dashboard is temporarily unavailable. Please try again later.'
+            );
+        }
+
+        return fhor_tc_render_dashboard_shell($pool);
+    }
+}
+add_shortcode('trainer_cycles_dashboard', 'fhor_tc_trainer_cycles_dashboard_shortcode');
+
 if (!function_exists('fhor_tc_add_rewrite')) {
     function fhor_tc_add_rewrite() {
         add_rewrite_tag('%fhor_trainer_slug%', '([^/]+)');
+        add_rewrite_tag('%fhor_trainer_cycles%', '([0-9]+)');
         add_rewrite_rule(
             '^trainers/([^/]+)/?$',
             'index.php?fhor_trainer_slug=$matches[1]',
+            'top'
+        );
+        add_rewrite_rule(
+            '^trainer-cycles/?$',
+            'index.php?fhor_trainer_cycles=1',
             'top'
         );
     }
@@ -2145,6 +2540,7 @@ add_action('init', 'fhor_tc_add_rewrite', 20);
 if (!function_exists('fhor_tc_query_vars')) {
     function fhor_tc_query_vars($vars) {
         $vars[] = 'fhor_trainer_slug';
+        $vars[] = 'fhor_trainer_cycles';
         return $vars;
     }
 }
@@ -2152,7 +2548,31 @@ add_filter('query_vars', 'fhor_tc_query_vars');
 
 if (!function_exists('fhor_tc_template_redirect')) {
     function fhor_tc_template_redirect() {
-        if (is_admin() || !fhor_tc_is_trainer_profile_request()) {
+        if (is_admin()) {
+            return;
+        }
+
+        if (fhor_tc_is_dashboard_request()) {
+            status_header(200);
+            nocache_headers();
+
+            ob_start();
+            get_header();
+            $header = ob_get_clean();
+
+            ob_start();
+            get_footer();
+            $footer = ob_get_clean();
+
+            echo $header;
+            echo '<main class="main-content fhor-tc-dashboard-page"><div class="content-container">';
+            echo do_shortcode('[trainer_cycles_dashboard]');
+            echo '</div></main>';
+            echo $footer;
+            exit;
+        }
+
+        if (!fhor_tc_is_trainer_profile_request()) {
             return;
         }
 
@@ -2192,13 +2612,32 @@ add_action('template_redirect', 'fhor_tc_template_redirect', 2);
 
 if (!function_exists('fhor_tc_flush_rewrites')) {
     function fhor_tc_flush_rewrites() {
-        if (get_option('fhor_tc_rewrite_flushed') !== '1') {
+        if (get_option('fhor_tc_rewrite_flushed') !== '2') {
             flush_rewrite_rules(false);
-            update_option('fhor_tc_rewrite_flushed', '1', false);
+            update_option('fhor_tc_rewrite_flushed', '2', false);
         }
     }
 }
 add_action('init', 'fhor_tc_flush_rewrites', 999);
+
+if (!function_exists('fhor_tc_document_title')) {
+    function fhor_tc_document_title($title) {
+        if (fhor_tc_is_dashboard_request()) {
+            return 'Trainer Cycles | Fhorsite';
+        }
+        if (fhor_tc_is_trainer_profile_request()) {
+            $slug = fhor_tc_profile_request_slug();
+            if ($slug !== '') {
+                $name = fhor_tc_resolve_trainer_from_slug($slug);
+                if (is_string($name) && $name !== '') {
+                    return $name . ' — Trainer Cycles | Fhorsite';
+                }
+            }
+        }
+        return $title;
+    }
+}
+add_filter('pre_get_document_title', 'fhor_tc_document_title', 28);
 
 if (!function_exists('fhor_tc_ajax_profile')) {
     /**

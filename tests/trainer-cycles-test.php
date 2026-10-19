@@ -149,6 +149,22 @@ tc_eq('macro unavailable ok', false, $macro['ok']);
 tc_eq('macro unavailable error', 'unavailable', $macro['error']);
 tc_assert('macro trainers array', is_array($macro['trainers']));
 
+tc_eq('dashboard url path', '/trainer-cycles/', fhor_tc_dashboard_url());
+
+$fixture_pool = [
+    'ok' => true,
+    'code' => 'jumps',
+    'reference_month' => 10,
+    'trainers' => [$spotlight_trainer],
+    'meta' => ['cache' => 'bypass', 'ms' => 0.1, 'count' => 1],
+];
+$dash_boot = fhor_tc_build_dashboard_client_bootstrap($fixture_pool);
+tc_eq('dashboard bootstrap ok', true, $dash_boot['ok']);
+tc_eq('dashboard bootstrap code', 'jumps', $dash_boot['code']);
+tc_eq('dashboard bootstrap trainer count', 1, $dash_boot['trainerCount']);
+tc_eq('dashboard bootstrap trainer name', 'Hot Yard', $dash_boot['trainers'][0]['trainerName']);
+tc_assert('dashboard bootstrap has month deltas', isset($dash_boot['trainers'][0]['months'][9]['delta']));
+
 $profile = fhor_tc_get_profile_data('', 'jumps');
 tc_eq('profile invalid ok', false, $profile['ok']);
 tc_eq('profile invalid error', 'invalid_trainer', $profile['error']);

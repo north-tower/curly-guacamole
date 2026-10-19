@@ -1,5 +1,6 @@
 /**
  * Trainer Cycles profile delta chart (Chart.js 4) + Jumps / Flat AJAX toggle (Phase 2.4–2.5).
+ * Macro dashboard hot/cold lists (Phase 3.2); spotlights/volatility in 3.3+.
  */
 (function () {
     'use strict';
@@ -406,7 +407,248 @@
         });
     }
 
+    function escapeHtml(text) {
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function formatDeltaPts(delta) {
+        if (delta === null || delta === undefined) {
+            return '—';
+        }
+        var num = Number(delta);
+        if (Number.isNaN(num)) {
+            return '—';
+        }
+        var sign = num > 0 ? '+' : '';
+        return sign + num.toFixed(1) + ' pts';
+    }
+
+    function deltaClassFor(value) {
+        if (value === null || value === undefined) {
+            return 'fhor-tc-delta--neutral';
+        }
+        var num = Number(value);
+        if (Number.isNaN(num) || num === 0) {
+            return 'fhor-tc-delta--neutral';
+        }
+        return num > 0 ? 'fhor-tc-delta--hot' : 'fhor-tc-delta--cold';
+    }
+
+    function sortedMonthRows(trainer) {
+        var months = trainer.months || [];
+        return months.slice().sort(function (a, b) {
+            return (a.cal_month || 0) - (b.cal_month || 0);
+        });
+    }
+
+    function buildSparklineHtml(trainer, referenceMonth, minMonthRunners) {
+        var rows = sortedMonthRows(trainer);
+        if (!rows.length) {
+            return '<div class="fhor-tc-dashboard-sparkline fhor-tc-dashboard-sparkline--empty" aria-hidden="true"></div>';
+        }
+
+        var maxAbs = 0;
+        rows.forEach(function (row) {
+            if (row.eligible && row.delta !== null && row.delta !== undefined) {
+                maxAbs = Math.max(maxAbs, Math.abs(Number(row.delta)));
+            }
+        });
+        if (maxAbs < 0.05) {
+            maxAbs = 1;
+        }
+
+        var bars = rows.map(function (row) {
+            var cal = row.cal_month || 0;
+            var isRef = cal === referenceMonth;
+            var classes = ['fhor-tc-dashboard-sparkline__bar'];
+            var heightPct = 8;
+            var titleParts = ['Month ' + cal];
+
+            if (!row.eligible) {
+                classes.push('fhor-tc-dashboard-sparkline__bar--small');
+                if (row.runs > 0) {
+                    titleParts.push('Small sample (' + row.runs + ' runs, min ' + minMonthRunners + ')');
+                } else {
+                    titleParts.push('No runs');
+                }
+            } else if (row.delta === null || row.delta === undefined) {
+                classes.push('fhor-tc-dashboard-sparkline__bar--neutral');
+                titleParts.push('Delta n/a');
+            } else {
+                var delta = Number(row.delta);
+                if (delta > 0) {
+                    classes.push('fhor-tc-dashboard-sparkline__bar--hot');
+                } else if (delta < 0) {
+                    classes.push('fhor-tc-dashboard-sparkline__bar--cold');
+                } else {
+                    classes.push('fhor-tc-dashboard-sparkline__bar--neutral');
+                }
+                heightPct = Math.max(14, Math.round((Math.abs(delta) / maxAbs) * 100));
+                titleParts.push(formatDeltaPts(delta));
+            }
+
+            if (isRef) {
+                classes.push('fhor-tc-dashboard-sparkline__bar--ref');
+            }
+
+            return (
+                '<span class="' + classes.join(' ') + '" style="--fhor-tc-spark-h:' + heightPct + '%" title="'
+                + escapeHtml(titleParts.join(' · '))
+                + '" aria-hidden="true"></span>'
+            );
+        });
+
+        return (
+            '<div class="fhor-tc-dashboard-sparkline" role="img" aria-label="12-month delta sparkline">'
+            + bars.join('')
+            + '</div>'
+        );
+    }
+
+    function buildDashboardRowHtml(trainer, data, tone) {
+        var refMonth = data.referenceMonth || 0;
+        var minRuns = data.minMonthRunners || 0;
+        var delta = trainer.currentMonthDelta;
+        var deltaHtml;
+        var badgeHtml = '';
+
+        if (trainer.currentMonthEligible === false) {
+            badgeHtml = '<span class="fhor-tc-dashboard-badge">Small sample</span>';
+            deltaHtml = '<span class="fhor-tc-dashboard-row__delta fhor-tc-delta--neutral">—</span>';
+        } else {
+            deltaHtml = (
+                '<span class="fhor-tc-dashboard-row__delta '
+                + deltaClassFor(delta)
+                + '">'
+                + escapeHtml(formatDeltaPts(delta))
+                + '</span>'
+            );
+        }
+
+        var name = trainer.trainerName || 'Trainer';
+        var url = trainer.url || '#';
+        var spark = buildSparklineHtml(trainer, refMonth, minRuns);
+
+        return (
+            '<li class="fhor-tc-dashboard-row fhor-tc-dashboard-row--' + tone + '">'
+            + '<a class="fhor-tc-dashboard-row__name" href="' + escapeHtml(url) + '">'
+            + escapeHtml(name)
+            + '</a>'
+            + spark
+            + deltaHtml
+            + badgeHtml
+            + '</li>'
+        );
+    }
+
+    function pickHotColdLists(trainers) {
+        var eligible = (trainers || []).filter(function (trainer) {
+            return trainer.currentMonthDelta !== null && trainer.currentMonthDelta !== undefined;
+        });
+
+        var hot = eligible
+            .filter(function (trainer) {
+                return Number(trainer.currentMonthDelta) > 0;
+            })
+            .sort(function (a, b) {
+                return Number(b.currentMonthDelta) - Number(a.currentMonthDelta);
+            })
+            .slice(0, 5);
+
+        var cold = eligible
+            .filter(function (trainer) {
+                return Number(trainer.currentMonthDelta) < 0;
+            })
+            .sort(function (a, b) {
+                return Number(a.currentMonthDelta) - Number(b.currentMonthDelta);
+            })
+            .slice(0, 5);
+
+        return { hot: hot, cold: cold };
+    }
+
+    function renderDashboardListRegion(container, trainers, data, tone, emptyCopy) {
+        if (!container) {
+            return;
+        }
+
+        if (!trainers.length) {
+            container.innerHTML = '<p class="fhor-tc-dashboard-empty">' + escapeHtml(emptyCopy) + '</p>';
+            return;
+        }
+
+        var items = trainers.map(function (trainer) {
+            return buildDashboardRowHtml(trainer, data, tone);
+        });
+
+        container.innerHTML = '<ul class="fhor-tc-dashboard-list">' + items.join('') + '</ul>';
+    }
+
+    function renderDashboardHotCold(root, data) {
+        if (!root || !data || !data.trainers) {
+            return;
+        }
+
+        var lists = pickHotColdLists(data.trainers);
+        var refLabel = data.referenceMonthLabel || 'this month';
+
+        renderDashboardListRegion(
+            root.querySelector('[data-fhor-tc-dashboard-region="hot"]'),
+            lists.hot,
+            data,
+            'hot',
+            'No hot yards with enough ' + refLabel + ' runs yet.'
+        );
+
+        renderDashboardListRegion(
+            root.querySelector('[data-fhor-tc-dashboard-region="cold"]'),
+            lists.cold,
+            data,
+            'cold',
+            'No cold yards with enough ' + refLabel + ' runs yet.'
+        );
+    }
+
+    function initDashboard(root) {
+        if (!root) {
+            return;
+        }
+        var data = window.fhorTcDashboard;
+        if (!data && root.getAttribute('data-fhor-tc-dashboard')) {
+            try {
+                data = JSON.parse(root.getAttribute('data-fhor-tc-dashboard'));
+            } catch (err) {
+                data = null;
+            }
+        }
+        if (data && data.code) {
+            root.setAttribute('data-code', data.code);
+        }
+        if (data) {
+            renderDashboardHotCold(root, data);
+        }
+        root.classList.remove('is-bootstrapping');
+        var sections = root.querySelector('[data-fhor-tc-dashboard-sections]');
+        if (sections) {
+            sections.setAttribute('aria-busy', 'false');
+        }
+    }
+
+    function bootDashboard() {
+        var root = document.querySelector('.fhor-tc-dashboard');
+        if (!root) {
+            return;
+        }
+        initDashboard(root);
+    }
+
     function boot() {
+        bootDashboard();
+
         var roots = document.querySelectorAll('.fhor-tc-profile');
         if (!roots.length) {
             return;
@@ -429,6 +671,8 @@
         boot();
     }
 
+    window.fhorTcInitDashboard = bootDashboard;
+    window.fhorTcRenderDashboardHotCold = renderDashboardHotCold;
     window.fhorTcInitProfileCharts = boot;
     window.fhorTcDestroyProfileChart = destroyProfileChart;
     window.fhorTcInitProfileChart = initProfileChart;
