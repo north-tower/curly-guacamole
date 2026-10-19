@@ -51,6 +51,11 @@ if (!function_exists('bricks_pace_map_resolve_race')) {
             return null;
         }
 
+        static $request_cache = [];
+        if (isset($request_cache[$race_id])) {
+            return $request_cache[$race_id];
+        }
+
         $tomorrow = date('Y-m-d', strtotime('+1 day'));
 
         $races_table   = 'advance_daily_races_beta';
@@ -84,14 +89,16 @@ if (!function_exists('bricks_pace_map_resolve_race')) {
         }
 
         if (!$race) {
+            $request_cache[$race_id] = null;
             return null;
         }
 
-        return [
+        $request_cache[$race_id] = [
             'race'          => $race,
             'speed_table'   => $speed_table,
             'runners_table' => $runners_table,
         ];
+        return $request_cache[$race_id];
     }
 }
 
@@ -107,6 +114,12 @@ if (!function_exists('bricks_pace_map_get_runners')) {
         $race_id = intval($race_id);
         if ($race_id <= 0) {
             return [];
+        }
+
+        static $request_cache = [];
+        $cache_key = $race_id . '|' . (string) $speed_table;
+        if (isset($request_cache[$cache_key])) {
+            return $request_cache[$cache_key];
         }
 
         // The speed table name legitimately contains "&"; it is an internal
@@ -149,9 +162,45 @@ if (!function_exists('bricks_pace_map_get_runners')) {
             $runners[] = $row;
         }
 
+        $request_cache[$cache_key] = $runners;
         return $runners;
     }
 }
+
+if (!function_exists('bricks_race_pace_panel_html')) {
+    /**
+     * Competitors pace card + pace map markup for a race (premium).
+     */
+    function bricks_race_pace_panel_html($race_id) {
+        $race_id = intval($race_id);
+        if ($race_id <= 0) {
+            return '';
+        }
+
+        $html = do_shortcode('[competitors_pace_card race_id="' . $race_id . '"]');
+        $html .= do_shortcode('[pace_map race_id="' . $race_id . '"]');
+        return $html;
+    }
+}
+
+if (!function_exists('bricks_ajax_load_race_pace_panel')) {
+    function bricks_ajax_load_race_pace_panel() {
+        $race_id = isset($_POST['race_id']) ? intval($_POST['race_id']) : 0;
+        if ($race_id <= 0) {
+            wp_send_json_error(['message' => 'Invalid race'], 400);
+        }
+
+        if (!function_exists('bricks_race_detail_can_view_premium') || !bricks_race_detail_can_view_premium()) {
+            wp_send_json_error(['message' => 'Forbidden'], 403);
+        }
+
+        wp_send_json_success([
+            'html' => bricks_race_pace_panel_html($race_id),
+        ]);
+    }
+}
+add_action('wp_ajax_load_race_pace_panel', 'bricks_ajax_load_race_pace_panel');
+add_action('wp_ajax_nopriv_load_race_pace_panel', 'bricks_ajax_load_race_pace_panel');
 
 // -----------------------------------------------------------------------------
 // Derived pace projection (PMS)

@@ -73,6 +73,121 @@ if (!function_exists('bricks_race_detail_sire_baseline_prb_cached')) {
     }
 }
 
+if (!function_exists('bricks_race_detail_lin5_sql_sire_names')) {
+    /**
+     * One canonical DB sire name per normalized key (drops duplicate lowercase aliases).
+     *
+     * @return string[]
+     */
+    function bricks_race_detail_lin5_sql_sire_names(array $sire_names) {
+        $by_norm = [];
+        foreach ($sire_names as $name) {
+            $name = trim((string) $name);
+            if ($name === '') {
+                continue;
+            }
+            $norm = function_exists('bricks_normalize_sire_name_key')
+                ? bricks_normalize_sire_name_key($name)
+                : strtolower($name);
+            if ($norm === '') {
+                continue;
+            }
+            if (!isset($by_norm[$norm]) || strlen($name) > strlen($by_norm[$norm])) {
+                $by_norm[$norm] = $name;
+            }
+        }
+        return array_values($by_norm);
+    }
+}
+
+if (!function_exists('bricks_race_detail_lin5_merge_entry')) {
+    /**
+     * @param array<string, array> $lookup
+     */
+    function bricks_race_detail_lin5_merge_entry(array &$lookup, $canonical_sire_name, array $by_sire) {
+        $sire_key = trim((string) $canonical_sire_name);
+        if ($sire_key === '') {
+            return;
+        }
+        $sire_key_lower = strtolower($sire_key);
+        $lookup[$sire_key] = $by_sire;
+        $lookup[$sire_key_lower] = $by_sire;
+        if (function_exists('bricks_normalize_sire_name_key')) {
+            $sire_key_norm = bricks_normalize_sire_name_key($sire_key);
+            if ($sire_key_norm !== $sire_key_lower) {
+                $lookup[$sire_key_norm] = $by_sire;
+            }
+        }
+    }
+}
+
+if (!function_exists('bricks_race_detail_lin5_sire_transient_key')) {
+    function bricks_race_detail_lin5_sire_transient_key($sire_name, $from_date, $to_date) {
+        $norm = function_exists('bricks_normalize_sire_name_key')
+            ? bricks_normalize_sire_name_key($sire_name)
+            : strtolower(trim((string) $sire_name));
+        return 'bricks_lin5_sire_v2_' . md5($from_date . '|' . $to_date . '|' . $norm);
+    }
+}
+
+if (!function_exists('bricks_race_detail_lin5_rows_to_lookup')) {
+    /**
+     * @return array<string, array>
+     */
+    function bricks_race_detail_lin5_rows_to_lookup($rows, $baseline_prb, $shrink_k) {
+        $sire_5y_lookup = [];
+        $level_defs = [
+            4 => ['runs' => 'lvl4_runs', 'prb' => 'lvl4_raw_prb', 'context' => 'All Flat'],
+            3 => ['runs' => 'lvl3_runs', 'prb' => 'lvl3_raw_prb', 'context' => 'Mar-Oct, any dist'],
+            2 => ['runs' => 'lvl2_runs', 'prb' => 'lvl2_raw_prb', 'context' => 'Mar-Jun, any dist'],
+            1 => ['runs' => 'lvl1_runs', 'prb' => 'lvl1_raw_prb', 'context' => 'Mar-Jun, 5-6f'],
+        ];
+
+        if (empty($rows)) {
+            return $sire_5y_lookup;
+        }
+
+        foreach ($rows as $row) {
+            $sire_key = trim((string) ($row->sire_name ?? ''));
+            if ($sire_key === '') {
+                continue;
+            }
+
+            $by_sire = null;
+            foreach ($level_defs as $def) {
+                $runs = isset($row->{$def['runs']}) ? intval($row->{$def['runs']}) : 0;
+                if ($runs <= 0) {
+                    continue;
+                }
+                $candidate = [
+                    'runs' => $runs,
+                    'raw_prb_pct' => round(floatval($row->{$def['prb']}), 1),
+                    'context' => $def['context'],
+                ];
+                if ($by_sire === null || $runs > $by_sire['runs']) {
+                    $by_sire = $candidate;
+                }
+            }
+
+            if ($by_sire === null) {
+                continue;
+            }
+
+            $runs = intval($by_sire['runs']);
+            $raw_prb = floatval($by_sire['raw_prb_pct']);
+            $adj_prb = round((($runs * $raw_prb) + ($shrink_k * $baseline_prb)) / ($runs + $shrink_k), 1);
+            $by_sire['prb_pct'] = $adj_prb;
+            $by_sire['raw_prb_pct'] = round($raw_prb, 1);
+            $by_sire['baseline_prb_pct'] = round($baseline_prb, 1);
+            $by_sire['shrink_k'] = $shrink_k;
+
+            bricks_race_detail_lin5_merge_entry($sire_5y_lookup, $sire_key, $by_sire);
+        }
+
+        return $sire_5y_lookup;
+    }
+}
+
 if (!function_exists('bricks_race_detail_lin5_lookup_cached')) {
     /**
      * Sire Lin5 PRB lookup — single combined query instead of four level queries on cache miss.
@@ -91,17 +206,38 @@ if (!function_exists('bricks_race_detail_lin5_lookup_cached')) {
         $to_date = (string) $to_date;
         $baseline_prb = floatval($baseline_prb);
         $shrink_k = floatval($shrink_k);
+        $sql_sire_names = bricks_race_detail_lin5_sql_sire_names($sire_names);
+        if (empty($sql_sire_names)) {
+            return [];
+        }
 
         $lin5_cache_key = 'bricks_lin5_' . md5(wp_json_encode([
             'from' => $from_date,
             'to' => $to_date,
-            'sire_names' => $sire_names,
+            'sire_names' => $sql_sire_names,
         ]));
         $lin5_cached = get_transient($lin5_cache_key);
         if (is_array($lin5_cached) && isset($lin5_cached['lookup']) && is_array($lin5_cached['lookup'])) {
             return $lin5_cached['lookup'];
         }
 
+        $sire_5y_lookup = [];
+        $missing_sires = [];
+        foreach ($sql_sire_names as $sql_sire_name) {
+            $sire_transient = get_transient(bricks_race_detail_lin5_sire_transient_key($sql_sire_name, $from_date, $to_date));
+            if (is_array($sire_transient) && isset($sire_transient['entry']) && is_array($sire_transient['entry'])) {
+                bricks_race_detail_lin5_merge_entry($sire_5y_lookup, $sql_sire_name, $sire_transient['entry']);
+            } else {
+                $missing_sires[] = $sql_sire_name;
+            }
+        }
+
+        if (empty($missing_sires)) {
+            set_transient($lin5_cache_key, ['lookup' => $sire_5y_lookup], DAY_IN_SECONDS);
+            return $sire_5y_lookup;
+        }
+
+        $sire_names = $missing_sires;
         $sire_placeholders = implode(',', array_fill(0, count($sire_names), '%s'));
         $sire_flat_filter = "
               COALESCE(dracb.race_type, hracb.race_type) IS NOT NULL
@@ -145,59 +281,28 @@ if (!function_exists('bricks_race_detail_lin5_lookup_cached')) {
         $params = array_merge($sire_names, [$from_date, $to_date]);
         $rows = $wpdb->get_results($wpdb->prepare($combined_sql, ...$params));
 
-        $sire_5y_lookup = [];
-        $level_defs = [
-            4 => ['runs' => 'lvl4_runs', 'prb' => 'lvl4_raw_prb', 'context' => 'All Flat'],
-            3 => ['runs' => 'lvl3_runs', 'prb' => 'lvl3_raw_prb', 'context' => 'Mar-Oct, any dist'],
-            2 => ['runs' => 'lvl2_runs', 'prb' => 'lvl2_raw_prb', 'context' => 'Mar-Jun, any dist'],
-            1 => ['runs' => 'lvl1_runs', 'prb' => 'lvl1_raw_prb', 'context' => 'Mar-Jun, 5-6f'],
-        ];
-
-        if (!empty($rows)) {
-            foreach ($rows as $row) {
-                $sire_key = trim((string) ($row->sire_name ?? ''));
-                if ($sire_key === '') {
-                    continue;
-                }
-
-                $by_sire = null;
-                foreach ($level_defs as $level_num => $def) {
-                    $runs = isset($row->{$def['runs']}) ? intval($row->{$def['runs']}) : 0;
-                    if ($runs <= 0) {
-                        continue;
-                    }
-                    $candidate = [
-                        'runs' => $runs,
-                        'raw_prb_pct' => round(floatval($row->{$def['prb']}), 1),
-                        'context' => $def['context'],
-                    ];
-                    if ($by_sire === null || $runs > $by_sire['runs']) {
-                        $by_sire = $candidate;
-                    }
-                }
-
-                if ($by_sire === null) {
-                    continue;
-                }
-
-                $runs = intval($by_sire['runs']);
-                $raw_prb = floatval($by_sire['raw_prb_pct']);
-                $adj_prb = round((($runs * $raw_prb) + ($shrink_k * $baseline_prb)) / ($runs + $shrink_k), 1);
-                $by_sire['prb_pct'] = $adj_prb;
-                $by_sire['raw_prb_pct'] = round($raw_prb, 1);
-                $by_sire['baseline_prb_pct'] = round($baseline_prb, 1);
-                $by_sire['shrink_k'] = $shrink_k;
-
-                $sire_key_lower = strtolower($sire_key);
-                $sire_5y_lookup[$sire_key] = $by_sire;
-                $sire_5y_lookup[$sire_key_lower] = $by_sire;
-                if (function_exists('bricks_normalize_sire_name_key')) {
-                    $sire_key_norm = bricks_normalize_sire_name_key($sire_key);
-                    if ($sire_key_norm !== $sire_key_lower) {
-                        $sire_5y_lookup[$sire_key_norm] = $by_sire;
-                    }
-                }
+        $fresh_lookup = bricks_race_detail_lin5_rows_to_lookup($rows, $baseline_prb, $shrink_k);
+        foreach ($missing_sires as $sql_sire_name) {
+            $norm = function_exists('bricks_normalize_sire_name_key')
+                ? bricks_normalize_sire_name_key($sql_sire_name)
+                : strtolower($sql_sire_name);
+            $entry = null;
+            if (isset($fresh_lookup[$sql_sire_name])) {
+                $entry = $fresh_lookup[$sql_sire_name];
+            } elseif ($norm !== '' && isset($fresh_lookup[$norm])) {
+                $entry = $fresh_lookup[$norm];
+            } elseif (isset($fresh_lookup[strtolower($sql_sire_name)])) {
+                $entry = $fresh_lookup[strtolower($sql_sire_name)];
             }
+            if (!is_array($entry)) {
+                continue;
+            }
+            set_transient(
+                bricks_race_detail_lin5_sire_transient_key($sql_sire_name, $from_date, $to_date),
+                ['entry' => $entry],
+                DAY_IN_SECONDS
+            );
+            bricks_race_detail_lin5_merge_entry($sire_5y_lookup, $sql_sire_name, $entry);
         }
 
         set_transient($lin5_cache_key, ['lookup' => $sire_5y_lookup], DAY_IN_SECONDS);

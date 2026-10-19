@@ -2131,7 +2131,16 @@ if ($runners && count($runners) > 0) {
 $dosage_lookup = [];
 if (!empty($runners) && function_exists('bricks_dosage_metrics_for_runners')) {
     try {
-        $dosage_lookup = bricks_dosage_metrics_for_runners($runners);
+        $dosage_cache_key = 'bricks_dosage_race_' . intval($race_id);
+        $dosage_cached = get_transient($dosage_cache_key);
+        if (is_array($dosage_cached)) {
+            $dosage_lookup = $dosage_cached;
+        } else {
+            $dosage_lookup = bricks_dosage_metrics_for_runners($runners);
+            if (is_array($dosage_lookup)) {
+                set_transient($dosage_cache_key, $dosage_lookup, DAY_IN_SECONDS);
+            }
+        }
         if (!is_array($dosage_lookup)) {
             $dosage_lookup = [];
         }
@@ -6361,10 +6370,9 @@ jQuery(document).on('click', '.toggle-details-btn', function(e) {
 
         <?php if ($race_show_premium_data): ?>
         <div class="fhor-race-panel" id="fhor-race-panel-pace" data-fhor-panel="pace" role="tabpanel" aria-labelledby="fhor-race-tab-pace" hidden>
-        <?php
-        echo do_shortcode('[competitors_pace_card race_id="' . intval($race_id) . '"]');
-        echo do_shortcode('[pace_map race_id="' . intval($race_id) . '"]');
-        ?>
+            <div id="fhor-race-pace-lazy" class="fhor-race-pace-lazy" data-race-id="<?php echo intval($race_id); ?>" data-loaded="0">
+                <p class="fhor-race-pace-lazy__hint" style="padding:1.25rem;color:#64748b;text-align:center;margin:0;">Open this tab to load pace analysis.</p>
+            </div>
         </div>
         <?php endif; ?>
     </div>
@@ -6393,6 +6401,42 @@ jQuery(document).on('click', '.toggle-details-btn', function(e) {
                         });
                         if (id === 'analysis' && window.dispatchEvent) {
                             window.dispatchEvent(new Event('resize'));
+                        }
+                        if (id === 'pace') {
+                            var paceHost = document.getElementById('fhor-race-pace-lazy');
+                            if (paceHost && paceHost.getAttribute('data-loaded') !== '1') {
+                                var raceId = parseInt(paceHost.getAttribute('data-race-id') || '0', 10);
+                                var ajaxUrl = (typeof bricks_tracker_obj !== 'undefined' && bricks_tracker_obj.ajax_url)
+                                    ? bricks_tracker_obj.ajax_url
+                                    : (typeof race_ajax_obj !== 'undefined' ? race_ajax_obj.ajax_url : '');
+                                if (raceId > 0 && ajaxUrl) {
+                                    paceHost.setAttribute('data-loaded', 'loading');
+                                    paceHost.innerHTML = '<p style="padding:1.25rem;color:#64748b;text-align:center;margin:0;">Loading pace analysis…</p>';
+                                    var body = new URLSearchParams();
+                                    body.set('action', 'load_race_pace_panel');
+                                    body.set('race_id', String(raceId));
+                                    fetch(ajaxUrl, {
+                                        method: 'POST',
+                                        credentials: 'same-origin',
+                                        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+                                        body: body.toString()
+                                    }).then(function(res) { return res.json(); }).then(function(payload) {
+                                        if (payload && payload.success && payload.data && payload.data.html) {
+                                            paceHost.innerHTML = payload.data.html;
+                                            paceHost.setAttribute('data-loaded', '1');
+                                            if (window.dispatchEvent) {
+                                                window.dispatchEvent(new Event('resize'));
+                                            }
+                                        } else {
+                                            paceHost.innerHTML = '<p style="padding:1.25rem;color:#991b1b;text-align:center;margin:0;">Could not load pace analysis.</p>';
+                                            paceHost.setAttribute('data-loaded', '0');
+                                        }
+                                    }).catch(function() {
+                                        paceHost.innerHTML = '<p style="padding:1.25rem;color:#991b1b;text-align:center;margin:0;">Could not load pace analysis.</p>';
+                                        paceHost.setAttribute('data-loaded', '0');
+                                    });
+                                }
+                            }
                         }
                     });
                 });

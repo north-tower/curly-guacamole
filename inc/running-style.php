@@ -607,12 +607,19 @@ if (!function_exists('bricks_running_style_fetch_comments_by_runners')) {
             $out[$rid] = ['comments' => [], 'avg_btn' => null];
         }
 
+        static $historic_tables = null;
+        if ($historic_tables === null) {
+            $historic_tables = [
+                'runners' => $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', 'historic_runners_beta')) === 'historic_runners_beta',
+                'races' => $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', 'historic_races_beta')) === 'historic_races_beta',
+                'dch' => $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', 'daily_comment_history')) === 'daily_comment_history',
+            ];
+        }
+
         $rows = [];
         $table = 'historic_runners_beta';
-        $exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
-        if ($exists === $table) {
-            $races_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', 'historic_races_beta'));
-            if ($races_exists === 'historic_races_beta') {
+        if ($historic_tables['runners']) {
+            if ($historic_tables['races']) {
                 $sql = "SELECT hrunb.runner_id, hrunb.in_race_comment, hrunb.distance_beaten,
                                hracb.meeting_date
                         FROM `historic_runners_beta` hrunb
@@ -631,8 +638,7 @@ if (!function_exists('bricks_running_style_fetch_comments_by_runners')) {
             $rows = $wpdb->get_results($wpdb->prepare($sql, ...$runner_ids));
         } else {
             $table = 'daily_comment_history';
-            $exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
-            if ($exists !== $table) {
+            if (!$historic_tables['dch']) {
                 set_transient($cache_key, $out, 15 * MINUTE_IN_SECONDS);
                 return $out;
             }
