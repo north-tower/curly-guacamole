@@ -96,6 +96,31 @@ if (!function_exists('fh_get_runner_snapshot_from_sp')) {
     }
 }
 
+if (!function_exists('fh_get_runner_name_by_id')) {
+    function fh_get_runner_name_by_id($runner_id) {
+        global $wpdb;
+        $runner_id = intval($runner_id);
+        if ($runner_id <= 0) {
+            return '';
+        }
+
+        $key = 'fh_runner_name_' . $runner_id;
+        $cached = get_transient($key);
+        if ($cached !== false) {
+            return is_string($cached) ? $cached : '';
+        }
+
+        $name = $wpdb->get_var($wpdb->prepare(
+            "SELECT name FROM advance_daily_runners_beta WHERE runner_id = %d LIMIT 1",
+            $runner_id
+        ));
+
+        $name = is_string($name) ? trim($name) : '';
+        set_transient($key, $name, HOUR_IN_SECONDS);
+        return $name;
+    }
+}
+
 if (!function_exists('fh_get_runner_snapshot_from_sp_by_name')) {
     function fh_get_runner_snapshot_from_sp_by_name($horse_name) {
         global $wpdb;
@@ -403,6 +428,10 @@ function horse_history_shortcode($atts) {
         }
     }
 
+    if (!$horse_name && $runner_id) {
+        $horse_name = fh_get_runner_name_by_id($runner_id);
+    }
+
     if (!$horse_name && !$runner_id) {
         return '
         <div style="max-width:600px;margin:60px auto;text-align:center;padding:40px 30px;background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
@@ -443,13 +472,15 @@ function horse_history_shortcode($atts) {
     }
 
     if (!$horse_info && !$sp_info) {
-        $display_id = esc_html($horse_name ?: ('Runner #' . $runner_id));
+        $profile_unavailable_line = $horse_name
+            ? 'We couldn\'t find a profile for <strong style="color:#334155;">' . esc_html($horse_name) . '</strong>.'
+            : 'We couldn\'t find a profile for this horse.';
         return '
         <div style="max-width:600px;margin:60px auto;text-align:center;padding:40px 30px;background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
             <div style="font-size:56px;margin-bottom:16px;">🐴</div>
             <h2 style="color:#1e293b;font-size:22px;font-weight:700;margin:0 0 12px 0;">Horse Profile Not Available</h2>
             <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 24px 0;">
-                We couldn\'t find a profile for <strong style="color:#334155;">' . $display_id . '</strong>.<br>
+                ' . $profile_unavailable_line . '<br>
                 This horse may not have run recently or data may not yet be available.
             </p>
             <a href="' . esc_url(home_url('/')) . '" 
@@ -466,7 +497,7 @@ function horse_history_shortcode($atts) {
     } elseif ($horse_info && isset($horse_info->name) && $horse_info->name) {
         $display_name = $horse_info->name;
     } else {
-        $display_name = $horse_name ?: ('Runner #' . $runner_id);
+        $display_name = $horse_name ?: 'Unknown Horse';
     }
 
     ob_start();
