@@ -220,9 +220,20 @@ function bricks_trainer_cycles_enqueue_scripts() {
 add_action('wp_enqueue_scripts', 'bricks_trainer_cycles_enqueue_scripts');
 
 function horse_history_enqueue_scripts() {
-    // Only load on horse history pages
-    if (get_query_var('horse_name') || get_query_var('runner_id')) {
-        wp_enqueue_script('jquery');
+    if (!get_query_var('horse_name') && !get_query_var('runner_id')) {
+        return;
+    }
+
+    wp_enqueue_script('jquery');
+
+    $rd_premium_css = get_stylesheet_directory() . '/race-detail-premium.css';
+    if (file_exists($rd_premium_css)) {
+        wp_enqueue_style(
+            'fhor-race-detail-premium',
+            get_stylesheet_directory_uri() . '/race-detail-premium.css',
+            ['fhor-ui'],
+            (string) filemtime($rd_premium_css)
+        );
     }
 }
 add_action('wp_enqueue_scripts', 'horse_history_enqueue_scripts');

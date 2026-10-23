@@ -4,12 +4,12 @@
  */
 
 .race-detail-page-shell:has(.fhor-race-premium) {
-  --rd-bg: #0b0f14;
-  --rd-s1: #121821;
-  --rd-s2: #182130;
-  --rd-line: #243044;
-  --rd-tx: #e8edf5;
-  --rd-mu: #8b97ab;
+  --rd-bg: #f4f6fa;
+  --rd-s1: #ffffff;
+  --rd-s2: #eef2f8;
+  --rd-line: #dbe2ee;
+  --rd-tx: #111827;
+  --rd-mu: #5b667a;
   --rd-ac: #2fd08a;
   --rd-ac2: #4c8dff;
   --rd-warn: #f5b84b;
@@ -31,17 +31,6 @@
   margin-right: auto;
   padding-left: 16px;
   padding-right: 16px;
-}
-
-@media (prefers-color-scheme: light) {
-  .race-detail-page-shell:has(.fhor-race-premium) {
-    --rd-bg: #f4f6fa;
-    --rd-s1: #ffffff;
-    --rd-s2: #eef2f8;
-    --rd-line: #dbe2ee;
-    --rd-tx: #111827;
-    --rd-mu: #5b667a;
-  }
 }
 
 .fhor-race-premium {
@@ -1503,5 +1492,338 @@
 
   .fhor-sire-form-page .sire-form-legend {
     display: none;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Horse history (/horse-history/) — same shell as race detail                */
+/* -------------------------------------------------------------------------- */
+
+.fhor-horse-history-page {
+  max-width: 1280px;
+  padding: 0 16px calc(28px + var(--fhor-fab-clearance, 72px));
+  font-size: 14px;
+  line-height: 1.45;
+  box-sizing: border-box;
+}
+
+.fhor-horse-history-page .horse-content-wrapper {
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.fhor-horse-history-page .horse-header-card {
+  background: linear-gradient(135deg, var(--rd-s2), var(--rd-s1));
+  border: 1px solid var(--rd-line);
+  border-radius: 18px;
+  box-shadow: none;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.fhor-horse-history-page .horse-header-top {
+  background: transparent;
+  border-bottom: none;
+  padding: 22px 22px 0;
+}
+
+.fhor-horse-history-page .horse-title {
+  color: var(--rd-tx);
+  font-size: clamp(20px, 3.2vw, 30px);
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 0 0 8px;
+  text-shadow: none;
+}
+
+.fhor-horse-history-page .horse-subtitle {
+  color: var(--rd-mu);
+  font-size: 12px;
+  margin: 0 0 14px;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+.fhor-horse-history-page .horse-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  padding: 14px 22px 22px;
+}
+
+.fhor-horse-history-page .stat-card {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 7px 11px;
+  background: var(--rd-bg);
+  border: 1px solid var(--rd-line);
+  border-radius: 10px;
+  backdrop-filter: none;
+  transform: none;
+}
+
+.fhor-horse-history-page .stat-card:hover {
+  background: var(--rd-bg);
+  transform: none;
+}
+
+.fhor-horse-history-page .stat-icon {
+  display: none;
+}
+
+.fhor-horse-history-page .stat-label {
+  font-size: 10.5px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  opacity: 1;
+  color: var(--rd-mu);
+  margin-bottom: 0;
+}
+
+.fhor-horse-history-page .stat-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rd-tx);
+}
+
+.fhor-horse-history-page .race-history-section {
+  background: var(--rd-s1);
+  border: 1px solid var(--rd-line);
+  border-radius: 18px;
+  box-shadow: none;
+  max-width: 100% !important;
+  margin: 0 0 16px !important;
+  overflow: hidden;
+}
+
+.fhor-horse-history-page .race-history-header {
+  background: transparent;
+  padding: 20px 22px 12px;
+  border-bottom: 1px solid var(--rd-line);
+}
+
+.fhor-horse-history-page .race-history-title {
+  color: var(--rd-tx);
+  font-size: clamp(18px, 2.5vw, 22px);
+  font-weight: 800;
+  margin: 0;
+}
+
+.fhor-horse-history-page .race-history-title span[style] {
+  background: color-mix(in srgb, var(--rd-ac2) 14%, var(--rd-s1)) !important;
+  color: var(--rd-ac2) !important;
+  border-radius: 999px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  padding: 4px 12px !important;
+}
+
+.fhor-horse-history-page .race-history-filters {
+  background: var(--rd-s2);
+  border: none;
+  border-bottom: 1px solid var(--rd-line);
+  border-radius: 0;
+  margin-bottom: 0;
+  padding: 16px 22px;
+}
+
+.fhor-horse-history-page .filter-group label {
+  color: var(--rd-mu);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fhor-horse-history-page .race-history-filters select,
+.fhor-horse-history-page .race-history-filters input[type="number"],
+.fhor-horse-history-page .history-header-filter {
+  border: 1px solid var(--rd-line);
+  border-radius: 10px;
+  background: var(--rd-bg);
+  color: var(--rd-tx);
+  padding: 9px 10px;
+  font-size: 13px;
+}
+
+.fhor-horse-history-page .race-history-filters select:focus,
+.fhor-horse-history-page .race-history-filters input[type="number"]:focus {
+  border-color: var(--rd-ac2);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--rd-ac2) 22%, transparent);
+}
+
+.fhor-horse-history-page .filter-button-apply {
+  background: var(--rd-ac2);
+  color: #fff;
+  border: 1px solid var(--rd-ac2);
+  box-shadow: none;
+}
+
+.fhor-horse-history-page .filter-button-apply:hover {
+  transform: none;
+  filter: brightness(1.05);
+  box-shadow: none;
+}
+
+.fhor-horse-history-page .filter-button-reset {
+  background: var(--rd-s2);
+  color: var(--rd-tx);
+  border: 1px solid var(--rd-line);
+  box-shadow: none;
+}
+
+.fhor-horse-history-page .filter-button-reset:hover {
+  transform: none;
+  background: var(--rd-bg);
+  box-shadow: none;
+}
+
+.fhor-horse-history-page .race-table thead,
+.fhor-horse-history-page .race-table thead th {
+  background: var(--rd-s2);
+}
+
+.fhor-horse-history-page .race-table th {
+  color: var(--rd-mu);
+  border-bottom: 1px solid var(--rd-line);
+}
+
+.fhor-horse-history-page .race-table td {
+  color: var(--rd-tx);
+  border-bottom: 1px solid color-mix(in srgb, var(--rd-line) 65%, transparent);
+}
+
+.fhor-horse-history-page .race-row:hover {
+  background: color-mix(in srgb, var(--rd-ac2) 6%, var(--rd-s1));
+  transform: none;
+  box-shadow: none;
+}
+
+.fhor-horse-history-page .race-row:nth-child(even) {
+  background: color-mix(in srgb, var(--rd-s2) 45%, var(--rd-s1));
+}
+
+.fhor-horse-history-page .race-row:nth-child(even):hover {
+  background: color-mix(in srgb, var(--rd-ac2) 6%, var(--rd-s1));
+}
+
+.fhor-horse-history-page .sortable-history:hover {
+  background: color-mix(in srgb, var(--rd-ac2) 10%, var(--rd-s2)) !important;
+}
+
+.fhor-horse-history-page .sortable-history.active-sort {
+  background: color-mix(in srgb, var(--rd-ac2) 14%, var(--rd-s2)) !important;
+  color: var(--rd-tx);
+}
+
+.fhor-horse-history-page .sortable-history.sorted-asc .sort-indicator::after,
+.fhor-horse-history-page .sortable-history.sorted-desc .sort-indicator::after {
+  color: var(--rd-ac2);
+}
+
+.fhor-horse-history-page .comment-box {
+  background: color-mix(in srgb, var(--rd-ac2) 8%, var(--rd-s1));
+  border-left: 3px solid var(--rd-ac2);
+}
+
+.fhor-horse-history-page .comment-label {
+  color: var(--rd-ac2);
+}
+
+.fhor-horse-history-page .comment-text {
+  color: var(--rd-tx);
+}
+
+.fhor-horse-history-page .comment-row {
+  background: color-mix(in srgb, var(--rd-ac2) 5%, var(--rd-s1)) !important;
+}
+
+.fhor-horse-history-page .race-card {
+  background: var(--rd-s1);
+  border: 1px solid var(--rd-line);
+  border-left: 4px solid var(--rd-ac2);
+  box-shadow: none;
+}
+
+.fhor-horse-history-page .race-card-header {
+  background: var(--rd-s2);
+  border-bottom: 1px solid var(--rd-line);
+}
+
+.fhor-horse-history-page .race-card-date {
+  color: var(--rd-ac2);
+}
+
+.fhor-horse-history-page .race-card-course,
+.fhor-horse-history-page .race-card-title,
+.fhor-horse-history-page .race-card-stat-value,
+.fhor-horse-history-page .race-card-detail-value {
+  color: var(--rd-tx);
+}
+
+.fhor-horse-history-page .race-card-stat-label,
+.fhor-horse-history-page .race-card-detail-label {
+  color: var(--rd-mu);
+}
+
+.fhor-horse-history-page .race-card-stat {
+  background: var(--rd-bg);
+  border: 1px solid var(--rd-line);
+}
+
+.fhor-horse-history-page .race-card-title a {
+  color: var(--rd-ac2);
+}
+
+.fhor-horse-history-page .no-data {
+  color: var(--rd-mu);
+  padding: 48px 24px;
+}
+
+.fhor-horse-history-page .no-data h3 {
+  color: var(--rd-tx) !important;
+}
+
+.fhor-horse-history-page .green-text {
+  color: var(--rd-ac) !important;
+}
+
+.fhor-horse-history-page .red-text {
+  color: #f87171 !important;
+}
+
+.fhor-horse-history-page .sr-highlight {
+  background: color-mix(in srgb, var(--rd-ac) 22%, var(--rd-s1));
+  color: var(--rd-ac) !important;
+  border: 1px solid color-mix(in srgb, var(--rd-ac) 45%, var(--rd-line));
+}
+
+.fhor-horse-history-page .position-1 {
+  color: var(--rd-ac);
+}
+
+.fhor-horse-history-page .race-table a {
+  color: var(--rd-ac2);
+}
+
+@media (max-width: 768px) {
+  .fhor-horse-history-page {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .fhor-horse-history-page .horse-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    padding: 14px 16px 18px;
+  }
+
+  .fhor-horse-history-page .race-history-filters {
+    padding: 14px 16px;
+  }
+
+  .fhor-horse-history-page .race-history-header {
+    padding: 16px;
   }
 }

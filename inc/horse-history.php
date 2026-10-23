@@ -1382,14 +1382,26 @@ function horse_history_shortcode($atts) {
 }
 
     </style>
+    <?php
+    $rd_premium_css = get_stylesheet_directory() . '/race-detail-premium.css';
+    if (is_file($rd_premium_css)) {
+        echo '<link rel="stylesheet" href="' . esc_url(get_stylesheet_directory_uri() . '/race-detail-premium.css') . '?ver=' . esc_attr((string) filemtime($rd_premium_css)) . '">';
+    }
+    ?>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 
-
-    <div class="horse-history-container">
+    <div class="fhor-race-premium fhor-horse-history-page">
+      <div class="back-button-container">
+          <a href="<?php echo esc_url(home_url('/daily/')); ?>" class="back-button">← Today's races</a>
+      </div>
       <div class="horse-content-wrapper">
         <!-- Horse Header Card -->
-        <div class="horse-header-card">
-            <div class="horse-header-top">
-                <h1 class="horse-title">🐎 <?php echo esc_html($display_name); ?></h1>
+        <div class="horse-header-card race-header-card">
+            <div class="horse-header-top race-header-top">
+                <div class="race-meta-time">Horse profile</div>
+                <h1 class="horse-title race-title">🐎 <?php echo esc_html($display_name); ?></h1>
                 <p class="horse-subtitle">Complete horse profile and racing history</p>
                 <?php
                 echo bricks_tracker_render_horse_widget(
@@ -1490,7 +1502,6 @@ function horse_history_shortcode($atts) {
     </div>
 </div>
 
-        </div>
         </div>
 
         <!-- Race History Section -->
@@ -2441,6 +2452,7 @@ if ($pos === 1) {
 </div>
 <?php endif; ?>
 
+    </div>
     </div>
     <?php
     $content = ob_get_clean();
