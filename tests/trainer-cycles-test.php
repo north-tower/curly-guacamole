@@ -151,6 +151,11 @@ tc_assert('macro trainers array', is_array($macro['trainers']));
 
 tc_eq('dashboard url path', '/trainer-cycles/', fhor_tc_dashboard_url());
 
+tc_eq('race profile code nh', 'jumps', fhor_tc_race_profile_code(true));
+tc_eq('race profile code flat', 'flat', fhor_tc_race_profile_code(false));
+tc_assert('trainer link contains slug', strpos(fhor_tc_trainer_link_html('Paul Nicholls', 'jumps'), '/trainers/') !== false);
+tc_assert('trainer link flat query', strpos(fhor_tc_trainer_link_html('Paul Nicholls', 'flat'), 'code=flat') !== false);
+
 $fixture_pool = [
     'ok' => true,
     'code' => 'jumps',

@@ -3982,7 +3982,7 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
 
         <div class="premium-ratings-container paywall">
         <?php if (!empty($race_pedigree_deferred)): ?>
-        <div id="fhor-race-pedigree-defer" data-race-id="<?php echo intval($race_id); ?>" hidden></div>
+        <div id="fhor-race-pedigree-defer" data-race-id="<?php echo intval($race_id); ?>" data-ajax-url="<?php echo esc_url(admin_url('admin-ajax.php')); ?>" hidden></div>
         <?php endif; ?>
 
         <div class="fhor-race-panel is-active" id="fhor-race-panel-runners" data-fhor-panel="runners" role="tabpanel" aria-labelledby="fhor-race-tab-runners">
@@ -6443,15 +6443,26 @@ jQuery(document).on('click', '.toggle-details-btn', function(e) {
                 });
             }
 
-            (function loadPedigreeEnrichmentDeferred() {
+            function fhorResolvePedigreeAjaxUrl(host) {
+                if (host && host.getAttribute('data-ajax-url')) {
+                    return host.getAttribute('data-ajax-url');
+                }
+                if (typeof bricks_tracker_obj !== 'undefined' && bricks_tracker_obj.ajax_url) {
+                    return bricks_tracker_obj.ajax_url;
+                }
+                if (typeof race_ajax_obj !== 'undefined' && race_ajax_obj.ajax_url) {
+                    return race_ajax_obj.ajax_url;
+                }
+                return '';
+            }
+
+            function loadPedigreeEnrichmentDeferred() {
                 var host = document.getElementById('fhor-race-pedigree-defer');
                 if (!host || host.getAttribute('data-loaded') === '1') {
                     return;
                 }
                 var raceId = parseInt(host.getAttribute('data-race-id') || '0', 10);
-                var ajaxUrl = (typeof bricks_tracker_obj !== 'undefined' && bricks_tracker_obj.ajax_url)
-                    ? bricks_tracker_obj.ajax_url
-                    : (typeof race_ajax_obj !== 'undefined' ? race_ajax_obj.ajax_url : '');
+                var ajaxUrl = fhorResolvePedigreeAjaxUrl(host);
                 if (raceId <= 0 || !ajaxUrl) {
                     return;
                 }
@@ -6528,7 +6539,13 @@ jQuery(document).on('click', '.toggle-details-btn', function(e) {
                 } else {
                     setTimeout(fetchPedigree, 80);
                 }
-            })();
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', loadPedigreeEnrichmentDeferred);
+            } else {
+                loadPedigreeEnrichmentDeferred();
+            }
 
             function updateActiveRunnerCount() {
                 var counter = document.getElementById('activeRunnersCount');
@@ -6845,6 +6862,12 @@ function bricks_get_navigation_header() {
                         <a href="<?php echo home_url('/speed/'); ?>" class="nav-link <?php echo (strpos($current_url, '/speed') !== false) ? 'active' : ''; ?>">
                             <span class="nav-icon">⚡</span>
                             <span class="nav-text">Quick Reference</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="<?php echo function_exists('fhor_tc_dashboard_url') ? esc_url(fhor_tc_dashboard_url()) : esc_url(home_url('/trainer-cycles/')); ?>" class="nav-link <?php echo (function_exists('fhor_tc_is_trainer_cycles_nav_active') && fhor_tc_is_trainer_cycles_nav_active()) ? 'active' : ''; ?>">
+                            <span class="nav-icon">📅</span>
+                            <span class="nav-text">Trainer Cycles</span>
                         </a>
                     </li>
                     <li>

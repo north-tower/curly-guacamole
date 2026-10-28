@@ -135,7 +135,16 @@ if (!defined('ABSPATH')) {
                                                 <span>Jockey</span>
                                                 <b><?php echo esc_html($runner->jockey_name ?: 'N/A'); ?><?php if ($runner->jockey_claim): ?> <span class="runner-card-wide__sub">(<?php echo esc_html($runner->jockey_claim); ?>lb)</span><?php endif; ?></b>
                                             </div>
-                                            <div class="runner-card-kv"><span>Trainer</span><b><?php echo esc_html($runner->trainer_name ?: 'N/A'); ?></b></div>
+                                            <div class="runner-card-kv"><span>Trainer</span><b><?php
+                                                $tc_profile_code = function_exists('fhor_tc_race_profile_code')
+                                                    ? fhor_tc_race_profile_code(!empty($is_national_hunt))
+                                                    : null;
+                                                if (function_exists('fhor_tc_trainer_link_html')) {
+                                                    echo fhor_tc_trainer_link_html($runner->trainer_name ?: 'N/A', $tc_profile_code);
+                                                } else {
+                                                    echo esc_html($runner->trainer_name ?: 'N/A');
+                                                }
+                                            ?></b></div>
                                             <div class="runner-card-kv"><span>Course 5Y</span><b><?php echo esc_html($trainer_course_kv); ?></b></div>
                                             <div class="runner-card-kv"><span>RTF</span><b class="<?php echo (floatval(str_replace('%', '', $rft_percentage)) >= 40) ? 'green-text' : ''; ?>"><?php echo esc_html($rft_percentage); ?></b></div>
                                         </section>

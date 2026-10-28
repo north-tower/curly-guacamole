@@ -1172,11 +1172,119 @@ if (!function_exists('fhor_tc_trainer_url')) {
         }
         $url = home_url($path);
         if ($code !== null && fhor_tc_normalize_code($code) === 'flat') {
-            $url = add_query_arg('code', 'flat', $url);
+            if (function_exists('add_query_arg')) {
+                $url = add_query_arg('code', 'flat', $url);
+            } else {
+                $url .= (strpos($url, '?') !== false ? '&' : '?') . 'code=flat';
+            }
         }
         return $url;
     }
 }
+
+if (!function_exists('fhor_tc_race_profile_code')) {
+    /**
+     * Jumps vs flat code for links from a race card (matches NH vs flat runner table).
+     */
+    function fhor_tc_race_profile_code($is_national_hunt) {
+        return $is_national_hunt ? 'jumps' : 'flat';
+    }
+}
+
+if (!function_exists('fhor_tc_trainer_link_html')) {
+    /**
+     * Linked trainer name for race cards and embeds (plain text when URL unavailable).
+     */
+    function fhor_tc_trainer_link_html($trainer_name, $code = null, $link_class = 'horse-name-link') {
+        $name = trim((string) $trainer_name);
+        if ($name === '' || strcasecmp($name, 'N/A') === 0) {
+            return esc_html($name !== '' ? $name : 'N/A');
+        }
+
+        $url = fhor_tc_trainer_url($name, $code);
+        if ($url === '') {
+            return esc_html($name);
+        }
+
+        $title = sprintf(
+            /* translators: %s: trainer name */
+            __('View %s seasonal trainer cycles', 'bricks'),
+            $name
+        );
+
+        return '<a href="' . esc_url($url) . '" class="' . esc_attr($link_class) . '" title="' . esc_attr($title) . '">'
+            . esc_html($name) . '</a>';
+    }
+}
+
+if (!function_exists('fhor_tc_is_trainer_cycles_nav_active')) {
+    function fhor_tc_is_trainer_cycles_nav_active() {
+        $current = (string) ($_SERVER['REQUEST_URI'] ?? '');
+
+        return (bool) preg_match('#/trainer-cycles(?:/|$|\?)#i', $current)
+            || (bool) preg_match('#/trainers/[^/]+/?(?:$|\?|#)#i', $current);
+    }
+}
+
+if (!function_exists('fhor_tc_menu_item_html')) {
+    function fhor_tc_menu_item_html() {
+        $active = fhor_tc_is_trainer_cycles_nav_active()
+            ? ' current-menu-item current_page_item'
+            : '';
+
+        return '<li class="menu-item menu-item-type-custom menu-item-trainer-cycles' . esc_attr($active) . '">'
+            . '<a href="' . esc_url(fhor_tc_dashboard_url()) . '">' . esc_html__('Trainer Cycles', 'bricks') . '</a></li>';
+    }
+}
+
+if (!function_exists('fhor_tc_insert_nav_menu_item')) {
+    /**
+     * Insert a menu item immediately after the first matching anchor fragment's </li>.
+     *
+     * @param array<int, string> $after_href_fragments
+     */
+    function fhor_tc_insert_nav_menu_item($items, $li_html, array $after_href_fragments) {
+        foreach ($after_href_fragments as $fragment) {
+            $fragment = (string) $fragment;
+            if ($fragment === '') {
+                continue;
+            }
+            $pos = stripos($items, $fragment);
+            if ($pos === false) {
+                continue;
+            }
+            $close = stripos($items, '</li>', $pos);
+            if ($close === false) {
+                continue;
+            }
+            $insert_at = $close + 5;
+
+            return substr($items, 0, $insert_at) . $li_html . substr($items, $insert_at);
+        }
+
+        return $items . $li_html;
+    }
+}
+
+if (!function_exists('fhor_tc_menu_item')) {
+    function fhor_tc_menu_item($items, $args) {
+        if (is_admin()) {
+            return $items;
+        }
+
+        $dash = fhor_tc_dashboard_url();
+        if (strpos($items, '/trainer-cycles') !== false || strpos($items, $dash) !== false) {
+            return $items;
+        }
+
+        return fhor_tc_insert_nav_menu_item($items, fhor_tc_menu_item_html(), [
+            '/speed/',
+            'quick-reference',
+            'Quick Reference',
+        ]);
+    }
+}
+add_filter('wp_nav_menu_items', 'fhor_tc_menu_item', 19, 2);
 
 if (!function_exists('fhor_tc_slug_index_cache_key')) {
     function fhor_tc_slug_index_cache_key() {

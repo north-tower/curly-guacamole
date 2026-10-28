@@ -1520,7 +1520,14 @@ function horse_history_shortcode($atts) {
         <div class="stat-icon">👨‍🏫</div>
         <div class="stat-content">
             <div class="stat-label">Trainer</div>
-            <div class="stat-value"><?php echo esc_html(($sp_info && isset($sp_info->trainer_name)) ? $sp_info->trainer_name : 'N/A'); ?></div>
+            <div class="stat-value"><?php
+                $hh_trainer = ($sp_info && isset($sp_info->trainer_name)) ? (string) $sp_info->trainer_name : 'N/A';
+                if (function_exists('fhor_tc_trainer_link_html')) {
+                    echo fhor_tc_trainer_link_html($hh_trainer);
+                } else {
+                    echo esc_html($hh_trainer);
+                }
+            ?></div>
         </div>
     </div>
     
