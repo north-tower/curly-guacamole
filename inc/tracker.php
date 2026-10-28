@@ -195,6 +195,8 @@ if (!function_exists('bricks_tracker_should_load_frontend_assets')) {
                 '/tracks',
                 '/racecourses',
                 '/festivals',
+                '/trainer-cycles',
+                '/trainers/',
             ]);
         }
 
@@ -218,6 +220,8 @@ if (!function_exists('bricks_tracker_should_load_frontend_assets')) {
                 'points_today_picks',
                 'daily_sires_insights',
                 'admin_pnl_dashboard',
+                'trainer_cycles_dashboard',
+                'trainer_cycles_profile',
             ]);
         }
 
@@ -235,6 +239,8 @@ if (!function_exists('bricks_tracker_should_load_frontend_assets')) {
             get_query_var('racecourses_region') ||
             get_query_var('festivals_index') ||
             get_query_var('festival_slug') ||
+            get_query_var('fhor_trainer_cycles') ||
+            get_query_var('fhor_trainer_slug') ||
             $has_route_match ||
             $has_shortcode_match
         );
@@ -555,9 +561,13 @@ function bricks_tracker_floating_quick_link() {
         get_query_var('fhor_system_builder') ||
         get_query_var('fhor_my_qualifiers') ||
         get_query_var('fhor_bet_tracker') ||
+        get_query_var('fhor_trainer_cycles') ||
+        get_query_var('fhor_trainer_slug') ||
         (function_exists('fhor_sb_is_request') && fhor_sb_is_request()) ||
         (function_exists('fhor_sb_is_qualifiers_request') && fhor_sb_is_qualifiers_request()) ||
-        (function_exists('fhor_bt_is_request') && fhor_bt_is_request())
+        (function_exists('fhor_bt_is_request') && fhor_bt_is_request()) ||
+        (function_exists('fhor_tc_is_dashboard_request') && fhor_tc_is_dashboard_request()) ||
+        (function_exists('fhor_tc_is_trainer_profile_request') && fhor_tc_is_trainer_profile_request())
     ) {
         return;
     }
@@ -574,6 +584,12 @@ function bricks_tracker_floating_quick_link() {
             <a class="fhor-fab__link fhor-fab__link--picks" href="<?php echo esc_url(home_url('/today-picks/')); ?>" title="Open Today's Picks (audit sheet)">📋 Today's Picks</a>
             <a class="fhor-fab__link fhor-fab__link--backtest" href="<?php echo esc_url(home_url('/points-backtest/')); ?>" title="Open Points Backtest">📊 Points Backtest</a>
             <?php endif; ?>
+            <?php
+            $tc_fab_url = function_exists('fhor_tc_dashboard_url')
+                ? fhor_tc_dashboard_url()
+                : home_url('/trainer-cycles/');
+            ?>
+            <a class="fhor-fab__link fhor-fab__link--trainer-cycles" href="<?php echo esc_url($tc_fab_url); ?>" title="Seasonal hot and cold yards by calendar month">📅 Trainer Cycles</a>
             <a class="fhor-fab__link fhor-fab__link--sires" href="<?php echo esc_url(home_url('/daily_sires_insights/')); ?>" title="Sire PRB form for today's card">🧬 Sire form</a>
             <?php if (current_user_can('manage_options')): ?>
             <a class="fhor-fab__link fhor-fab__link--admin" href="<?php echo esc_url(home_url('/admin-pnl/')); ?>" title="Open Admin P&L">💷 Admin P&amp;L</a>

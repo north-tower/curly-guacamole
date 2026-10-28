@@ -1237,6 +1237,122 @@ if (!function_exists('fhor_tc_menu_item_html')) {
     }
 }
 
+if (!function_exists('fhor_tc_nav_items_contain_trainer_cycles')) {
+    /**
+     * @param array<int, object> $items
+     */
+    function fhor_tc_nav_items_contain_trainer_cycles(array $items) {
+        $dash = fhor_tc_dashboard_url();
+        foreach ($items as $item) {
+            $url = (string) ($item->url ?? '');
+            if ($url === '' || $url === '#') {
+                continue;
+            }
+            if (strpos($url, '/trainer-cycles') !== false || $url === $dash) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('fhor_tc_find_guides_menu_parent')) {
+    /**
+     * Top-level WordPress menu item titled "Guides" (Fhorsite header dropdown).
+     *
+     * @param array<int, object> $items
+     */
+    function fhor_tc_find_guides_menu_parent(array $items) {
+        foreach ($items as $item) {
+            if ((int) ($item->menu_item_parent ?? 0) !== 0) {
+                continue;
+            }
+            $title = strtolower(trim((string) ($item->title ?? '')));
+            if ($title === 'guides') {
+                return $item;
+            }
+        }
+
+        return null;
+    }
+}
+
+if (!function_exists('fhor_tc_guides_submenu_max_order')) {
+    /**
+     * @param array<int, object> $items
+     */
+    function fhor_tc_guides_submenu_max_order(array $items, $parent_id) {
+        $max = 0;
+        foreach ($items as $item) {
+            if ((int) ($item->menu_item_parent ?? 0) === (int) $parent_id) {
+                $max = max($max, (int) ($item->menu_order ?? 0));
+            }
+        }
+
+        return $max;
+    }
+}
+
+if (!function_exists('fhor_tc_register_guides_nav_menu_item')) {
+    /**
+     * Append Trainer Cycles under the GUIDES dropdown (WordPress nav menu).
+     *
+     * @param array<int, object>|false|null $items
+     * @return array<int, object>|false|null
+     */
+    function fhor_tc_register_guides_nav_menu_item($items, $menu, $args) {
+        if (is_admin() || !is_array($items) || $items === []) {
+            return $items;
+        }
+        if (fhor_tc_nav_items_contain_trainer_cycles($items)) {
+            return $items;
+        }
+
+        $guides = fhor_tc_find_guides_menu_parent($items);
+        if ($guides === null) {
+            return $items;
+        }
+
+        $parent_id = (int) $guides->ID;
+        $order = fhor_tc_guides_submenu_max_order($items, $parent_id) + 1;
+
+        $item = new stdClass();
+        $item->ID = 999888771;
+        $item->db_id = $item->ID;
+        $item->menu_item_parent = $parent_id;
+        $item->object_id = $item->ID;
+        $item->post_parent = 0;
+        $item->type = 'custom';
+        $item->object = 'custom';
+        $item->type_label = 'Custom Link';
+        $item->title = __('Trainer Cycles', 'bricks');
+        $item->url = fhor_tc_dashboard_url();
+        $item->target = '';
+        $item->attr_title = __('Seasonal hot and cold yards by calendar month', 'bricks');
+        $item->description = '';
+        $item->classes = [
+            'menu-item',
+            'menu-item-type-custom',
+            'menu-item-object-custom',
+            'menu-item-trainer-cycles',
+        ];
+        if (fhor_tc_is_trainer_cycles_nav_active()) {
+            $item->classes[] = 'current-menu-item';
+            $item->classes[] = 'current-page-item';
+        }
+        $item->xfn = '';
+        $item->status = 'publish';
+        $item->menu_order = $order;
+        $item->post_type = 'nav_menu_item';
+
+        $items[] = $item;
+
+        return $items;
+    }
+}
+add_filter('wp_get_nav_menu_items', 'fhor_tc_register_guides_nav_menu_item', 21, 3);
+
 if (!function_exists('fhor_tc_insert_nav_menu_item')) {
     /**
      * Insert a menu item immediately after the first matching anchor fragment's </li>.
@@ -1265,26 +1381,6 @@ if (!function_exists('fhor_tc_insert_nav_menu_item')) {
         return $items . $li_html;
     }
 }
-
-if (!function_exists('fhor_tc_menu_item')) {
-    function fhor_tc_menu_item($items, $args) {
-        if (is_admin()) {
-            return $items;
-        }
-
-        $dash = fhor_tc_dashboard_url();
-        if (strpos($items, '/trainer-cycles') !== false || strpos($items, $dash) !== false) {
-            return $items;
-        }
-
-        return fhor_tc_insert_nav_menu_item($items, fhor_tc_menu_item_html(), [
-            '/speed/',
-            'quick-reference',
-            'Quick Reference',
-        ]);
-    }
-}
-add_filter('wp_nav_menu_items', 'fhor_tc_menu_item', 19, 2);
 
 if (!function_exists('fhor_tc_slug_index_cache_key')) {
     function fhor_tc_slug_index_cache_key() {

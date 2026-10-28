@@ -156,6 +156,25 @@ tc_eq('race profile code flat', 'flat', fhor_tc_race_profile_code(false));
 tc_assert('trainer link contains slug', strpos(fhor_tc_trainer_link_html('Paul Nicholls', 'jumps'), '/trainers/') !== false);
 tc_assert('trainer link flat query', strpos(fhor_tc_trainer_link_html('Paul Nicholls', 'flat'), 'code=flat') !== false);
 
+$guide_parent = (object) [
+    'ID' => 42,
+    'title' => 'Guides',
+    'menu_item_parent' => 0,
+    'menu_order' => 3,
+    'url' => '#',
+];
+$guide_child = (object) [
+    'ID' => 43,
+    'title' => 'Pace Mapping',
+    'menu_item_parent' => 42,
+    'menu_order' => 7,
+    'url' => home_url('/pace/'),
+];
+$menu_items = fhor_tc_register_guides_nav_menu_item([$guide_parent, $guide_child], null, null);
+tc_assert('guides submenu injects item', is_array($menu_items) && count($menu_items) === 3);
+tc_eq('guides submenu parent', 42, (int) $menu_items[2]->menu_item_parent);
+tc_eq('guides submenu order', 8, (int) $menu_items[2]->menu_order);
+
 $fixture_pool = [
     'ok' => true,
     'code' => 'jumps',
