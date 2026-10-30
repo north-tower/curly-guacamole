@@ -3,6 +3,48 @@
  * Race detail page performance helpers (caching, lazy-load hooks).
  */
 
+if (!function_exists('bricks_normalize_sire_name_key')) {
+    function bricks_normalize_sire_name_key($name) {
+        $name = is_string($name) ? $name : '';
+        // Remove trailing country code in parentheses, e.g., "Galileo (IRE)" -> "Galileo"
+        $name = preg_replace('/\s*\([A-Z]{2,3}\)\s*$/', '', $name);
+        // Collapse multiple spaces and lowercase for key normalization
+        $name = strtolower(trim(preg_replace('/\s+/', ' ', $name)));
+        return $name;
+    }
+}
+
+if (!function_exists('bricks_extract_sire_name')) {
+    function bricks_extract_sire_name($row) {
+        if (!is_object($row)) {
+            return '';
+        }
+        if (isset($row->sire_name) && $row->sire_name !== '') {
+            return trim((string) $row->sire_name);
+        }
+        if (isset($row->sire) && $row->sire !== '') {
+            return trim((string) $row->sire);
+        }
+        return '';
+    }
+}
+
+if (!function_exists('bricks_lin5_quality')) {
+    function bricks_lin5_quality($runs) {
+        $runs = intval($runs);
+        if ($runs >= 100) {
+            return ['label' => 'High', 'class' => 'lin5-quality-high'];
+        }
+        if ($runs >= 30) {
+            return ['label' => 'Med', 'class' => 'lin5-quality-med'];
+        }
+        if ($runs >= 1) {
+            return ['label' => 'Low', 'class' => 'lin5-quality-low'];
+        }
+        return ['label' => 'N/A', 'class' => 'lin5-quality-na'];
+    }
+}
+
 if (!function_exists('bricks_race_detail_resolve_context')) {
     /**
      * Resolve race row + table set (beta vs advance/tomorrow) with per-request cache.
@@ -96,63 +138,49 @@ if (!function_exists('bricks_race_detail_meeting_races_cached')) {
     }
 }
 
+if (!function_exists('bricks_race_detail_lin5_code')) {
+    function bricks_race_detail_lin5_code($is_national_hunt) {
+        return $is_national_hunt ? 'jumps' : 'flat';
+    }
+}
+
+if (!function_exists('bricks_race_detail_lin5_race_type_filter')) {
+    /**
+     * WHERE fragment limiting history to the flat or jumps code. Expects `hracb` / `dracb` aliases.
+     */
+    function bricks_race_detail_lin5_race_type_filter($code = 'flat') {
+        $race_type = 'LOWER(COALESCE(dracb.race_type, hracb.race_type))';
+        $jumps_terms = ['%hurdle%', '%chase%', '%nh%', '%n_h_flat%', '%national hunt%'];
+        $sql = "COALESCE(dracb.race_type, hracb.race_type) IS NOT NULL
+          AND COALESCE(dracb.race_type, hracb.race_type) != ''";
+        if ($code === 'jumps') {
+            $likes = [];
+            foreach ($jumps_terms as $term) {
+                $likes[] = "$race_type LIKE '$term'";
+            }
+            return $sql . "\n          AND (" . implode(' OR ', $likes) . ')';
+        }
+        foreach ($jumps_terms as $term) {
+            $sql .= "\n          AND $race_type NOT LIKE '$term'";
+        }
+        return $sql;
+    }
+}
+
 if (!function_exists('bricks_race_detail_sire_baseline_prb_cached')) {
-    function bricks_race_detail_sire_baseline_prb_cached($from_date, $to_date) {
+    function bricks_race_detail_sire_baseline_prb_cached($from_date, $to_date, $code = 'flat') {
         global $wpdb;
 
-        $cache_key = 'bricks_sire_baseline_' . md5($from_date . '|' . $to_date);
+        $code = ($code === 'jumps') ? 'jumps' : 'flat';
+        $hash = md5($code . '|' . $from_date . '|' . $to_date);
+        $cache_key = 'bricks_sire_baseline_' . $hash;
         $cached = get_transient($cache_key);
         if ($cached !== false && is_numeric($cached)) {
             return floatval($cached);
         }
 
-        $stale_option = 'bricks_sire_baseline_stale_' . md5($from_date . '|' . $to_date);
-        $stale = get_option($stale_option);
-        $refresh_lock = $cache_key . '_refreshing';
-        if ($stale !== false && is_numeric($stale) && !get_transient($refresh_lock)) {
-            set_transient($refresh_lock, 1, 10 * MINUTE_IN_SECONDS);
-            register_shutdown_function(static function () use ($wpdb, $from_date, $to_date, $cache_key, $stale_option, $refresh_lock) {
-                $sire_flat_filter = "
-              COALESCE(dracb.race_type, hracb.race_type) IS NOT NULL
-          AND COALESCE(dracb.race_type, hracb.race_type) != ''
-          AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%hurdle%'
-          AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%chase%'
-          AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%nh%'
-          AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%national hunt%'";
-                $baseline_sql = "
-            SELECT ROUND(AVG((rf.field_size - hrunb.finish_position) / (rf.field_size - 1)) * 100, 1) AS baseline_prb
-            FROM historic_runners_beta hrunb
-            INNER JOIN historic_races_beta hracb ON hracb.race_id = hrunb.race_id
-            LEFT JOIN daily_races_beta dracb ON dracb.race_id = hrunb.race_id
-            INNER JOIN (
-                SELECT race_id, COUNT(*) AS field_size
-                FROM historic_runners_beta
-                WHERE finish_position IS NOT NULL AND finish_position > 0
-                GROUP BY race_id
-                HAVING COUNT(*) > 1
-            ) rf ON rf.race_id = hrunb.race_id
-            WHERE hracb.meeting_date BETWEEN %s AND %s
-              AND MONTH(hracb.meeting_date) BETWEEN 3 AND 10
-              AND $sire_flat_filter";
-                $baseline_prb = $wpdb->get_var($wpdb->prepare($baseline_sql, $from_date, $to_date));
-                if ($baseline_prb !== null && is_numeric($baseline_prb)) {
-                    $val = floatval($baseline_prb);
-                    set_transient($cache_key, $val, DAY_IN_SECONDS);
-                    update_option($stale_option, $val, false);
-                }
-                delete_transient($refresh_lock);
-            });
-            return floatval($stale);
-        }
-
-        $sire_flat_filter = "
-              COALESCE(dracb.race_type, hracb.race_type) IS NOT NULL
-          AND COALESCE(dracb.race_type, hracb.race_type) != ''
-          AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%hurdle%'
-          AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%chase%'
-          AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%nh%'
-          AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%national hunt%'";
-
+        $race_type_filter = bricks_race_detail_lin5_race_type_filter($code);
+        $season_filter = ($code === 'flat') ? 'AND MONTH(hracb.meeting_date) BETWEEN 3 AND 10' : '';
         $baseline_sql = "
             SELECT ROUND(AVG((rf.field_size - hrunb.finish_position) / (rf.field_size - 1)) * 100, 1) AS baseline_prb
             FROM historic_runners_beta hrunb
@@ -166,8 +194,25 @@ if (!function_exists('bricks_race_detail_sire_baseline_prb_cached')) {
                 HAVING COUNT(*) > 1
             ) rf ON rf.race_id = hrunb.race_id
             WHERE hracb.meeting_date BETWEEN %s AND %s
-              AND MONTH(hracb.meeting_date) BETWEEN 3 AND 10
-              AND $sire_flat_filter";
+              $season_filter
+              AND $race_type_filter";
+
+        $stale_option = 'bricks_sire_baseline_stale_' . $hash;
+        $stale = get_option($stale_option);
+        $refresh_lock = $cache_key . '_refreshing';
+        if ($stale !== false && is_numeric($stale) && !get_transient($refresh_lock)) {
+            set_transient($refresh_lock, 1, 10 * MINUTE_IN_SECONDS);
+            register_shutdown_function(static function () use ($wpdb, $baseline_sql, $from_date, $to_date, $cache_key, $stale_option, $refresh_lock) {
+                $baseline_prb = $wpdb->get_var($wpdb->prepare($baseline_sql, $from_date, $to_date));
+                if ($baseline_prb !== null && is_numeric($baseline_prb)) {
+                    $val = floatval($baseline_prb);
+                    set_transient($cache_key, $val, DAY_IN_SECONDS);
+                    update_option($stale_option, $val, false);
+                }
+                delete_transient($refresh_lock);
+            });
+            return floatval($stale);
+        }
 
         $baseline_prb = $wpdb->get_var($wpdb->prepare($baseline_sql, $from_date, $to_date));
         $baseline_prb = ($baseline_prb !== null) ? floatval($baseline_prb) : 50.0;
@@ -266,16 +311,17 @@ if (!function_exists('bricks_race_detail_collect_sire_names')) {
 
 if (!function_exists('bricks_race_detail_pedigree_rows_payload')) {
     /**
-     * Lin5 + dosage enrichment for runner cards (flat races only).
+     * Lin5 + dosage enrichment for runner cards. Lin5 uses flat or jumps sire history to match the race.
      *
      * @param object[] $runners
      * @return array<int, array<string, mixed>>
      */
     function bricks_race_detail_pedigree_rows_payload($race_id, array $runners, array $speed_ratings_lookup, $is_national_hunt) {
-        if ($is_national_hunt || empty($runners)) {
+        if (empty($runners)) {
             return [];
         }
 
+        $lin5_code = bricks_race_detail_lin5_code($is_national_hunt);
         $sire_backtest_to = date('Y-m-d', strtotime('-1 day'));
         $sire_backtest_from = date('Y-m-d', strtotime('-5 years', strtotime($sire_backtest_to)));
 
@@ -286,13 +332,14 @@ if (!function_exists('bricks_race_detail_pedigree_rows_payload')) {
         $sire_names = bricks_race_detail_collect_sire_names($runners, $speed_ratings);
         $sire_5y_lookup = [];
         if (!empty($sire_names)) {
-            $baseline_prb = bricks_race_detail_sire_baseline_prb_cached($sire_backtest_from, $sire_backtest_to);
+            $baseline_prb = bricks_race_detail_sire_baseline_prb_cached($sire_backtest_from, $sire_backtest_to, $lin5_code);
             $sire_5y_lookup = bricks_race_detail_lin5_lookup_cached(
                 $sire_names,
                 $sire_backtest_from,
                 $sire_backtest_to,
                 $baseline_prb,
-                30.0
+                30.0,
+                $lin5_code
             );
         }
 
@@ -511,11 +558,11 @@ if (!function_exists('bricks_race_detail_lin5_merge_entry')) {
 }
 
 if (!function_exists('bricks_race_detail_lin5_sire_transient_key')) {
-    function bricks_race_detail_lin5_sire_transient_key($sire_name, $from_date, $to_date) {
+    function bricks_race_detail_lin5_sire_transient_key($sire_name, $from_date, $to_date, $code = 'flat') {
         $norm = function_exists('bricks_normalize_sire_name_key')
             ? bricks_normalize_sire_name_key($sire_name)
             : strtolower(trim((string) $sire_name));
-        return 'bricks_lin5_sire_v2_' . md5($from_date . '|' . $to_date . '|' . $norm);
+        return 'bricks_lin5_sire_v3_' . md5($code . '|' . $from_date . '|' . $to_date . '|' . $norm);
     }
 }
 
@@ -523,14 +570,20 @@ if (!function_exists('bricks_race_detail_lin5_rows_to_lookup')) {
     /**
      * @return array<string, array>
      */
-    function bricks_race_detail_lin5_rows_to_lookup($rows, $baseline_prb, $shrink_k) {
+    function bricks_race_detail_lin5_rows_to_lookup($rows, $baseline_prb, $shrink_k, $code = 'flat') {
         $sire_5y_lookup = [];
-        $level_defs = [
-            4 => ['runs' => 'lvl4_runs', 'prb' => 'lvl4_raw_prb', 'context' => 'All Flat'],
-            3 => ['runs' => 'lvl3_runs', 'prb' => 'lvl3_raw_prb', 'context' => 'Mar-Oct, any dist'],
-            2 => ['runs' => 'lvl2_runs', 'prb' => 'lvl2_raw_prb', 'context' => 'Mar-Jun, any dist'],
-            1 => ['runs' => 'lvl1_runs', 'prb' => 'lvl1_raw_prb', 'context' => 'Mar-Jun, 5-6f'],
-        ];
+        if ($code === 'jumps') {
+            $level_defs = [
+                4 => ['runs' => 'lvl4_runs', 'prb' => 'lvl4_raw_prb', 'context' => 'All Jumps'],
+            ];
+        } else {
+            $level_defs = [
+                4 => ['runs' => 'lvl4_runs', 'prb' => 'lvl4_raw_prb', 'context' => 'All Flat'],
+                3 => ['runs' => 'lvl3_runs', 'prb' => 'lvl3_raw_prb', 'context' => 'Mar-Oct, any dist'],
+                2 => ['runs' => 'lvl2_runs', 'prb' => 'lvl2_raw_prb', 'context' => 'Mar-Jun, any dist'],
+                1 => ['runs' => 'lvl1_runs', 'prb' => 'lvl1_raw_prb', 'context' => 'Mar-Jun, 5-6f'],
+            ];
+        }
 
         if (empty($rows)) {
             return $sire_5y_lookup;
@@ -583,7 +636,7 @@ if (!function_exists('bricks_race_detail_lin5_lookup_cached')) {
      *
      * @return array<string, array{runs:int, raw_prb_pct:float, context:string}>
      */
-    function bricks_race_detail_lin5_lookup_cached(array $sire_names, $from_date, $to_date, $baseline_prb, $shrink_k = 30.0) {
+    function bricks_race_detail_lin5_lookup_cached(array $sire_names, $from_date, $to_date, $baseline_prb, $shrink_k = 30.0, $code = 'flat') {
         global $wpdb;
 
         $sire_names = array_values(array_unique(array_filter(array_map('strval', $sire_names))));
@@ -591,6 +644,7 @@ if (!function_exists('bricks_race_detail_lin5_lookup_cached')) {
             return [];
         }
 
+        $code = ($code === 'jumps') ? 'jumps' : 'flat';
         $from_date = (string) $from_date;
         $to_date = (string) $to_date;
         $baseline_prb = floatval($baseline_prb);
@@ -600,7 +654,8 @@ if (!function_exists('bricks_race_detail_lin5_lookup_cached')) {
             return [];
         }
 
-        $lin5_cache_key = 'bricks_lin5_' . md5(wp_json_encode([
+        $lin5_cache_key = 'bricks_lin5_v3_' . md5(wp_json_encode([
+            'code' => $code,
             'from' => $from_date,
             'to' => $to_date,
             'sire_names' => $sql_sire_names,
@@ -613,7 +668,7 @@ if (!function_exists('bricks_race_detail_lin5_lookup_cached')) {
         $sire_5y_lookup = [];
         $missing_sires = [];
         foreach ($sql_sire_names as $sql_sire_name) {
-            $sire_transient = get_transient(bricks_race_detail_lin5_sire_transient_key($sql_sire_name, $from_date, $to_date));
+            $sire_transient = get_transient(bricks_race_detail_lin5_sire_transient_key($sql_sire_name, $from_date, $to_date, $code));
             if (is_array($sire_transient) && isset($sire_transient['entry']) && is_array($sire_transient['entry'])) {
                 bricks_race_detail_lin5_merge_entry($sire_5y_lookup, $sql_sire_name, $sire_transient['entry']);
             } else {
@@ -628,13 +683,7 @@ if (!function_exists('bricks_race_detail_lin5_lookup_cached')) {
 
         $sire_names = $missing_sires;
         $sire_placeholders = implode(',', array_fill(0, count($sire_names), '%s'));
-        $sire_flat_filter = "
-              COALESCE(dracb.race_type, hracb.race_type) IS NOT NULL
-          AND COALESCE(dracb.race_type, hracb.race_type) != ''
-          AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%hurdle%'
-          AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%chase%'
-          AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%nh%'
-          AND LOWER(COALESCE(dracb.race_type, hracb.race_type)) NOT LIKE '%national hunt%'";
+        $race_type_filter = bricks_race_detail_lin5_race_type_filter($code);
 
         $prb_expr = '((rf.field_size - hrunb.finish_position) / (rf.field_size - 1)) * 100';
         $combined_sql = "
@@ -664,13 +713,13 @@ if (!function_exists('bricks_race_detail_lin5_lookup_cached')) {
               AND hrunb.finish_position > 0
               AND rf.field_size > 1
               AND hracb.meeting_date BETWEEN %s AND %s
-              AND $sire_flat_filter
+              AND $race_type_filter
             GROUP BY hrunb.sire_name";
 
         $params = array_merge($sire_names, [$from_date, $to_date]);
         $rows = $wpdb->get_results($wpdb->prepare($combined_sql, ...$params));
 
-        $fresh_lookup = bricks_race_detail_lin5_rows_to_lookup($rows, $baseline_prb, $shrink_k);
+        $fresh_lookup = bricks_race_detail_lin5_rows_to_lookup($rows, $baseline_prb, $shrink_k, $code);
         foreach ($missing_sires as $sql_sire_name) {
             $norm = function_exists('bricks_normalize_sire_name_key')
                 ? bricks_normalize_sire_name_key($sql_sire_name)
@@ -687,7 +736,7 @@ if (!function_exists('bricks_race_detail_lin5_lookup_cached')) {
                 continue;
             }
             set_transient(
-                bricks_race_detail_lin5_sire_transient_key($sql_sire_name, $from_date, $to_date),
+                bricks_race_detail_lin5_sire_transient_key($sql_sire_name, $from_date, $to_date, $code),
                 ['entry' => $entry],
                 DAY_IN_SECONDS
             );

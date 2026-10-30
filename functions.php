@@ -1859,7 +1859,7 @@ function bricks_race_detail_shortcode($atts) {
     }
     
     $race_show_premium_data = bricks_race_detail_can_view_premium();
-    $race_pedigree_deferred = ($race_show_premium_data && !$is_national_hunt);
+    $race_pedigree_deferred = $race_show_premium_data;
     
     // Check if this is tomorrow's race
     $is_tomorrow_race = ($race->meeting_date === $tomorrow);
@@ -1995,45 +1995,6 @@ if ($race_show_premium_data) {
 $sire_backtest_to = date('Y-m-d', strtotime('-1 day'));
 $sire_backtest_from = date('Y-m-d', strtotime('-5 years', strtotime($sire_backtest_to)));
 $sire_names = [];
-if (!function_exists('bricks_normalize_sire_name_key')) {
-    function bricks_normalize_sire_name_key($name) {
-        $name = is_string($name) ? $name : '';
-        // Remove trailing country code in parentheses, e.g., "Galileo (IRE)" -> "Galileo"
-        $name = preg_replace('/\s*\([A-Z]{2,3}\)\s*$/', '', $name);
-        // Collapse multiple spaces and lowercase for key normalization
-        $name = strtolower(trim(preg_replace('/\s+/', ' ', $name)));
-        return $name;
-    }
-}
-if (!function_exists('bricks_extract_sire_name')) {
-    function bricks_extract_sire_name($row) {
-        if (!is_object($row)) {
-            return '';
-        }
-        if (isset($row->sire_name) && $row->sire_name !== '') {
-            return trim((string) $row->sire_name);
-        }
-        if (isset($row->sire) && $row->sire !== '') {
-            return trim((string) $row->sire);
-        }
-        return '';
-    }
-}
-if (!function_exists('bricks_lin5_quality')) {
-    function bricks_lin5_quality($runs) {
-        $runs = intval($runs);
-        if ($runs >= 100) {
-            return ['label' => 'High', 'class' => 'lin5-quality-high'];
-        }
-        if ($runs >= 30) {
-            return ['label' => 'Med', 'class' => 'lin5-quality-med'];
-        }
-        if ($runs >= 1) {
-            return ['label' => 'Low', 'class' => 'lin5-quality-low'];
-        }
-        return ['label' => 'N/A', 'class' => 'lin5-quality-na'];
-    }
-}
 if (!empty($speed_ratings)) {
     foreach ($speed_ratings as $rating) {
         $raw = bricks_extract_sire_name($rating);
@@ -2068,14 +2029,16 @@ if (!empty($runners)) {
 }
 $sire_names = array_values(array_unique(array_filter($sire_names)));
 bricks_debug_log('Race Detail Debug - Sire names candidate count: ' . count($sire_names));
-if (!$is_national_hunt && !$race_pedigree_deferred && !empty($sire_names)) {
-    $baseline_prb = bricks_race_detail_sire_baseline_prb_cached($sire_backtest_from, $sire_backtest_to);
+if (!$race_pedigree_deferred && !empty($sire_names)) {
+    $lin5_code = bricks_race_detail_lin5_code($is_national_hunt);
+    $baseline_prb = bricks_race_detail_sire_baseline_prb_cached($sire_backtest_from, $sire_backtest_to, $lin5_code);
     $sire_5y_lookup = bricks_race_detail_lin5_lookup_cached(
         $sire_names,
         $sire_backtest_from,
         $sire_backtest_to,
         $baseline_prb,
-        30.0
+        30.0,
+        $lin5_code
     );
 }
 
@@ -4031,7 +3994,7 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
     <div class="lin5-legend">
         <strong style="color:#374151;">Legend:</strong>
         <strong style="color:#111827;">Lin5</strong> = Lineage 5Y signal (internal): sire PRB% in the locked backtest scope
-        (last 5 years to yesterday, Flat races, Mar-Oct).
+        (last 5 years to yesterday, <?php echo $is_national_hunt ? 'Jumps races: hurdles, chases and NH flat' : 'Flat races'; ?>).
         <br>
         <span title="PRB% = percentage of rivals beaten by horses from the same sire line. Higher is better.">
             <strong style="color:#111827;">How to read it:</strong> the % shows how often that sire line beats rivals (higher = better).
@@ -4105,7 +4068,7 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
 <?php if ($show_maturity_edge): ?>
 <th class="sortable" tabindex="0" data-sort="number" data-column="maturity_edge" title="Maturity Edge Rating">Mat <span class="sort-arrow"></span></th>
 <?php endif; ?>
-<th class="sortable" tabindex="0" data-sort="number" data-column="sire_5y" title="Lineage 5Y: sire PRB% in locked window (last 5 years to yesterday), Flat, Mar-Oct">Lin5 <span class="sort-arrow"></span></th>
+<th class="sortable" tabindex="0" data-sort="number" data-column="sire_5y" title="Lineage 5Y: sire PRB% in locked window (last 5 years to yesterday), <?php echo $is_national_hunt ? 'Jumps' : 'Flat'; ?>">Lin5 <span class="sort-arrow"></span></th>
 <th class="sortable" tabindex="0" data-sort="number" data-column="dosage_di" title="Dosage Index and Center of Distribution from 4-generation Chefs-de-Race scoring">DI/CD <span class="sort-arrow"></span></th>
 <th class="sortable" tabindex="0" data-sort="number" data-column="cls" title="Class Change from Last Run">Cls <span class="sort-arrow"></span></th>
 <th class="sortable" tabindex="0" data-sort="number" data-column="or_diff" title="Official Rating Difference from Last Run">OR+/- <span class="sort-arrow"></span></th>
