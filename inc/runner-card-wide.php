@@ -145,6 +145,7 @@ if (!defined('ABSPATH')) {
                                                     echo esc_html($runner->trainer_name ?: 'N/A');
                                                 }
                                             ?></b></div>
+                                            <div class="runner-card-kv"><span>Owner</span><b><?php echo esc_html($owner_name); ?></b></div>
                                             <div class="runner-card-kv"><span>Course 5Y</span><b><?php echo esc_html($trainer_course_kv); ?></b></div>
                                             <div class="runner-card-kv"><span>RTF</span><b class="<?php echo (floatval(str_replace('%', '', $rft_percentage)) >= 40) ? 'green-text' : ''; ?>"><?php echo esc_html($rft_percentage); ?></b></div>
                                         </section>

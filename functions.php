@@ -1275,6 +1275,37 @@ if (!function_exists('bricks_points_format_finish_position')) {
     }
 }
 
+if (!function_exists('bricks_race_detail_sr_history_position')) {
+    /**
+     * Finish position for speed-rating history cards (LTO + last five runs).
+     *
+     * @param object|null $speed_data Row from speed&performance_table.
+     * @param string      $field      e.g. position_LTO, position_2.
+     */
+    function bricks_race_detail_sr_history_position($speed_data, $field) {
+        if (!$speed_data || !is_object($speed_data) || !isset($speed_data->$field)) {
+            return '-';
+        }
+        $raw = $speed_data->$field;
+        if ($raw === '' || $raw === null) {
+            return '-';
+        }
+        return bricks_points_format_finish_position($raw);
+    }
+}
+
+if (!function_exists('bricks_race_detail_sr_history_position_win_class')) {
+    function bricks_race_detail_sr_history_position_win_class($speed_data, $field) {
+        if (!$speed_data || !is_object($speed_data) || !isset($speed_data->$field)) {
+            return '';
+        }
+        if (!function_exists('bricks_points_finish_is_win')) {
+            return '';
+        }
+        return bricks_points_finish_is_win($speed_data->$field) ? 'green-text' : '';
+    }
+}
+
 if (!function_exists('bricks_points_finish_is_placed')) {
     function bricks_points_finish_is_placed($finish_position, $place_terms) {
         $fp = strtolower(trim((string) $finish_position));
@@ -4113,6 +4144,13 @@ if (function_exists('bricks_debug_enabled') && bricks_debug_enabled() && $race_s
                             if (isset($speed_ratings_lookup[$runner->name])) {
                                 $speed_data = $speed_ratings_lookup[$runner->name];
                             }
+
+                            $owner_name = '—';
+                            if ($speed_data && isset($speed_data->owner_name) && trim((string) $speed_data->owner_name) !== '') {
+                                $owner_name = trim((string) $speed_data->owner_name);
+                            } elseif (isset($runner->owner_name) && trim((string) $runner->owner_name) !== '') {
+                                $owner_name = trim((string) $runner->owner_name);
+                            }
                             
                             // Extract all the data fields from speed_data
                             $stall_number = $runner->stall_number ?: '';
@@ -4189,6 +4227,13 @@ if ($speed_data) {
                             $going_4 = $speed_data ? (isset($speed_data->going_3) && $speed_data->going_3 !== '' ? $speed_data->going_3 : '-') : '-';
                             $going_5 = $speed_data ? (isset($speed_data->going_4) && $speed_data->going_4 !== '' ? $speed_data->going_4 : '-') : '-';
                             $going_6 = $speed_data ? (isset($speed_data->going_5) && $speed_data->going_5 !== '' ? $speed_data->going_5 : '-') : '-';
+
+                            $pos_lto = bricks_race_detail_sr_history_position($speed_data, 'position_LTO');
+                            $pos_2 = bricks_race_detail_sr_history_position($speed_data, 'position_2');
+                            $pos_3 = bricks_race_detail_sr_history_position($speed_data, 'position_3');
+                            $pos_4 = bricks_race_detail_sr_history_position($speed_data, 'position_4');
+                            $pos_5 = bricks_race_detail_sr_history_position($speed_data, 'position_5');
+                            $pos_6 = bricks_race_detail_sr_history_position($speed_data, 'position_6');
                             
                             // Additional data fields
                             $rft_percentage = $speed_data ? (isset($speed_data->TnrRTPPct14d) ? round($speed_data->TnrRTPPct14d, 1) . '%' : '-') : '-';
@@ -4454,6 +4499,10 @@ if ($speed_data) {
                         <span class="runner-sr-card__key">Going:</span>
                         <span class="runner-sr-card__val"><?php echo esc_html($going_lto); ?></span>
                     </div>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Pos:</span>
+                        <span class="runner-sr-card__val <?php echo esc_attr(bricks_race_detail_sr_history_position_win_class($speed_data, 'position_LTO')); ?>"><?php echo esc_html($pos_lto); ?></span>
+                    </div>
                 </div>
                 
                 <!-- 2nd Last Run -->
@@ -4474,6 +4523,10 @@ if ($speed_data) {
                     <div class="runner-sr-card__row">
                         <span class="runner-sr-card__key">Going:</span>
                         <span class="runner-sr-card__val"><?php echo esc_html($going_2); ?></span>
+                    </div>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Pos:</span>
+                        <span class="runner-sr-card__val <?php echo esc_attr(bricks_race_detail_sr_history_position_win_class($speed_data, 'position_2')); ?>"><?php echo esc_html($pos_2); ?></span>
                     </div>
                 </div>
                 
@@ -4496,6 +4549,10 @@ if ($speed_data) {
                         <span class="runner-sr-card__key">Going:</span>
                         <span class="runner-sr-card__val"><?php echo esc_html($going_3); ?></span>
                     </div>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Pos:</span>
+                        <span class="runner-sr-card__val <?php echo esc_attr(bricks_race_detail_sr_history_position_win_class($speed_data, 'position_3')); ?>"><?php echo esc_html($pos_3); ?></span>
+                    </div>
                 </div>
                 
                 <!-- 4th Last Run -->
@@ -4516,6 +4573,10 @@ if ($speed_data) {
                     <div class="runner-sr-card__row">
                         <span class="runner-sr-card__key">Going:</span>
                         <span class="runner-sr-card__val"><?php echo esc_html($going_4); ?></span>
+                    </div>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Pos:</span>
+                        <span class="runner-sr-card__val <?php echo esc_attr(bricks_race_detail_sr_history_position_win_class($speed_data, 'position_4')); ?>"><?php echo esc_html($pos_4); ?></span>
                     </div>
                 </div>
                 
@@ -4538,6 +4599,10 @@ if ($speed_data) {
                         <span class="runner-sr-card__key">Going:</span>
                         <span class="runner-sr-card__val"><?php echo esc_html($going_5); ?></span>
                     </div>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Pos:</span>
+                        <span class="runner-sr-card__val <?php echo esc_attr(bricks_race_detail_sr_history_position_win_class($speed_data, 'position_5')); ?>"><?php echo esc_html($pos_5); ?></span>
+                    </div>
                 </div>
                 
                 <!-- 6th Last Run -->
@@ -4558,6 +4623,10 @@ if ($speed_data) {
                     <div class="runner-sr-card__row">
                         <span class="runner-sr-card__key">Going:</span>
                         <span class="runner-sr-card__val"><?php echo esc_html($going_6); ?></span>
+                    </div>
+                    <div class="runner-sr-card__row">
+                        <span class="runner-sr-card__key">Pos:</span>
+                        <span class="runner-sr-card__val <?php echo esc_attr(bricks_race_detail_sr_history_position_win_class($speed_data, 'position_6')); ?>"><?php echo esc_html($pos_6); ?></span>
                     </div>
                 </div>
             </div>
