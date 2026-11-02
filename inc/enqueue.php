@@ -277,11 +277,22 @@ function bricks_tracker_enqueue_scripts() {
         return;
     }
 
+    $tracker_css = get_stylesheet_directory() . '/tracker-premium.css';
+    if (file_exists($tracker_css)) {
+        wp_enqueue_style(
+            'fhor-tracker-premium',
+            get_stylesheet_directory_uri() . '/tracker-premium.css',
+            ['fhor-ui'],
+            (string) filemtime($tracker_css)
+        );
+    }
+
     wp_enqueue_script('jquery');
     wp_localize_script('jquery', 'bricks_tracker_obj', [
         'ajax_url' => admin_url('admin-ajax.php'),
         'is_logged_in' => is_user_logged_in(),
-        'tracker_nonce' => wp_create_nonce('bricks_tracker_nonce')
+        'tracker_nonce' => wp_create_nonce('bricks_tracker_nonce'),
+        'quote_sources' => function_exists('fhor_tracker_quote_sources') ? fhor_tracker_quote_sources() : [],
     ]);
 }
 add_action('wp_enqueue_scripts', 'bricks_tracker_enqueue_scripts', 30);

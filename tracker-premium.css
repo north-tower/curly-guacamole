@@ -1,0 +1,290 @@
+/**
+ * My Tracker — premium UI (aligned with race detail tokens).
+ */
+
+.fhor-tracker-page {
+  --rd-bg: #f4f6fa;
+  --rd-s1: #ffffff;
+  --rd-s2: #eef2f8;
+  --rd-line: #dbe2ee;
+  --rd-tx: #111827;
+  --rd-mu: #5b667a;
+  --rd-ac: #2fd08a;
+  --rd-ac2: #4c8dff;
+  --fhor-bg: var(--rd-bg);
+  --fhor-surface: var(--rd-s1);
+  --fhor-surface-muted: var(--rd-s2);
+  --fhor-ink: var(--rd-tx);
+  --fhor-ink-muted: var(--rd-mu);
+  --fhor-border: var(--rd-line);
+  --fhor-primary: var(--rd-ac2);
+  --fhor-accent: var(--rd-ac);
+  box-sizing: border-box;
+  background: var(--fhor-bg);
+  color: var(--fhor-ink);
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  min-height: 40vh;
+  padding-bottom: calc(24px + var(--fhor-fab-clearance, 72px));
+}
+
+.fhor-tracker-page .my-tracker-dashboard {
+  max-width: 1280px;
+}
+
+.fhor-tracker-page .my-tracker-header h1 {
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 6px;
+}
+
+.fhor-tracker-page .my-tracker-header p {
+  margin: 0;
+  color: var(--fhor-ink-muted);
+  font-size: 14px;
+}
+
+.fhor-tracker-login-card {
+  max-width: 560px;
+  margin: 40px auto;
+  padding: 24px;
+  background: var(--fhor-surface);
+  border: 1px solid var(--fhor-border);
+  border-radius: var(--fhor-radius-sm, 10px);
+  box-shadow: var(--fhor-shadow-soft);
+}
+
+.fhor-tracker-login-card h2 {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+}
+
+.fhor-tracker-login-card p {
+  margin: 0;
+  color: var(--fhor-ink-muted);
+  font-size: 14px;
+}
+
+/* Inline widget */
+.tracker-inline-widget {
+  margin-top: 6px;
+  width: 100%;
+}
+
+.tracker-inline-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.fhor-tracker-toggle-btn,
+.fhor-tracker-save-btn {
+  border: 1px solid var(--fhor-border);
+  border-radius: 10px;
+  background: var(--fhor-surface-muted);
+  color: var(--fhor-ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 10px;
+  line-height: 1.2;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.fhor-tracker-toggle-btn:hover,
+.fhor-tracker-save-btn:hover {
+  background: var(--fhor-surface);
+  border-color: var(--fhor-primary);
+  color: var(--fhor-ink);
+}
+
+.fhor-tracker-save-btn {
+  background: color-mix(in srgb, var(--fhor-primary) 12%, var(--fhor-surface));
+  border-color: color-mix(in srgb, var(--fhor-primary) 35%, var(--fhor-border));
+  margin-top: 10px;
+  width: 100%;
+}
+
+.fhor-tracker-panel {
+  margin-top: 8px;
+  border: 1px solid var(--fhor-border);
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--fhor-surface);
+  box-shadow: var(--fhor-shadow-soft);
+}
+
+.fhor-tracker-notes-list {
+  max-height: 220px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.fhor-tracker-note-item {
+  border-bottom: 1px solid var(--fhor-border);
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+}
+
+.fhor-tracker-note-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.fhor-tracker-note-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.fhor-tracker-note-meta {
+  color: var(--fhor-ink-muted);
+  font-size: 11px;
+  flex: 1 1 100%;
+}
+
+.fhor-tracker-type-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--fhor-border);
+  color: var(--fhor-ink-muted);
+  background: var(--fhor-surface-muted);
+}
+
+.fhor-tracker-type-pill--quote {
+  border-color: color-mix(in srgb, var(--fhor-primary) 40%, var(--fhor-border));
+  color: var(--fhor-primary);
+  background: color-mix(in srgb, var(--fhor-primary) 8%, var(--fhor-surface));
+}
+
+.fhor-tracker-note-body {
+  font-size: 12px;
+  color: var(--fhor-ink);
+  margin-bottom: 6px;
+  white-space: normal;
+  line-height: 1.45;
+}
+
+.fhor-tracker-note-body--quote {
+  font-style: italic;
+}
+
+.fhor-tracker-note-footer {
+  font-size: 11px;
+  color: var(--fhor-ink-muted);
+  margin-bottom: 6px;
+}
+
+.fhor-tracker-delete-btn {
+  border: 1px solid var(--fhor-border);
+  border-radius: 8px;
+  background: transparent;
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.fhor-tracker-delete-btn:hover {
+  background: #fff7ed;
+  border-color: #fdba74;
+}
+
+.fhor-tracker-flag {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fhor-ink-muted);
+  line-height: 1.4;
+}
+
+.fhor-tracker-flag__label {
+  font-weight: 700;
+  color: var(--fhor-ink);
+}
+
+.fhor-tracker-flag__quote {
+  font-style: italic;
+}
+
+.fhor-tracker-guest-message,
+.fhor-tracker-empty {
+  color: var(--fhor-ink-muted);
+  font-size: 12px;
+}
+
+.fhor-tracker-composer {
+  border-top: 1px solid var(--fhor-border);
+  padding-top: 10px;
+}
+
+.fhor-tracker-kind-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fhor-tracker-kind-toggle label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  color: var(--fhor-ink-muted);
+}
+
+.fhor-tracker-kind-toggle input:checked + span,
+.fhor-tracker-kind-toggle label:has(input:checked) {
+  color: var(--fhor-ink);
+}
+
+.fhor-tracker-quote-fields {
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.fhor-tracker-quote-fields.is-visible {
+  display: flex;
+}
+
+.fhor-tracker-trainer-input,
+.fhor-tracker-source-select,
+.fhor-tracker-note-input {
+  width: 100%;
+  border: 1px solid var(--fhor-border);
+  border-radius: 8px;
+  padding: 7px 8px;
+  font-size: 12px;
+  background: var(--fhor-surface);
+  color: var(--fhor-ink);
+  box-sizing: border-box;
+}
+
+.fhor-tracker-note-input {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.fhor-tracker-type-summary {
+  font-size: 12px;
+  color: var(--fhor-ink-muted);
+}
+
+.my-tracker-table .fhor-tracker-note-item {
+  text-align: left;
+}

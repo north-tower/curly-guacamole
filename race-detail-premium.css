@@ -653,6 +653,27 @@
   line-height: 1.2 !important;
 }
 
+.fhor-race-premium .fhor-tracker-widget {
+  --fhor-bg: var(--rd-bg);
+  --fhor-surface: var(--rd-s1);
+  --fhor-surface-muted: var(--rd-s2);
+  --fhor-ink: var(--rd-tx);
+  --fhor-ink-muted: var(--rd-mu);
+  --fhor-border: var(--rd-line);
+  --fhor-primary: var(--rd-ac2);
+  --fhor-accent: var(--rd-ac);
+}
+
+.fhor-race-premium .fhor-tracker-panel {
+  background: var(--rd-s1);
+  border-color: var(--rd-line);
+}
+
+.fhor-race-premium .fhor-tracker-save-btn {
+  background: color-mix(in srgb, var(--rd-ac2) 14%, var(--rd-s1));
+  border-color: color-mix(in srgb, var(--rd-ac2) 35%, var(--rd-line));
+}
+
 .fhor-race-premium .runner-card-wide__body {
   display: flex;
   flex-direction: column;

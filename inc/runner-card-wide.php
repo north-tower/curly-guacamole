@@ -54,6 +54,7 @@ if (!defined('ABSPATH')) {
                                                 'race_date' => $race_date,
                                                 'race_time' => isset($race->Time) ? $race->Time : '',
                                                 'course' => isset($race->course) ? $race->course : '',
+                                                'trainer_name' => isset($runner->trainer_name) ? (string) $runner->trainer_name : '',
                                                 'forecast_odds' => is_string($odds ?? null) ? $odds : (isset($odds) ? (string) $odds : ''),
                                             ],
                                             [

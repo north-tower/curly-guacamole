@@ -65,7 +65,7 @@ SELECT
     last_winner_distance_winner,
     last_winner_candd_winner,
     last_winner_beaten_favourite
-FROM advance_daily_races_beta adracb
+FROM advance_daily_races adracb
 LEFT JOIN (SELECT course, country, race_type_id, race_code, profile, general_features, specific_features, direction, straight_track_up_to,
 IF(race_type = 'National_Hunt_Flat', 'N_H_Flat', race_type) AS race_type
 FROM course_features) cf ON(cf.course = adracb.course AND cf.country = adracb.country AND cf.race_type = IF(adracb.race_type = 'Flat' AND adracb.track_type != 'Turf', 'All Weather Flat', adracb.race_type))

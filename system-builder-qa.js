@@ -34,7 +34,19 @@
                     var lines = [(data.ok ? 'PASS' : 'FAIL') + ' — all server checks'];
                     (data.tests || []).forEach(function (t) {
                         lines.push((t.ok ? '  ok ' : '  FAIL ') + t.name);
-                        if (!t.ok && t.detail) {
+                        if (t.detail && t.detail.tomorrow !== undefined) {
+                            lines.push('       today ' + t.detail.today + ': declared ' + t.detail.today_declared +
+                                ', speed rows ' + t.detail.today_speed_rows);
+                            lines.push('       tomorrow ' + t.detail.tomorrow + ': declared ' + t.detail.tomorrow_declared +
+                                ', adv speed rows ' + t.detail.tomorrow_speed_rows);
+                            if (t.detail.note) {
+                                lines.push('       ' + t.detail.note);
+                            } else if (t.detail.issues && t.detail.issues.length) {
+                                t.detail.issues.forEach(function (issue) {
+                                    lines.push('       · ' + issue);
+                                });
+                            }
+                        } else if (!t.ok && t.detail) {
                             lines.push('       ' + JSON.stringify(t.detail));
                         }
                     });

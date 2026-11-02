@@ -135,8 +135,8 @@ BEGIN
 		`adracb`.`last_winner_jockey` AS `last_winner_jockey`
 	FROM `adv_dailyracecard14` `adrc`
 		LEFT JOIN `adv_speed_analysis` `asa` ON (`adrc`.`runner_id` = `asa`.`runner_id`)
-		LEFT JOIN `advance_daily_races_beta` `adracb` ON (`adracb`.`race_id` = `adrc`.`race_id`)
-		LEFT JOIN `advance_daily_runners_beta` `adrunb` ON ((`adracb`.`race_id` = `adrunb`.`race_id`) AND (`adrc`.`runner_id` = `adrunb`.`runner_id`))
+		LEFT JOIN `advance_daily_races` `adracb` ON (`adracb`.`race_id` = `adrc`.`race_id`)
+		LEFT JOIN `advance_daily_runners` `adrunb` ON ((`adracb`.`race_id` = `adrunb`.`race_id`) AND (`adrc`.`runner_id` = `adrunb`.`runner_id`))
 		LEFT JOIN `adv_daily_comment_ratings` `adcr` ON (`adrc`.`runner_id` = `adcr`.`runner_id`)
 		LEFT JOIN `daily_runners_insights` `dri` ON ((`dri`.`race_id` = `adracb`.`race_id`) AND (`dri`.`runner_id` = `adrc`.`runner_id`))
 		LEFT JOIN `draw_bias` `db` ON ((`adrc`.`course` = `db`.`course`)

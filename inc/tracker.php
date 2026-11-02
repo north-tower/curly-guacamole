@@ -43,6 +43,182 @@ if (!function_exists('bricks_tracker_set_user_data')) {
     }
 }
 
+if (!function_exists('fhor_tracker_note_kinds')) {
+    function fhor_tracker_note_kinds() {
+        return ['note', 'trainer_quote'];
+    }
+}
+
+if (!function_exists('fhor_tracker_quote_sources')) {
+    function fhor_tracker_quote_sources() {
+        return [
+            'TV',
+            'Newspaper',
+            'Trainer website',
+            'Podcast / radio',
+            'Stable / social',
+            'Other',
+        ];
+    }
+}
+
+if (!function_exists('fhor_tracker_sanitize_kind')) {
+    function fhor_tracker_sanitize_kind($kind) {
+        $kind = sanitize_key((string) $kind);
+        return $kind === 'trainer_quote' ? 'trainer_quote' : 'note';
+    }
+}
+
+if (!function_exists('fhor_tracker_sanitize_source')) {
+    function fhor_tracker_sanitize_source($source, $kind) {
+        if ($kind !== 'trainer_quote') {
+            return '';
+        }
+        $source = sanitize_text_field((string) $source);
+        return in_array($source, fhor_tracker_quote_sources(), true) ? $source : '';
+    }
+}
+
+if (!function_exists('fhor_tracker_sanitize_trainer_name')) {
+    function fhor_tracker_sanitize_trainer_name($trainer_name) {
+        $trainer_name = sanitize_text_field((string) $trainer_name);
+        if (strlen($trainer_name) > 100) {
+            $trainer_name = substr($trainer_name, 0, 100);
+        }
+        return $trainer_name;
+    }
+}
+
+if (!function_exists('fhor_tracker_get_entry_kind')) {
+    function fhor_tracker_get_entry_kind($entry) {
+        if (!is_array($entry)) {
+            return 'note';
+        }
+        return fhor_tracker_sanitize_kind($entry['kind'] ?? 'note');
+    }
+}
+
+if (!function_exists('bricks_tracker_sort_notes_newest')) {
+    function bricks_tracker_sort_notes_newest(array $notes) {
+        usort($notes, function ($a, $b) {
+            $a_ts = !empty($a['created_at']) ? strtotime($a['created_at']) : 0;
+            $b_ts = !empty($b['created_at']) ? strtotime($b['created_at']) : 0;
+            return $b_ts <=> $a_ts;
+        });
+        return $notes;
+    }
+}
+
+if (!function_exists('bricks_tracker_pick_latest_for_context')) {
+    function bricks_tracker_pick_latest_for_context(array $notes, $race_meta = []) {
+        if (empty($notes)) {
+            return null;
+        }
+        $notes = bricks_tracker_sort_notes_newest($notes);
+        $race_id = sanitize_text_field($race_meta['race_id'] ?? '');
+        $race_date = sanitize_text_field($race_meta['race_date'] ?? '');
+
+        if ($race_id !== '') {
+            foreach ($notes as $entry) {
+                if (!empty($entry['race_id']) && (string) $entry['race_id'] === $race_id) {
+                    return $entry;
+                }
+            }
+        }
+        if ($race_date !== '') {
+            foreach ($notes as $entry) {
+                if (!empty($entry['race_date']) && (string) $entry['race_date'] === $race_date) {
+                    return $entry;
+                }
+            }
+        }
+        return $notes[0];
+    }
+}
+
+if (!function_exists('fhor_tracker_render_note_item_html')) {
+    function fhor_tracker_render_note_item_html($entry, $horse_name, $context = 'inline') {
+        if (!is_array($entry)) {
+            return '';
+        }
+        $horse_name = sanitize_text_field((string) $horse_name);
+        $note_id = esc_attr($entry['id'] ?? '');
+        $kind = fhor_tracker_get_entry_kind($entry);
+        $is_quote = ($kind === 'trainer_quote');
+        $note_text = esc_html($entry['note'] ?? '');
+        $note_date = !empty($entry['created_at']) ? esc_html(date_i18n('d M Y H:i', strtotime($entry['created_at']))) : '';
+        $note_race = trim(implode(' | ', array_filter([
+            $entry['race_date'] ?? '',
+            $entry['race_time'] ?? '',
+            $entry['course'] ?? '',
+        ])));
+        $pill_label = $is_quote ? 'Quote' : 'Note';
+        $pill_class = $is_quote ? 'fhor-tracker-type-pill fhor-tracker-type-pill--quote' : 'fhor-tracker-type-pill';
+        $body_class = $is_quote ? 'fhor-tracker-note-body fhor-tracker-note-body--quote' : 'fhor-tracker-note-body';
+
+        $footer_parts = [];
+        if ($is_quote && !empty($entry['trainer_name'])) {
+            $footer_parts[] = 'Trainer: ' . esc_html($entry['trainer_name']);
+        }
+        if ($is_quote && !empty($entry['source'])) {
+            $footer_parts[] = 'Source: ' . esc_html($entry['source']);
+        }
+        $footer_html = '';
+        if (!empty($footer_parts)) {
+            $footer_html = '<div class="fhor-tracker-note-footer">' . implode(' · ', $footer_parts) . '</div>';
+        }
+
+        $item_class = 'fhor-tracker-note-item tracker-note-item';
+        if ($context === 'dashboard') {
+            $item_class .= ' my-tracker-note-item';
+        }
+
+        return '<div class="' . esc_attr($item_class) . '">
+            <div class="fhor-tracker-note-head">
+                <span class="' . esc_attr($pill_class) . '">' . esc_html($pill_label) . '</span>
+            </div>
+            <div class="fhor-tracker-note-meta">' . $note_date . ($note_race ? ' — ' . esc_html($note_race) : '') . '</div>
+            <div class="' . esc_attr($body_class) . '">' . nl2br($note_text) . '</div>
+            ' . $footer_html . '
+            <button type="button" class="fhor-tracker-delete-btn tracker-delete-btn" data-horse-name="' . esc_attr($horse_name) . '" data-note-id="' . $note_id . '">Delete</button>
+        </div>';
+    }
+}
+
+if (!function_exists('fhor_tracker_render_latest_flag_html')) {
+    function fhor_tracker_render_latest_flag_html($entry) {
+        if (!is_array($entry) || empty($entry['note'])) {
+            return '';
+        }
+        $kind = fhor_tracker_get_entry_kind($entry);
+        $snippet = esc_html(wp_trim_words($entry['note'], 14, '…'));
+        if ($kind === 'trainer_quote') {
+            return '<div class="fhor-tracker-flag tracker-flag"><span class="fhor-tracker-flag__label">Trainer quote:</span> <span class="fhor-tracker-flag__quote">' . $snippet . '</span></div>';
+        }
+        return '<div class="fhor-tracker-flag tracker-flag"><span class="fhor-tracker-flag__label">Note:</span> ' . $snippet . '</div>';
+    }
+}
+
+if (!function_exists('fhor_tracker_note_to_array')) {
+    function fhor_tracker_note_to_array($note) {
+        if (!is_array($note)) {
+            return [];
+        }
+        return [
+            'id' => isset($note['id']) ? sanitize_text_field($note['id']) : '',
+            'kind' => fhor_tracker_get_entry_kind($note),
+            'note' => isset($note['note']) ? sanitize_textarea_field($note['note']) : '',
+            'source' => isset($note['source']) ? sanitize_text_field($note['source']) : '',
+            'trainer_name' => isset($note['trainer_name']) ? fhor_tracker_sanitize_trainer_name($note['trainer_name']) : '',
+            'created_at' => isset($note['created_at']) ? sanitize_text_field($note['created_at']) : current_time('mysql'),
+            'race_date' => isset($note['race_date']) ? sanitize_text_field($note['race_date']) : '',
+            'race_time' => isset($note['race_time']) ? sanitize_text_field($note['race_time']) : '',
+            'course' => isset($note['course']) ? sanitize_text_field($note['course']) : '',
+            'race_id' => isset($note['race_id']) ? sanitize_text_field($note['race_id']) : '',
+        ];
+    }
+}
+
 if (!function_exists('bricks_tracker_add_note')) {
     function bricks_tracker_add_note($horse_name, $note, $race_meta = [], $user_id = 0) {
         $user_id = $user_id ? intval($user_id) : get_current_user_id();
@@ -61,6 +237,10 @@ if (!function_exists('bricks_tracker_add_note')) {
             return new WP_Error('invalid_horse', 'Invalid horse name.');
         }
 
+        $kind = fhor_tracker_sanitize_kind($race_meta['kind'] ?? 'note');
+        $source = fhor_tracker_sanitize_source($race_meta['source'] ?? '', $kind);
+        $trainer_name = fhor_tracker_sanitize_trainer_name($race_meta['trainer_name'] ?? '');
+
         $data = bricks_tracker_get_user_data($user_id);
         if (!isset($data[$horse_key]) || !is_array($data[$horse_key])) {
             $data[$horse_key] = [
@@ -71,7 +251,10 @@ if (!function_exists('bricks_tracker_add_note')) {
 
         $new_note = [
             'id' => uniqid('tn_', true),
+            'kind' => $kind,
             'note' => $note,
+            'source' => $source,
+            'trainer_name' => $trainer_name,
             'created_at' => current_time('mysql'),
             'race_date' => sanitize_text_field($race_meta['race_date'] ?? ''),
             'race_time' => sanitize_text_field($race_meta['race_time'] ?? ''),
@@ -129,29 +312,30 @@ function bricks_ajax_add_tracker_note() {
 
     $horse_name = isset($_POST['horse_name']) ? wp_unslash($_POST['horse_name']) : '';
     $note = isset($_POST['note']) ? wp_unslash($_POST['note']) : '';
+    $kind = isset($_POST['kind']) ? wp_unslash($_POST['kind']) : 'note';
 
     $result = bricks_tracker_add_note($horse_name, $note, [
         'race_date' => isset($_POST['race_date']) ? wp_unslash($_POST['race_date']) : '',
         'race_time' => isset($_POST['race_time']) ? wp_unslash($_POST['race_time']) : '',
         'course' => isset($_POST['course']) ? wp_unslash($_POST['course']) : '',
         'race_id' => isset($_POST['race_id']) ? wp_unslash($_POST['race_id']) : '',
+        'kind' => $kind,
+        'source' => isset($_POST['source']) ? wp_unslash($_POST['source']) : '',
+        'trainer_name' => isset($_POST['trainer_name']) ? wp_unslash($_POST['trainer_name']) : '',
     ]);
 
     if (is_wp_error($result)) {
         wp_send_json_error(['message' => $result->get_error_message()], 400);
     }
 
+    $horse_name_clean = sanitize_text_field($horse_name);
+    $note_payload = fhor_tracker_note_to_array($result);
+
     wp_send_json_success([
-        'message' => 'Tracker note saved.',
-        'note' => [
-            'id' => isset($result['id']) ? sanitize_text_field($result['id']) : '',
-            'note' => isset($result['note']) ? sanitize_textarea_field($result['note']) : '',
-            'created_at' => isset($result['created_at']) ? sanitize_text_field($result['created_at']) : current_time('mysql'),
-            'race_date' => isset($result['race_date']) ? sanitize_text_field($result['race_date']) : '',
-            'race_time' => isset($result['race_time']) ? sanitize_text_field($result['race_time']) : '',
-            'course' => isset($result['course']) ? sanitize_text_field($result['course']) : '',
-            'race_id' => isset($result['race_id']) ? sanitize_text_field($result['race_id']) : '',
-        ]
+        'message' => $note_payload['kind'] === 'trainer_quote' ? 'Trainer quote saved.' : 'Tracker note saved.',
+        'note' => $note_payload,
+        'html' => fhor_tracker_render_note_item_html($result, $horse_name_clean, 'inline'),
+        'flag_html' => fhor_tracker_render_latest_flag_html($result),
     ]);
 }
 add_action('wp_ajax_bricks_add_tracker_note', 'bricks_ajax_add_tracker_note');
@@ -259,7 +443,7 @@ if (!function_exists('bricks_tracker_get_notes_for_horse')) {
             return [];
         }
 
-        return $data[$horse_key]['notes'];
+        return bricks_tracker_sort_notes_newest($data[$horse_key]['notes']);
     }
 }
 
@@ -279,46 +463,40 @@ if (!function_exists('bricks_tracker_render_horse_widget')) {
 
         $notes = is_user_logged_in() ? bricks_tracker_get_notes_for_horse($horse_name, get_current_user_id()) : [];
         $count = count($notes);
-        $latest = $count > 0 ? end($notes) : null;
+        $latest = $count > 0 ? bricks_tracker_pick_latest_for_context($notes, $race_meta) : null;
 
         $panel_id = 'tracker-panel-' . md5($horse_name . '|' . maybe_serialize($race_meta) . '|' . wp_rand(1000, 9999));
-        $button_text = $count > 0 ? 'My Tracker (' . $count . ')' : 'Add to Tracker';
+        $button_text = $count > 0 ? 'My Tracker (' . $count . ')' : 'My Tracker';
         $notes_html = '';
 
         if ($count > 0) {
             foreach ($notes as $entry) {
-                $note_id = esc_attr($entry['id'] ?? '');
-                $note_text = esc_html($entry['note'] ?? '');
-                $note_date = !empty($entry['created_at']) ? esc_html(date_i18n('d M Y H:i', strtotime($entry['created_at']))) : '';
-                $note_race = trim(implode(' | ', array_filter([
-                    $entry['race_date'] ?? '',
-                    $entry['race_time'] ?? '',
-                    $entry['course'] ?? ''
-                ])));
-                $notes_html .= '<div class="tracker-note-item">
-                    <div class="tracker-note-meta">' . $note_date . ($note_race ? ' - ' . esc_html($note_race) : '') . '</div>
-                    <div class="tracker-note-text">' . nl2br($note_text) . '</div>
-                    <button type="button" class="tracker-delete-btn" data-horse-name="' . esc_attr($horse_name) . '" data-note-id="' . $note_id . '">Delete</button>
-                </div>';
+                $notes_html .= fhor_tracker_render_note_item_html($entry, $horse_name, 'inline');
             }
         } else {
-            $notes_html = '<div class="tracker-empty">No notes yet for this horse.</div>';
+            $notes_html = '<div class="fhor-tracker-empty tracker-empty">No notes yet for this horse.</div>';
         }
 
         $latest_html = '';
-        if ($args['show_latest_flag'] && $latest && !empty($latest['note'])) {
-            $latest_html = '<div class="tracker-flag">📝 Tracker: ' . esc_html(wp_trim_words($latest['note'], 14, '...')) . '</div>';
+        if ($args['show_latest_flag'] && $latest) {
+            $latest_html = fhor_tracker_render_latest_flag_html($latest);
         }
 
-        $widget_html = '<div class="tracker-inline-widget ' . esc_attr($args['wrapper_class']) . '">
+        $default_trainer = fhor_tracker_sanitize_trainer_name($race_meta['trainer_name'] ?? '');
+        $source_options_html = '<option value="">Source (optional)</option>';
+        foreach (fhor_tracker_quote_sources() as $source_label) {
+            $source_options_html .= '<option value="' . esc_attr($source_label) . '">' . esc_html($source_label) . '</option>';
+        }
+
+        $widget_html = '<div class="tracker-inline-widget fhor-tracker-widget ' . esc_attr($args['wrapper_class']) . '">
             ' . $latest_html;
 
         if (!is_user_logged_in()) {
-            $widget_html .= '<span class="tracker-guest-message">Log in to use tracker</span></div>';
+            $widget_html .= '<span class="fhor-tracker-guest-message tracker-guest-message">Log in to use My Tracker</span></div>';
             return $widget_html;
         }
 
-        $action_buttons = '<button type="button" class="tracker-toggle-btn tracker-compact-btn" data-target="#' . esc_attr($panel_id) . '">' . esc_html($button_text) . '</button>';
+        $action_buttons = '<button type="button" class="fhor-tracker-toggle-btn tracker-toggle-btn tracker-compact-btn" data-target="#' . esc_attr($panel_id) . '">' . esc_html($button_text) . '</button>';
         if (!empty($args['show_bet_tracker']) && function_exists('fhor_bt_log_button_html')) {
             $forecast_odds = isset($race_meta['forecast_odds']) ? $race_meta['forecast_odds'] : '';
             $action_buttons .= fhor_bt_log_button_html([
@@ -332,15 +510,26 @@ if (!function_exists('bricks_tracker_render_horse_widget')) {
             ]);
         }
         $widget_html .= '<div class="tracker-inline-actions">' . $action_buttons . '</div>
-            <div id="' . esc_attr($panel_id) . '" class="tracker-panel" style="display:none;">
-                <div class="tracker-notes-list">' . $notes_html . '</div>
-                <textarea class="tracker-note-input" rows="3" placeholder="Add your note about this horse..."></textarea>
-                <button type="button" class="tracker-save-btn"
-                    data-horse-name="' . esc_attr($horse_name) . '"
-                    data-race-id="' . esc_attr($race_meta['race_id'] ?? '') . '"
-                    data-race-date="' . esc_attr($race_meta['race_date'] ?? '') . '"
-                    data-race-time="' . esc_attr($race_meta['race_time'] ?? '') . '"
-                    data-course="' . esc_attr($race_meta['course'] ?? '') . '">Save Note</button>
+            <div id="' . esc_attr($panel_id) . '" class="fhor-tracker-panel tracker-panel" style="display:none;">
+                <div class="fhor-tracker-notes-list tracker-notes-list">' . $notes_html . '</div>
+                <div class="fhor-tracker-composer">
+                    <div class="fhor-tracker-kind-toggle" role="radiogroup" aria-label="Entry type">
+                        <label><input type="radio" name="' . esc_attr($panel_id) . '-kind" class="fhor-tracker-kind-input" value="note" checked> General note</label>
+                        <label><input type="radio" name="' . esc_attr($panel_id) . '-kind" class="fhor-tracker-kind-input" value="trainer_quote"> Trainer quote</label>
+                    </div>
+                    <div class="fhor-tracker-quote-fields">
+                        <input type="text" class="fhor-tracker-trainer-input" value="' . esc_attr($default_trainer) . '" placeholder="Trainer name (optional)" maxlength="100">
+                        <select class="fhor-tracker-source-select">' . $source_options_html . '</select>
+                    </div>
+                    <textarea class="fhor-tracker-note-input tracker-note-input" rows="3" placeholder="Add your note about this horse…"></textarea>
+                    <button type="button" class="fhor-tracker-save-btn tracker-save-btn"
+                        data-horse-name="' . esc_attr($horse_name) . '"
+                        data-race-id="' . esc_attr($race_meta['race_id'] ?? '') . '"
+                        data-race-date="' . esc_attr($race_meta['race_date'] ?? '') . '"
+                        data-race-time="' . esc_attr($race_meta['race_time'] ?? '') . '"
+                        data-course="' . esc_attr($race_meta['course'] ?? '') . '"
+                        data-default-trainer="' . esc_attr($default_trainer) . '">Save</button>
+                </div>
             </div>
         </div>';
 
@@ -374,47 +563,70 @@ function bricks_tracker_inline_js() {
             const $widget = $panel.closest('.tracker-inline-widget');
             const $btn = $widget.find('.tracker-toggle-btn').first();
             if (!$btn.length) return;
-            const count = $panel.find('.tracker-note-item').length;
-            $btn.text(count > 0 ? ('My Tracker (' + count + ')') : 'Add to Tracker');
+            const count = $panel.find('.fhor-tracker-note-item').length;
+            $btn.text(count > 0 ? ('My Tracker (' + count + ')') : 'My Tracker');
         }
 
-        function ensureTrackerFlag($panel, noteText) {
-            const $widget = $panel.closest('.tracker-inline-widget');
-            let $flag = $widget.find('.tracker-flag').first();
-            const text = (noteText || '').trim();
-            if (!text) return;
-            const shortText = text.length > 120 ? (text.substring(0, 117) + '...') : text;
+        function syncTrackerComposer($panel) {
+            const isQuote = $panel.find('.fhor-tracker-kind-input:checked').val() === 'trainer_quote';
+            const $quoteFields = $panel.find('.fhor-tracker-quote-fields');
+            const $input = $panel.find('.fhor-tracker-note-input');
+            if (isQuote) {
+                $quoteFields.addClass('is-visible');
+                $input.attr('placeholder', 'Paste or type what the trainer said…');
+            } else {
+                $quoteFields.removeClass('is-visible');
+                $input.attr('placeholder', 'Add your note about this horse…');
+            }
+        }
+
+        function applyTrackerFlag($widget, flagHtml) {
+            if (!flagHtml) return;
+            let $flag = $widget.find('.fhor-tracker-flag, .tracker-flag').first();
             if (!$flag.length) {
-                $flag = $('<div class="tracker-flag"></div>');
+                $flag = $('<div></div>');
                 $widget.prepend($flag);
             }
-            $flag.text('📝 Tracker: ' + shortText);
+            $flag.replaceWith($(flagHtml));
         }
+
+        $(document).on('change', '.fhor-tracker-kind-input', function() {
+            syncTrackerComposer($(this).closest('.fhor-tracker-panel, .tracker-panel'));
+        });
 
         $(document).on('click', '.tracker-toggle-btn', function() {
             const target = $(this).data('target');
             if (target) {
-                $(target).slideToggle(150);
+                const $panel = $(target);
+                $panel.slideToggle(150, function() {
+                    if ($panel.is(':visible')) {
+                        syncTrackerComposer($panel);
+                    }
+                });
             }
         });
 
         $(document).on('click', '.tracker-save-btn', function() {
             const cfg = trackerConfig();
             if (!cfg.is_logged_in) {
-                alert('Please log in to use tracker notes.');
+                alert('Please log in to use My Tracker.');
                 return;
             }
 
             const $button = $(this);
-            const $panel = $button.closest('.tracker-panel');
-            const $input = $panel.find('.tracker-note-input');
+            const $panel = $button.closest('.fhor-tracker-panel, .tracker-panel');
+            const $input = $panel.find('.fhor-tracker-note-input');
             const note = ($input.val() || '').trim();
             if (!note) {
-                alert('Please add a note first.');
+                alert('Please add some text first.');
                 return;
             }
 
-            $button.prop('disabled', true).text('Saving...');
+            const kind = $panel.find('.fhor-tracker-kind-input:checked').val() || 'note';
+            const trainerName = ($panel.find('.fhor-tracker-trainer-input').val() || '').trim();
+            const source = $panel.find('.fhor-tracker-source-select').val() || '';
+
+            $button.prop('disabled', true).text('Saving…');
 
             $.post(cfg.ajax_url, {
                 action: 'bricks_add_tracker_note',
@@ -424,33 +636,53 @@ function bricks_tracker_inline_js() {
                 race_date: $button.data('race-date'),
                 race_time: $button.data('race-time'),
                 course: $button.data('course'),
+                kind: kind,
+                source: source,
+                trainer_name: trainerName,
                 note: note
             }).done(function(response) {
                 if (!response || !response.success) {
-                    const msg = response && response.data && response.data.message ? response.data.message : 'Failed to save note.';
+                    const msg = response && response.data && response.data.message ? response.data.message : 'Failed to save.';
                     alert(msg);
                     return;
                 }
-                window.location.reload();
+                const $list = $panel.find('.fhor-tracker-notes-list');
+                $list.find('.fhor-tracker-empty, .tracker-empty').remove();
+                if (response.data && response.data.html) {
+                    $list.prepend(response.data.html);
+                }
+                $input.val('');
+                $panel.find('.fhor-tracker-kind-input[value="note"]').prop('checked', true);
+                const defaultTrainer = $button.data('default-trainer') || '';
+                $panel.find('.fhor-tracker-trainer-input').val(defaultTrainer);
+                $panel.find('.fhor-tracker-source-select').val('');
+                syncTrackerComposer($panel);
+                updateTrackerButtonCount($panel);
+                const $widget = $panel.closest('.tracker-inline-widget');
+                if (response.data && response.data.flag_html) {
+                    applyTrackerFlag($widget, response.data.flag_html);
+                }
             }).fail(function() {
-                alert('Failed to save tracker note. Please try again.');
+                alert('Failed to save. Please try again.');
             }).always(function() {
-                $button.prop('disabled', false).text('Save Note');
+                $button.prop('disabled', false).text('Save');
             });
         });
 
         $(document).on('click', '.tracker-delete-btn', function() {
             const cfg = trackerConfig();
             if (!cfg.is_logged_in) {
-                alert('Please log in to use tracker notes.');
+                alert('Please log in to use My Tracker.');
                 return;
             }
-            if (!confirm('Delete this note?')) {
+            if (!confirm('Delete this entry?')) {
                 return;
             }
 
             const $button = $(this);
-            $button.prop('disabled', true).text('Deleting...');
+            const $item = $button.closest('.fhor-tracker-note-item');
+            const $panel = $button.closest('.fhor-tracker-panel, .tracker-panel');
+            $button.prop('disabled', true).text('Deleting…');
 
             $.post(cfg.ajax_url, {
                 action: 'bricks_delete_tracker_note',
@@ -459,13 +691,22 @@ function bricks_tracker_inline_js() {
                 note_id: $button.data('note-id')
             }).done(function(response) {
                 if (!response || !response.success) {
-                    const msg = response && response.data && response.data.message ? response.data.message : 'Failed to delete note.';
+                    const msg = response && response.data && response.data.message ? response.data.message : 'Failed to delete.';
                     alert(msg);
                     return;
                 }
-                window.location.reload();
+                $item.remove();
+                if ($panel.length) {
+                    const $list = $panel.find('.fhor-tracker-notes-list');
+                    if (!$list.find('.fhor-tracker-note-item').length) {
+                        $list.html('<div class="fhor-tracker-empty tracker-empty">No notes yet for this horse.</div>');
+                    }
+                    updateTrackerButtonCount($panel);
+                } else {
+                    window.location.reload();
+                }
             }).fail(function() {
-                alert('Failed to delete tracker note. Please try again.');
+                alert('Failed to delete. Please try again.');
             }).always(function() {
                 $button.prop('disabled', false).text('Delete');
             });
@@ -482,70 +723,7 @@ function bricks_tracker_inline_styles() {
     }
     ?>
     <style>
-    [title] { cursor: pointer; }
-    .tracker-inline-widget { margin-top: 6px; }
-    .tracker-flag { margin-top: 4px; font-size: 11px; font-weight: 500; color: #92400e; line-height: 1.4; }
-    .tracker-toggle-btn,
-    .tracker-save-btn,
-    .tracker-delete-btn {
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        background: #fff;
-        color: #111827;
-        font-size: 12px;
-        font-weight: 600;
-        cursor: pointer;
-        padding: 6px 10px;
-    }
-    .tracker-toggle-btn:hover,
-    .tracker-save-btn:hover,
-    .tracker-delete-btn:hover {
-        border-color: #7c3aed;
-        color: #6d28d9;
-        background: #faf5ff;
-    }
-    .tracker-panel {
-        margin-top: 8px;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        padding: 8px;
-        background: #fff;
-    }
-    .tracker-note-item { border-bottom: 1px solid #f3f4f6; padding-bottom: 8px; margin-bottom: 8px; }
-    .tracker-note-item:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
-    .tracker-note-meta { color: #6b7280; font-size: 11px; margin-bottom: 4px; }
-    .tracker-note-text { font-size: 12px; color: #111827; margin-bottom: 6px; white-space: normal; }
-    .tracker-note-input {
-        width: 100%;
-        min-height: 64px;
-        margin-top: 8px;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        padding: 8px;
-        font-size: 12px;
-        resize: vertical;
-    }
-    .tracker-save-btn { margin-top: 8px; }
-    .tracker-guest-message, .tracker-empty { color: #6b7280; font-size: 12px; }
-    .tracker-horse-header .tracker-toggle-btn { margin-top: 10px; }
-    .tracker-summary-link {
-        display: inline-flex;
-        align-items: center;
-        color: #7c2d12;
-        background: rgba(255, 255, 255, 0.6);
-        padding: 6px 10px;
-        border-radius: 8px;
-        text-decoration: none;
-        font-size: 12px;
-        font-weight: 600;
-    }
-    .tracker-summary-link:hover {
-        background: #fff;
-        color: #9a3412;
-    }
-    .tracker-alert-strip {
-        display: block;
-    }
+    .tracker-alert-strip { display: block; }
     </style>
     <?php
 }
@@ -622,10 +800,10 @@ add_action('wp_footer', 'bricks_tracker_floating_quick_link', 1001);
 
 function bricks_my_tracker_dashboard_shortcode($atts = []) {
     if (!is_user_logged_in()) {
-        return '<div style="max-width:760px;margin:40px auto;padding:24px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;">
-            <h2 style="margin:0 0 10px 0;color:#111827;">My Tracker</h2>
-            <p style="margin:0;color:#6b7280;">Please log in to view and manage your tracked horses.</p>
-        </div>';
+        return '<div class="fhor-tracker-page"><div class="fhor-tracker-login-card">
+            <h2>My Tracker</h2>
+            <p>Please log in to view and manage your notes and trainer quotes.</p>
+        </div></div>';
     }
 
     $tracker_data = bricks_tracker_get_user_data(get_current_user_id());
@@ -639,6 +817,8 @@ function bricks_my_tracker_dashboard_shortcode($atts = []) {
         }
 
         $note_rows = [];
+        $quote_count = 0;
+        $note_count = 0;
         foreach ($notes as $note_entry) {
             if (!is_array($note_entry)) {
                 continue;
@@ -650,39 +830,43 @@ function bricks_my_tracker_dashboard_shortcode($atts = []) {
             $note_id = isset($note_entry['id']) ? sanitize_text_field($note_entry['id']) : '';
             $note_race_date = isset($note_entry['race_date']) ? sanitize_text_field($note_entry['race_date']) : '';
             $note_race_time = isset($note_entry['race_time']) ? sanitize_text_field($note_entry['race_time']) : '';
+            $kind = fhor_tracker_get_entry_kind($note_entry);
 
             if ($note_id === '' || $note_text === '') {
                 continue;
             }
 
-            $note_rows[] = [
-                'note' => $note_text,
-                'created_at' => $note_created_at,
-                'course' => $note_course,
-                'note_id' => $note_id,
-                'race_date' => $note_race_date,
-                'race_time' => $note_race_time,
-            ];
+            if ($kind === 'trainer_quote') {
+                $quote_count++;
+            } else {
+                $note_count++;
+            }
+
+            $note_rows[] = $note_entry;
         }
 
         if (empty($note_rows)) {
             continue;
         }
 
-        usort($note_rows, function($a, $b) {
-            $a_ts = !empty($a['created_at']) ? strtotime($a['created_at']) : 0;
-            $b_ts = !empty($b['created_at']) ? strtotime($b['created_at']) : 0;
-            return $b_ts <=> $a_ts;
-        });
-
+        $note_rows = bricks_tracker_sort_notes_newest($note_rows);
         $latest = $note_rows[0];
+        $type_parts = [];
+        if ($note_count > 0) {
+            $type_parts[] = $note_count . ' note' . ($note_count === 1 ? '' : 's');
+        }
+        if ($quote_count > 0) {
+            $type_parts[] = $quote_count . ' quote' . ($quote_count === 1 ? '' : 's');
+        }
+
         $rows[] = [
             'horse_name' => $horse_name,
             'notes_count' => count($note_rows),
-            'latest_created_at' => $latest['created_at'],
-            'latest_course' => $latest['course'],
-            'latest_race_date' => $latest['race_date'],
-            'latest_race_time' => $latest['race_time'],
+            'type_summary' => implode(' · ', $type_parts),
+            'latest_created_at' => $latest['created_at'] ?? '',
+            'latest_course' => $latest['course'] ?? '',
+            'latest_race_date' => $latest['race_date'] ?? '',
+            'latest_race_time' => $latest['race_time'] ?? '',
             'notes' => $note_rows,
         ];
     }
@@ -695,15 +879,16 @@ function bricks_my_tracker_dashboard_shortcode($atts = []) {
 
     ob_start();
     ?>
+    <div class="fhor-tracker-page">
     <div class="my-tracker-dashboard">
         <div class="my-tracker-header fhor-page-header">
-            <h1>📝 My Tracker</h1>
-            <p>Tracked horses grouped with expandable comments.</p>
+            <h1>My Tracker</h1>
+            <p>Your private notes and trainer quotes, grouped by horse.</p>
         </div>
 
         <?php if (empty($rows)): ?>
             <div class="my-tracker-empty">
-                No tracked horses yet. Add notes from race cards, quick reference, or comments pages.
+                No entries yet. Open a racecard, expand <strong>My Tracker</strong> on a runner, and save a note or trainer quote.
             </div>
         <?php else: ?>
             <div class="my-tracker-table-wrap">
@@ -711,9 +896,10 @@ function bricks_my_tracker_dashboard_shortcode($atts = []) {
                     <thead>
                         <tr>
                             <th>Horse</th>
-                            <th>Latest Date</th>
-                            <th>Latest Course</th>
-                            <th>Comments</th>
+                            <th>Latest</th>
+                            <th>Race context</th>
+                            <th>Types</th>
+                            <th>Entries</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -728,39 +914,17 @@ function bricks_my_tracker_dashboard_shortcode($atts = []) {
                             ?>
                             <tr class="tracker-row">
                                 <td class="tracker-cell tracker-cell--horse" data-label="Horse"><?php echo esc_html($row['horse_name']); ?></td>
-                                <td class="tracker-cell tracker-cell--date" data-label="Latest Date"><?php echo esc_html($display_date); ?></td>
-                                <td class="tracker-cell tracker-cell--course" data-label="Latest Course"><?php echo esc_html($meta_course ?: '-'); ?></td>
-                                <td class="tracker-cell tracker-cell--comments" data-label="Comments">
+                                <td class="tracker-cell tracker-cell--date" data-label="Latest"><?php echo esc_html($display_date); ?></td>
+                                <td class="tracker-cell tracker-cell--course" data-label="Race context"><?php echo esc_html($meta_course ?: '-'); ?></td>
+                                <td class="tracker-cell tracker-cell--types" data-label="Types"><span class="fhor-tracker-type-summary"><?php echo esc_html($row['type_summary']); ?></span></td>
+                                <td class="tracker-cell tracker-cell--comments" data-label="Entries">
                                     <details class="my-tracker-details">
                                         <summary>
-                                            View Comments (<?php echo esc_html($row['notes_count']); ?>)
+                                            View (<?php echo esc_html($row['notes_count']); ?>)
                                         </summary>
                                         <div class="my-tracker-notes-dropdown">
                                             <?php foreach ($row['notes'] as $note_row): ?>
-                                                <?php
-                                                $note_date = $note_row['created_at'] ? date_i18n('d M Y H:i', strtotime($note_row['created_at'])) : '-';
-                                                $note_course = trim(implode(' | ', array_filter([
-                                                    $note_row['race_date'],
-                                                    $note_row['race_time'],
-                                                    $note_row['course']
-                                                ])));
-                                                ?>
-                                                <div class="my-tracker-note-item">
-                                                    <div class="my-tracker-note-meta">
-                                                        <?php echo esc_html($note_date); ?>
-                                                        <?php if ($note_course): ?>
-                                                            - <?php echo esc_html($note_course); ?>
-                                                        <?php endif; ?>
-                                                    </div>
-                                                    <div class="my-tracker-note-text"><?php echo esc_html($note_row['note']); ?></div>
-                                                    <button
-                                                        type="button"
-                                                        class="tracker-delete-btn my-tracker-delete-btn"
-                                                        data-horse-name="<?php echo esc_attr($row['horse_name']); ?>"
-                                                        data-note-id="<?php echo esc_attr($note_row['note_id']); ?>">
-                                                        Delete
-                                                    </button>
-                                                </div>
+                                                <?php echo fhor_tracker_render_note_item_html($note_row, $row['horse_name'], 'dashboard'); ?>
                                             <?php endforeach; ?>
                                         </div>
                                     </details>
@@ -771,6 +935,7 @@ function bricks_my_tracker_dashboard_shortcode($atts = []) {
                 </table>
             </div>
         <?php endif; ?>
+    </div>
     </div>
     <?php
     return ob_get_clean();

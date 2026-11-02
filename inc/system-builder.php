@@ -794,6 +794,74 @@ if (!function_exists('fhor_sb_fetch_live')) {
     }
 }
 
+if (!function_exists('fhor_sb_declared_runner_count')) {
+    function fhor_sb_declared_runner_count($date) {
+        global $wpdb;
+        $date = function_exists('bricks_daily_archive_normalize_date')
+            ? bricks_daily_archive_normalize_date($date)
+            : null;
+        if ($date === null || !function_exists('bricks_race_tables_for_date')) {
+            return 0;
+        }
+        $tables = bricks_race_tables_for_date($date);
+        $races = $tables['races'] ?? '';
+        $runners = $tables['runners'] ?? '';
+        if ($races === '' || $runners === '' || !fhor_sb_table_exists($races) || !fhor_sb_table_exists($runners)) {
+            return 0;
+        }
+        return intval($wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(ru.runner_id) FROM `$races` r INNER JOIN `$runners` ru ON r.race_id = ru.race_id WHERE r.meeting_date = %s",
+            $date
+        )));
+    }
+}
+
+if (!function_exists('fhor_sb_speed_table_runner_count')) {
+    function fhor_sb_speed_table_runner_count($date) {
+        global $wpdb;
+        $date = function_exists('bricks_daily_archive_normalize_date')
+            ? bricks_daily_archive_normalize_date($date)
+            : null;
+        if ($date === null) {
+            return 0;
+        }
+        $sp_table = fhor_sb_speed_table_for_date($date);
+        if ($sp_table === '' || !fhor_sb_table_exists($sp_table)) {
+            return 0;
+        }
+        $date_col = fhor_sb_col($sp_table, ['Date', 'meeting_date'], 'Date');
+        $dmy = wp_date('d-m-Y', strtotime($date));
+        return intval($wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM `$sp_table` sp WHERE sp.`" . esc_sql($date_col) . '` = %s OR sp.`' . esc_sql($date_col) . '` = %s',
+            $date,
+            $dmy
+        )));
+    }
+}
+
+if (!function_exists('fhor_sb_tomorrow_qualifier_pipeline_note')) {
+    /**
+     * When the live card has runners but adv_speed is empty, qualifiers cannot match anything.
+     */
+    function fhor_sb_tomorrow_qualifier_pipeline_note() {
+        $tomorrow = function_exists('bricks_daily_archive_tomorrow')
+            ? bricks_daily_archive_tomorrow()
+            : wp_date('Y-m-d', strtotime('+1 day'));
+        $declared = fhor_sb_declared_runner_count($tomorrow);
+        if ($declared < 1) {
+            return '';
+        }
+        if (fhor_sb_speed_table_runner_count($tomorrow) > 0) {
+            return '';
+        }
+        return sprintf(
+            'Tomorrow\'s card is loaded (%d declared runners) but the advance speed table has no rows for %s yet, so System Builder cannot match qualifiers. This usually clears after RUNME_UpdateCall and the daily analysis rebuild `adv_speed&performance_table`. If it is still empty by mid-morning, check last night\'s declaration import and overnight jobs.',
+            $declared,
+            $tomorrow
+        );
+    }
+}
+
 if (!function_exists('fhor_sb_country_courses')) {
     function fhor_sb_country_courses() {
         return [
@@ -3040,6 +3108,7 @@ if (!function_exists('fhor_sb_qualifiers_shortcode')) {
             return '<div class="sb-gate"><h1>My Daily Qualifiers</h1><p>Log in to see horses that match your saved systems.</p></div>';
         }
         $data = fhor_sb_user_dashboard_qualifiers();
+        $pipeline_note = fhor_sb_tomorrow_qualifier_pipeline_note();
         $signup = function_exists('fhor_get_membership_signup_url') ? fhor_get_membership_signup_url() : home_url('/register/');
         ob_start();
         ?>
@@ -3063,6 +3132,9 @@ if (!function_exists('fhor_sb_qualifiers_shortcode')) {
                 <h1 class="sb-title">My Daily Qualifiers</h1>
                 <p class="sb-lead">Horses on today’s and tomorrow’s cards that match your saved systems. Email digest is a Premium feature after declarations (20:30).</p>
                 <p class="sb-note"><a href="<?php echo esc_url(fhor_sb_url()); ?>">Open System Builder</a><?php if (!fhor_sb_is_premium()): ?> · <a href="<?php echo esc_url($signup); ?>">Upgrade for email alerts</a><?php endif; ?></p>
+                <?php if ($pipeline_note !== ''): ?>
+                    <p class="sb-note is-warn"><?php echo esc_html($pipeline_note); ?></p>
+                <?php endif; ?>
             </header>
             <?php if (empty($data['systems'])): ?>
                 <p class="sb-empty">No saved systems yet. Build one, save it, then qualifiers appear here.</p>

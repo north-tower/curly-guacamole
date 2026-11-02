@@ -168,6 +168,7 @@ if (!function_exists('fhor_sb_qa_checklist')) {
         return [
             ['id' => 'ajax_backtest', 'label' => 'Backtest AJAX returns success', 'hint' => 'Network → fhor_sb_backtest'],
             ['id' => 'ajax_qualifiers', 'label' => 'Qualifiers AJAX returns today + tomorrow', 'hint' => 'fhor_sb_qualifiers'],
+            ['id' => 'pipeline_health', 'label' => 'Tomorrow pipeline: declared runners match adv_speed rows', 'hint' => 'Health checks → self-tests'],
             ['id' => 'dosage_card_match', 'label' => 'DI/CD matches race card for one horse', 'hint' => 'Same Chefs-de-Race engine'],
             ['id' => 'dosage_sample_cols', 'label' => 'Historic sample shows DI/CD when dosage filtered', 'hint' => 'Sprint/stamina scenarios'],
             ['id' => 'pace_note', 'label' => 'Pace-only rules show live-only note on backtest', 'hint' => 'Set pace zone, run backtest'],
@@ -175,6 +176,79 @@ if (!function_exists('fhor_sb_qa_checklist')) {
             ['id' => 'premium_cap', 'label' => 'Lookback respects member tier', 'hint' => 'Free vs premium max days'],
             ['id' => 'unit_node', 'label' => 'node tests/system-builder-filters-test.mjs passes', 'hint' => 'Local CI'],
             ['id' => 'unit_php', 'label' => 'php tests/system-builder-test.php passes', 'hint' => 'Server with PHP CLI'],
+        ];
+    }
+}
+
+if (!function_exists('fhor_sb_qa_tomorrow_pipeline_health')) {
+    /**
+     * Compare live card runner counts to speed tables used by Find qualifiers.
+     *
+     * @return array{
+     *   ok:bool,
+     *   today:string,
+     *   tomorrow:string,
+     *   today_declared:int,
+     *   today_speed_rows:int,
+     *   tomorrow_declared:int,
+     *   tomorrow_speed_rows:int,
+     *   issues:array<int,string>,
+     *   note:string,
+     *   adv_table:bool,
+     *   speed_table:bool
+     * }
+     */
+    function fhor_sb_qa_tomorrow_pipeline_health() {
+        $today = function_exists('bricks_daily_archive_today')
+            ? bricks_daily_archive_today()
+            : wp_date('Y-m-d');
+        $tomorrow = function_exists('bricks_daily_archive_tomorrow')
+            ? bricks_daily_archive_tomorrow()
+            : wp_date('Y-m-d', strtotime('+1 day'));
+
+        $declared_today = function_exists('fhor_sb_declared_runner_count')
+            ? fhor_sb_declared_runner_count($today)
+            : 0;
+        $declared_tomorrow = function_exists('fhor_sb_declared_runner_count')
+            ? fhor_sb_declared_runner_count($tomorrow)
+            : 0;
+        $speed_today = function_exists('fhor_sb_speed_table_runner_count')
+            ? fhor_sb_speed_table_runner_count($today)
+            : 0;
+        $speed_tomorrow = function_exists('fhor_sb_speed_table_runner_count')
+            ? fhor_sb_speed_table_runner_count($tomorrow)
+            : 0;
+
+        $issues = [];
+        if ($declared_today > 0 && $speed_today === 0) {
+            $issues[] = 'Today\'s card has declared runners but speed&performance_table has no rows for ' . $today . '.';
+        }
+        if ($declared_tomorrow > 0 && $speed_tomorrow === 0) {
+            $issues[] = 'Tomorrow\'s card has declared runners but adv_speed&performance_table has no rows for ' . $tomorrow . '.';
+        }
+        if ($declared_tomorrow === 0) {
+            $issues[] = 'No declared runners for tomorrow yet (normal before ~20:30 UK declarations).';
+        }
+
+        $note = function_exists('fhor_sb_tomorrow_qualifier_pipeline_note')
+            ? fhor_sb_tomorrow_qualifier_pipeline_note()
+            : '';
+
+        $ok = ($declared_today <= 0 || $speed_today > 0)
+            && ($declared_tomorrow <= 0 || $speed_tomorrow > 0);
+
+        return [
+            'ok' => $ok,
+            'today' => $today,
+            'tomorrow' => $tomorrow,
+            'today_declared' => $declared_today,
+            'today_speed_rows' => $speed_today,
+            'tomorrow_declared' => $declared_tomorrow,
+            'tomorrow_speed_rows' => $speed_tomorrow,
+            'issues' => $issues,
+            'note' => $note,
+            'adv_table' => function_exists('fhor_sb_table_exists') && fhor_sb_table_exists('adv_speed&performance_table'),
+            'speed_table' => function_exists('fhor_sb_table_exists') && fhor_sb_table_exists('speed&performance_table'),
         ];
     }
 }
@@ -212,6 +286,16 @@ if (!function_exists('fhor_sb_qa_run_self_tests')) {
             'ok' => is_numeric($san['days'] ?? null) && intval($san['days']) >= 7,
             'detail' => ['days' => $san['days'] ?? null],
         ];
+
+        $pipeline = fhor_sb_qa_tomorrow_pipeline_health();
+        $results['tests'][] = [
+            'name' => 'Qualifier pipeline (live card vs speed tables)',
+            'ok' => !empty($pipeline['ok']),
+            'detail' => $pipeline,
+        ];
+        if (empty($pipeline['ok'])) {
+            $results['ok'] = false;
+        }
 
         return $results;
     }
@@ -290,6 +374,8 @@ if (!function_exists('fhor_sb_qa_shortcode')) {
             return '<div class="sb-gate"><h1>System Builder QA</h1><p>Log in to run guided tests.</p><p><a class="sb-btn sb-btn-primary" href="' . esc_url($login) . '">Log in</a></p></div>';
         }
 
+        $pipeline_snapshot = fhor_sb_qa_tomorrow_pipeline_health();
+
         ob_start();
         ?>
         <div class="sb-qa-page" id="fhor-system-builder-qa">
@@ -306,7 +392,29 @@ if (!function_exists('fhor_sb_qa_shortcode')) {
             <div class="sb-qa-grid">
                 <section class="sb-qa-panel" id="sb-qa-health">
                     <h2>Health checks</h2>
-                    <p class="sb-qa-note">Server-side dosage and filter sanitization (no database scan).</p>
+                    <p class="sb-qa-note">Dosage/filter checks plus live qualifier pipeline counts (reads declared runners vs speed tables).</p>
+                    <div class="sb-qa-pipeline<?php echo !empty($pipeline_snapshot['ok']) ? ' is-ok' : ' is-warn'; ?>" id="sb-qa-pipeline-snapshot">
+                        <p class="sb-qa-pipeline-title"><?php echo !empty($pipeline_snapshot['ok']) ? 'Pipeline OK' : 'Pipeline gap detected'; ?></p>
+                        <dl class="sb-qa-pipeline-dl">
+                            <div>
+                                <dt>Today · <?php echo esc_html($pipeline_snapshot['today']); ?></dt>
+                                <dd><?php echo intval($pipeline_snapshot['today_declared']); ?> declared · <?php echo intval($pipeline_snapshot['today_speed_rows']); ?> in speed&amp;performance</dd>
+                            </div>
+                            <div>
+                                <dt>Tomorrow · <?php echo esc_html($pipeline_snapshot['tomorrow']); ?></dt>
+                                <dd><?php echo intval($pipeline_snapshot['tomorrow_declared']); ?> declared · <?php echo intval($pipeline_snapshot['tomorrow_speed_rows']); ?> in adv_speed&amp;performance</dd>
+                            </div>
+                        </dl>
+                        <?php if (!empty($pipeline_snapshot['note'])): ?>
+                            <p class="sb-qa-pipeline-note"><?php echo esc_html($pipeline_snapshot['note']); ?></p>
+                        <?php elseif (!empty($pipeline_snapshot['issues']) && empty($pipeline_snapshot['ok'])): ?>
+                            <ul class="sb-qa-pipeline-issues">
+                                <?php foreach ($pipeline_snapshot['issues'] as $issue): ?>
+                                    <li><?php echo esc_html($issue); ?></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php endif; ?>
+                    </div>
                     <button type="button" class="sb-btn sb-btn-primary" id="sb-qa-run-self-tests">Run self-tests</button>
                     <pre class="sb-qa-log" id="sb-qa-self-test-log" hidden></pre>
                     <details class="sb-qa-guide" open>
@@ -314,6 +422,7 @@ if (!function_exists('fhor_sb_qa_shortcode')) {
                         <ul>
                             <li><strong>Dosage engine</strong> — Secretariat DI 3.00 / CD 0.90; split chefs; Inf when stamina wing is zero.</li>
                             <li><strong>cd_min 0</strong> — must survive save/load (stamina presets use low CD caps, not zero min).</li>
+                            <li><strong>Qualifier pipeline</strong> — when tomorrow declared &gt; 0, adv_speed rows must be &gt; 0 or My Qualifiers stays empty. Fix: RUNME_UpdateCall then daily analysis (<code>adv_speed&amp;performance_table_UPDATE</code>).</li>
                             <li>CLI: <code>wp eval 'var_export(bricks_dosage_self_test());'</code></li>
                         </ul>
                     </details>
@@ -351,6 +460,16 @@ if (!function_exists('fhor_sb_qa_shortcode')) {
         .sb-qa-panel h2{margin:0 0 .5rem;font-size:1rem}
         .sb-qa-note{font-size:.82rem;color:#64748b;margin:0 0 .65rem;line-height:1.45}
         .sb-qa-note a{color:#15803d;font-weight:700}
+        .sb-qa-pipeline{margin:.65rem 0 .85rem;padding:.75rem .85rem;border-radius:10px;border:1px solid #e2e8f0;background:#f8fafc;font-size:.82rem}
+        .sb-qa-pipeline.is-ok{border-color:#bbf7d0;background:#f0fdf4}
+        .sb-qa-pipeline.is-warn{border-color:#fde68a;background:#fffbeb}
+        .sb-qa-pipeline-title{margin:0 0 .45rem;font-weight:700;color:#0f172a}
+        .sb-qa-pipeline.is-warn .sb-qa-pipeline-title{color:#b45309}
+        .sb-qa-pipeline-dl{margin:0;display:grid;gap:.35rem}
+        .sb-qa-pipeline-dl dt{font-weight:700;color:#334155;margin:0}
+        .sb-qa-pipeline-dl dd{margin:.1rem 0 0;color:#64748b}
+        .sb-qa-pipeline-note,.sb-qa-pipeline-issues{margin:.55rem 0 0;color:#92400e;line-height:1.45}
+        .sb-qa-pipeline-issues{padding-left:1.1rem;margin-bottom:0}
         .sb-qa-log{margin:.75rem 0 0;padding:.65rem .75rem;background:#0f172a;color:#e2e8f0;border-radius:8px;font-size:.72rem;max-height:220px;overflow:auto;white-space:pre-wrap}
         .sb-qa-guide{margin-top:.75rem;font-size:.82rem;color:#334155}
         .sb-qa-guide summary{cursor:pointer;font-weight:700;color:#475569}
