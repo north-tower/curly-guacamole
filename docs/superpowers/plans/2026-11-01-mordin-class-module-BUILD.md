@@ -48,7 +48,7 @@ Use this file to track execution. Check boxes as tasks complete; paste verificat
 
 | Task | Files | Verify | Done | Notes |
 | --- | --- | --- | --- | --- |
-| **1** | `mordin_functions.sql`, `tests/mordin_functions_TEST.sql` | Test script: `failures = 0` | [ ] | |
+| **1** | `mordin_functions.sql`, `tests/mordin_functions_TEST.sql` | Test script: `failures = 0` | [ ] | Files in repo; deploy + run on VPS pending |
 | **2** | `mordin_seed_tables.sql` | 60 matrix rows; trainers match DB | [ ] | |
 | **3** | `mordin_history_UPDATE.sql` | `CALL mordin_history_UPDATE()`; G1 sample sane | [ ] | |
 | **4** | `mordin_runner_flags_UPDATE.sql` | `leaks = 0`; today’s card spot check | [ ] | |
@@ -101,6 +101,7 @@ Append dated lines as you go:
 ```
 2026-11-02 — Build tracker created. Awaiting Task 0 discovery.
 2026-11-02 — Task 0 discovery written to `mordin_class_NOTES.md` (commit 0.6 pending).
+2026-11-02 — Task 1: added `mordin_functions.sql` + `tests/mordin_functions_TEST.sql` (NI→GB; +6 discovery/daily age_range checks → 77 total).
 ```
 
 ---
