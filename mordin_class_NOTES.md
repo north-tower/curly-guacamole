@@ -69,6 +69,14 @@ Improvement (if product wants fewer gaps): extend `mordin_tier_code` for NULL-cl
 
 ---
 
+## Task 4 verification (2026-11-03, VPS)
+
+- **Point-in-time:** `leaks = 0` (last 30 days vs prior `mordin_runner_perf` counts).
+- **Flag volumes (all rows):** outclassed **64241**; outclassed_unknown **28863** (handicap 3yo+ with no season runs); juv_elim **285**; northern **42**; clear_2nd **326**; yar/sal pockets **162** / **33**; debut_pen **14540**; class_ok **53370**; elite_trainer **29076**.
+- **Today’s card (2026-11-03):** Handicaps → **C67_BOTTOM** with **outclassed_handicapper** 0/1/**NULL** (NULL = no qualifying season activity); novice/maiden → **C4_LOWMID** with **debut_penalty** on first-time 2yos as expected. Titles align with tier codes on spot sample.
+
+---
+
 ## Backtest verdicts (Task 10)
 
 | Rule | Bets | Strike % | ROI % | Baseline ROI % | Verdict |
