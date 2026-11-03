@@ -46,6 +46,29 @@ Discovery source: phpMyAdmin export on **server.fhor.site** / database **`coolwe
 
 ---
 
+## Task 3 verification (2026-11-03, VPS)
+
+- **Procedure:** `32226` races, `307609` runner rows (7-year flat window).
+- **G1 sample:** Winners `lengths_to_winner = 0`; placings scale with cumulative margins (Futurity Trophy example looks consistent with `mordin_perf_mcr`).
+- **Trainer group SR:** `Charlie Appleby` / `Owen Burrows` elite at realistic volume; small-sample foreign names at top of sort order is expected.
+- **comp_level:** Levels 1–5 all present; largest bucket level 4 at ~40% (within plan “none above ~45%”).
+- **Tier buckets:** `G1` (350) smallest pattern bucket; full ladder through `C67_BOTTOM`.
+- **Follow-up — `no_tier` / `no_mcr` = 6305 (~19.6%):** Above master-plan 10% guideline. These rows have **`tier_code IS NULL`** (not `UNQ`), so no `mordin_class_matrix` join → no `race_mcr`. Likely NULL **`daily_races_beta.class`** plus no Group/Listed/sell match in title (see band-only handicap note in Discovery). Optional diagnostic on server:
+
+```sql
+SELECT COUNT(*) AS n,
+  SUM(dracb.class IS NULL OR dracb.class = '') AS null_daily_class,
+  SUM(mordin_tier_code(dracb.race_title, dracb.class, hracb.handicap) IS NULL) AS fn_null
+FROM mordin_race_class mrc
+JOIN daily_races_beta dracb ON dracb.race_id = mrc.race_id
+JOIN historic_races_beta hracb ON hracb.race_id = mrc.race_id
+WHERE mrc.tier_code IS NULL;
+```
+
+Improvement (if product wants fewer gaps): extend `mordin_tier_code` for NULL-class band handicaps, or Task 4+ rules for untiered races — not a blocker for deploying Task 4.
+
+---
+
 ## Backtest verdicts (Task 10)
 
 | Rule | Bets | Strike % | ROI % | Baseline ROI % | Verdict |
