@@ -1041,6 +1041,21 @@
   color: var(--rd-mu);
 }
 
+.fhor-race-premium .fhor-mordin-pill--pos {
+  background: color-mix(in srgb, var(--rd-ac) 15%, transparent);
+  color: var(--rd-ac);
+}
+
+.fhor-race-premium .fhor-mordin-pill--neg {
+  background: color-mix(in srgb, #e5484d 14%, transparent);
+  color: #c2353a;
+}
+
+.fhor-race-premium .fhor-mordin-pill--warn {
+  background: color-mix(in srgb, var(--rd-warn) 15%, transparent);
+  color: var(--rd-warn);
+}
+
 .fhor-race-premium .btn,
 .fhor-race-premium .toggle-details-btn {
   background: var(--rd-s2);

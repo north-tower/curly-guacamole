@@ -56,6 +56,7 @@ add_filter( 'bricks/builder/i18n', function( $i18n ) {
 
     require_once __DIR__ . '/inc/helpers-core.php';
     require_once __DIR__ . '/inc/pedigree-dosage.php';
+    require_once __DIR__ . '/inc/mordin-class.php';
     require_once __DIR__ . '/inc/race-detail-perf.php';
     require_once __DIR__ . '/inc/enqueue.php';
     require_once __DIR__ . '/inc/rewrites.php';
@@ -2128,6 +2129,8 @@ if (!$race_pedigree_deferred && !empty($runners) && function_exists('bricks_dosa
         }
     }
 }
+
+$mordin_lookup = function_exists('fhor_mordin_flags_for_race') ? fhor_mordin_flags_for_race($race_id) : [];
 
 // Trainers-for-course signal (5y lookback up to yesterday) for trainers in this race.
 $trainer_course_lookup = [];
@@ -4355,6 +4358,17 @@ if ($speed_data) {
                                 } elseif (isset($dosage['di']) && is_numeric($dosage['di'])) {
                                     $dosage_sort_value = floatval($dosage['di']);
                                 }
+                            }
+
+                            $mordin_badges = [];
+                            $mordin_row = $mordin_lookup[intval($runner->runner_id ?? 0)] ?? null;
+                            if ($mordin_row && function_exists('fhor_mordin_badges')) {
+                                $mordin_badges = fhor_mordin_badges($mordin_row, fhor_mordin_stamina(
+                                    $race->distance_yards ?? null,
+                                    $mordin_row['race_tier_rank'] ?? null,
+                                    $dosage['di'] ?? null,
+                                    !empty($dosage['di_is_infinite'])
+                                ));
                             }
                             
                             // Row styling

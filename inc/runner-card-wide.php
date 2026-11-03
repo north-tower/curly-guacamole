@@ -44,6 +44,9 @@ if (!defined('ABSPATH')) {
                                         <?php if ($points_edge > 0): ?>
                                             <span class="fhor-pick-pill fhor-pick-pill--edge" title="Model vs market edge.">Edge <?php echo esc_html(number_format($points_edge, 1)); ?></span>
                                         <?php endif; ?>
+                                        <?php foreach (($mordin_badges ?? []) as $mordin_badge): ?>
+                                            <span class="fhor-pick-pill fhor-mordin-pill fhor-mordin-pill--<?php echo esc_attr($mordin_badge['tone']); ?>" title="<?php echo esc_attr($mordin_badge['title']); ?>"><?php echo esc_html($mordin_badge['label']); ?></span>
+                                        <?php endforeach; ?>
                                     </div>
                                     <div class="runner-card-wide__act">
                                         <?php
