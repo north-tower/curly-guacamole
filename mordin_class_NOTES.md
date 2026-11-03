@@ -96,11 +96,30 @@ cd /path/to/wordpress
 wp eval-file wp-content/themes/curly-guacamole/tests/mordin-backtest-verdicts.php -- --out=task10-report.md
 ```
 
-Requires `mordin_runner_flags` on the DB. Paste the generated markdown table below.
+Requires `mordin_runner_flags` on the DB. Full report: `mordin-task10-report.md` (2026-11-03 batch, 1825 days).
+
+**Applied:** All nine rule families → **Drop badge** on racecard (`fhor_mordin_badges`); **System Builder filters unchanged**. Only **Foreign form** warn pill remains (not in ROI matrix).
 
 | Rule | Bets | Strike % | ROI % | Baseline ROI % | Verdict |
-| --- | --- | --- | --- | --- | --- |
-| *(paste after batch or manual UI runs)* | | | | | |
+| --- | ---: | ---: | ---: | ---: | --- |
+| not_outclassed | 11972 | 10.9 | -25.5 | -26.7 | Drop badge |
+| class_ok | 2737 | 18.3 | -18.9 | -17.6 | Drop badge |
+| not_juv_eliminated | 0 | 0.0 | 0.0 | 0.0 | Drop badge |
+| not_northern | 0 | 0.0 | 0.0 | 0.0 | Drop badge |
+| clear_2nd · age band 2 | 0 | 0.0 | 0.0 | 0.0 | Drop badge |
+| clear_2nd · age band 3 | 0 | 0.0 | 0.0 | 0.0 | Drop badge |
+| debut_pocket · Yarmouth | 0 | 0.0 | 0.0 | 0.0 | Drop badge |
+| debut_pocket · Salisbury | 0 | 0.0 | 0.0 | 0.0 | Drop badge |
+| group_trainer | 4970 | 18.7 | -8.4 | -17.6 | Drop badge |
+| stamina_ok | 5851 | 12.9 | -24.1 | -24.3 | Drop badge |
+| dosage_target | 5358 | 13.2 | -23.1 | -24.3 | Drop badge |
+
+**Notes on this run**
+
+- **group_trainer** was **+9.2** ROI pts vs baseline (threshold **+10**) — automated drop; product may revisit.
+- **not_outclassed** removed pool ROI worse than remainder but **gap 3.5** (< 10); handicaps hit **scan cap** on baseline.
+- **Zero-bet** rows (2yo Class 1, maiden age band, debut pockets): likely **historic class / age_range filter mismatch** with `historic_races_beta` (tinyint class vs daily `"1"` string, age band `2` vs `2YO only`) — SB filters still work on live card; re-run batch after SB historic filter fix if you want valid ROI for those scenarios.
+- **stamina_ok:** only **18** removed bets (< 300 min) despite large gap on those 18.
 
 ---
 

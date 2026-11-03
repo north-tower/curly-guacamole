@@ -48,11 +48,12 @@ $labels = function (array $badges) {
 };
 $none = ['applies' => false, 'exceeded' => false, 'target' => false];
 mc_eq('no flags no badges', [], fhor_mordin_badges([], $none));
-mc_eq('clear 2nd badge', ['Clear 2nd'], $labels(fhor_mordin_badges(['high_value_maiden_placing' => '1'], $none)));
-mc_eq('outclassed badge', ['Outclassed'], $labels(fhor_mordin_badges(['outclassed_handicapper' => '1'], $none)));
-mc_eq('outclassed unknown no badge', [], $labels(fhor_mordin_badges(['outclassed_handicapper' => null], $none)));
-mc_eq('stamina doubt badge', ['Stamina doubt'], $labels(fhor_mordin_badges([], ['applies' => true, 'exceeded' => true, 'target' => false])));
-mc_eq('positives before negatives', ['Class proven', 'Debut'], $labels(fhor_mordin_badges(['debut_penalty' => '1', 'meets_class_requirement' => '1'], $none)));
+mc_eq('task10: mordin flags alone no racecard badges', [], $labels(fhor_mordin_badges([
+    'high_value_maiden_placing' => '1',
+    'meets_class_requirement' => '1',
+    'outclassed_handicapper' => '1',
+    'debut_penalty' => '1',
+], ['applies' => true, 'exceeded' => true, 'target' => true])));
 mc_eq('foreign form warn', ['Foreign form'], $labels(fhor_mordin_badges(['foreign_unquantified_runs' => '2'], $none)));
 
 mc_eq('not_outclassed rejects flagged', false, fhor_mordin_row_passes((object) ['mrf_outclassed_handicapper' => '1'], ['not_outclassed']));

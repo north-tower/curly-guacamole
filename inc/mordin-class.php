@@ -72,45 +72,10 @@ if (!function_exists('fhor_mordin_badges')) {
             $flags = get_object_vars($flags);
         }
         $flags = is_array($flags) ? $flags : [];
-        $on = function ($key) use ($flags) {
-            return isset($flags[$key]) && (string) $flags[$key] === '1';
-        };
 
+        // Task 10 (2026-11-03): ROI badge rules did not meet ±10pt thresholds — see mordin_class_NOTES.md § Backtest verdicts.
+        // System Builder Mordin filters unchanged; only racecard pills removed here.
         $badges = [];
-        if ($on('high_value_maiden_placing')) {
-            $badges[] = ['label' => 'Clear 2nd', 'tone' => 'pos', 'title' => 'Finished 2nd last time, 5+ lengths clear of the 3rd.'];
-        }
-        if ($on('meets_class_requirement')) {
-            $badges[] = ['label' => 'Class proven', 'tone' => 'pos', 'title' => 'Has won at this class tier or higher.'];
-        }
-        if ($on('yarmouth_newmarket_pocket')) {
-            $badges[] = ['label' => 'Yarmouth debut', 'tone' => 'pos', 'title' => 'Newmarket-trained 2yo debuting at Yarmouth (high strike-rate pocket).'];
-        }
-        if ($on('salisbury_lambourn_pocket')) {
-            $badges[] = ['label' => 'Salisbury debut', 'tone' => 'pos', 'title' => 'Lambourn-trained 2yo debuting at Salisbury (above-average strike-rate pocket).'];
-        }
-        if ($on('trainer_group_elite')) {
-            $rate = isset($flags['trainer_group_strike_rate']) ? (string) $flags['trainer_group_strike_rate'] : '';
-            $badges[] = ['label' => 'Group trainer', 'tone' => 'pos', 'title' => 'Trainer Group/Listed strike rate ' . $rate . '% over 5 years.'];
-        }
-        if (!empty($stamina['target'])) {
-            $badges[] = ['label' => 'DI ≤ 3.30', 'tone' => 'pos', 'title' => 'Dosage Index within the stamina target for a 10f+ Class 1 race.'];
-        }
-        if ($on('outclassed_handicapper')) {
-            $badges[] = ['label' => 'Outclassed', 'tone' => 'neg', 'title' => 'No top-3 or within-3-lengths run at this class or higher this season.'];
-        }
-        if ($on('eliminate_juvenile')) {
-            $badges[] = ['label' => 'Low-grade 2yo form', 'tone' => 'neg', 'title' => 'Has run in a nursery, claimer or seller.'];
-        }
-        if ($on('downgrade_northern_form')) {
-            $badges[] = ['label' => 'Northern form', 'tone' => 'neg', 'title' => 'Has run in a non-Pattern race at a northern track.'];
-        }
-        if (!empty($stamina['exceeded'])) {
-            $badges[] = ['label' => 'Stamina doubt', 'tone' => 'neg', 'title' => 'Dosage Index above 5.00 in a 10f+ Class 1 race.'];
-        }
-        if ($on('debut_penalty')) {
-            $badges[] = ['label' => 'Debut', 'tone' => 'neg', 'title' => 'Juvenile debutant outside the Yarmouth/Salisbury pockets.'];
-        }
         if (isset($flags['foreign_unquantified_runs']) && (int) $flags['foreign_unquantified_runs'] > 0) {
             $badges[] = ['label' => 'Foreign form', 'tone' => 'warn', 'title' => 'Has form abroad that cannot be converted to a UK class.'];
         }
