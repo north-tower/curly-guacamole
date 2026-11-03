@@ -77,6 +77,14 @@ Improvement (if product wants fewer gaps): extend `mordin_tier_code` for NULL-cl
 
 ---
 
+## Task 6 verification (2026-11-03, VPS)
+
+- Redeployed `RUNME_UpdateCall` from repo; `CALL RUNME_UpdateCall()` completed successfully.
+- Status output included **`mordin_history_UPDATE completed at`** and **`mordin_runner_flags_UPDATE completed at`** (not skipped).
+- Nightly chain now refreshes Mordin history + runner flags after daily card / optional sires job.
+
+---
+
 ## Backtest verdicts (Task 10)
 
 | Rule | Bets | Strike % | ROI % | Baseline ROI % | Verdict |

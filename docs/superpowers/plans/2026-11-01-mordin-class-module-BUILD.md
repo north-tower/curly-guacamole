@@ -53,7 +53,7 @@ Use this file to track execution. Check boxes as tasks complete; paste verificat
 | **3** | `mordin_history_UPDATE.sql` | `CALL mordin_history_UPDATE()`; G1 sample sane | [x] | VPS 2026-11-03: **32226** races, **307609** runs; G1/trainer SR OK; **no_tier 6305 (~19.6%)** — see NOTES |
 | **4** | `mordin_runner_flags_UPDATE.sql` | `leaks = 0`; today’s card spot check | [x] | VPS 2026-11-03: **leaks 0**; aggregates OK; today **C67_BOTTOM** / **C4_LOWMID** vs titles; hcap **outclassed** 0/1/NULL |
 | **5** | `mordin_calibration_REPORT.sql` | Paste calibration into NOTES | [x] | VPS 2026-11-03: **50** rows ok; LISTED vs C2_OPEN SR reversal (small n); no matrix change |
-| **6** | `RUNME_UpdateCall.sql` | Full nightly run includes both Mordin calls | [ ] | Repo wired 2026-11-03; VPS redeploy + `CALL RUNME_UpdateCall()` pending |
+| **6** | `RUNME_UpdateCall.sql` | Full nightly run includes both Mordin calls | [x] | VPS 2026-11-03: full `CALL RUNME_UpdateCall()`; both Mordin **completed at** status rows |
 
 **Milestone:** After Task 4, `SELECT * FROM mordin_runner_flags WHERE meeting_date = CURDATE() LIMIT 20` is meaningful without WordPress.
 
@@ -65,7 +65,7 @@ Use this file to track execution. Check boxes as tasks complete; paste verificat
 
 | Task | Files | Verify | Done | Notes |
 | --- | --- | --- | --- | --- |
-| **7** | `inc/mordin-class.php`, `tests/mordin-class-test.php` | `php tests/mordin-class-test.php` all ok | [ ] | |
+| **7** | `inc/mordin-class.php`, `tests/mordin-class-test.php` | `php tests/mordin-class-test.php` all ok | [x] | Local 2026-11-03: **27** checks, exit **0** |
 | **8** | `functions.php`, `inc/runner-card-wide.php`, `race-detail-premium.css` | Staging race page pills; `git add -p functions.php` | [ ] | |
 | **9** | `inc/system-builder.php`, `system-builder.js` | Backtest e.g. `not_outclassed`; save/load filters | [ ] | |
 | **10** | `mordin_class_NOTES.md`, maybe trim badges in `inc/mordin-class.php` | Backtest verdict table; badges match ROI rules | [ ] | |
@@ -111,6 +111,9 @@ Append dated lines as you go:
 2026-11-03 — Task 5: added `mordin_calibration_REPORT.sql` + `tests/mordin_calibration_VERIFY.sql` (5yr tiered races → `mordin_class_calibration`).
 2026-11-03 — Task 5 verified on VPS: calibration **50** rows; gap notes in `mordin_class_NOTES.md` § Calibration.
 2026-11-03 — Task 6: guarded `mordin_history_UPDATE` + `mordin_runner_flags_UPDATE` in `RUNME_UpdateCall.sql` (after `daily_sires_insights_UPDATE`, before final status).
+2026-11-03 — Task 6 verified on VPS: redeployed procedure; full nightly chain OK (both Mordin calls ran).
+2026-11-03 — Task 7: added `inc/mordin-class.php` + `tests/mordin-class-test.php` (stamina, badges, SB row check).
+2026-11-03 — Task 7 verified locally: `php tests/mordin-class-test.php` → all ok, exit 0.
 ```
 
 ---
