@@ -87,4 +87,6 @@ Improvement (if product wants fewer gaps): extend `mordin_tier_code` for NULL-cl
 
 ## Calibration (Task 5)
 
-*(Paste output from `mordin_calibration_REPORT.sql` here after Task 5.)*
+**Deploy (VPS):** load `mordin_calibration_REPORT.sql`, then `CALL mordin_calibration_REPORT();` (or `mysql … < tests/mordin_calibration_VERIFY.sql` after the CALL). Expect **50–60** rows in `mordin_class_calibration`. Compare **gaps** between tiers in `avg_winner_sr` with gaps in `spec_mcr` (absolute levels differ from Mordin’s scale). If a lower tier beats a higher one at the same `comp_level` in **3+** adjacent tier steps, note it here; matrix edits are data-only (`mordin_class_matrix`).
+
+*(Paste full `SELECT * FROM mordin_class_calibration …` output below after VPS run.)*

@@ -52,7 +52,7 @@ Use this file to track execution. Check boxes as tasks complete; paste verificat
 | **2** | `mordin_seed_tables.sql`, `tests/mordin_seed_TEST.sql` | 60 matrix rows; trainers match DB | [ ] | Repo ready 2026-11-03; `Charles Hills` (not Charlie); VPS deploy + test pending |
 | **3** | `mordin_history_UPDATE.sql` | `CALL mordin_history_UPDATE()`; G1 sample sane | [x] | VPS 2026-11-03: **32226** races, **307609** runs; G1/trainer SR OK; **no_tier 6305 (~19.6%)** — see NOTES |
 | **4** | `mordin_runner_flags_UPDATE.sql` | `leaks = 0`; today’s card spot check | [x] | VPS 2026-11-03: **leaks 0**; aggregates OK; today **C67_BOTTOM** / **C4_LOWMID** vs titles; hcap **outclassed** 0/1/NULL |
-| **5** | `mordin_calibration_REPORT.sql` | Paste calibration into NOTES | [ ] | |
+| **5** | `mordin_calibration_REPORT.sql` | Paste calibration into NOTES | [ ] | Repo ready 2026-11-03; VPS `CALL` + VERIFY pending |
 | **6** | `RUNME_UpdateCall.sql` | Full nightly run includes both Mordin calls | [ ] | |
 
 **Milestone:** After Task 4, `SELECT * FROM mordin_runner_flags WHERE meeting_date = CURDATE() LIMIT 20` is meaningful without WordPress.
@@ -108,6 +108,7 @@ Append dated lines as you go:
 2026-11-03 — Task 3 verified on VPS: CALL OK; VERIFY G1 margins/ratings + Appleby elite; flag no_tier 6305/32226.
 2026-11-03 — Task 4: added `mordin_runner_flags_UPDATE.sql` + `tests/mordin_runner_flags_VERIFY.sql` (5yr incremental + today/advance; v_logic_version 1).
 2026-11-03 — Task 4 verified on VPS: VERIFY leaks **0**; flag totals sane; 2026-11-03 card tiers match handicap/novice/maiden titles.
+2026-11-03 — Task 5: added `mordin_calibration_REPORT.sql` + `tests/mordin_calibration_VERIFY.sql` (5yr tiered races → `mordin_class_calibration`).
 ```
 
 ---
