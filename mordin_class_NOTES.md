@@ -87,9 +87,20 @@ Improvement (if product wants fewer gaps): extend `mordin_tier_code` for NULL-cl
 
 ## Backtest verdicts (Task 10)
 
+**Admin page (recommended):** log in as administrator → **`/mordin-backtest/`** → **Run all backtests** → copy NOTES table, download `.md` / `.json`, or paste JSON here in chat.
+
+**CLI** (same engine):
+
+```bash
+cd /path/to/wordpress
+wp eval-file wp-content/themes/curly-guacamole/tests/mordin-backtest-verdicts.php -- --out=task10-report.md
+```
+
+Requires `mordin_runner_flags` on the DB. Paste the generated markdown table below.
+
 | Rule | Bets | Strike % | ROI % | Baseline ROI % | Verdict |
 | --- | --- | --- | --- | --- | --- |
-| *(paste after Task 10)* | | | | | |
+| *(paste after batch or manual UI runs)* | | | | | |
 
 ---
 

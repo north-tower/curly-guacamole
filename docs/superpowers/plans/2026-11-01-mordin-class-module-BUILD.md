@@ -68,7 +68,7 @@ Use this file to track execution. Check boxes as tasks complete; paste verificat
 | **7** | `inc/mordin-class.php`, `tests/mordin-class-test.php` | `php tests/mordin-class-test.php` all ok | [x] | Local 2026-11-03: **27** checks, exit **0** |
 | **8** | `functions.php`, `inc/runner-card-wide.php`, `race-detail-premium.css` | Staging race page pills; `git add -p functions.php` | [x] | Repo wired 2026-11-03; staging spot-check pending |
 | **9** | `inc/system-builder.php`, `system-builder.js` | Backtest e.g. `not_outclassed`; save/load filters | [ ] | Repo wired 2026-11-03; local tests OK; staging backtest pending |
-| **10** | `mordin_class_NOTES.md`, maybe trim badges in `inc/mordin-class.php` | Backtest verdict table; badges match ROI rules | [ ] | |
+| **10** | `mordin_class_NOTES.md`, maybe trim badges in `inc/mordin-class.php` | Backtest verdict table; badges match ROI rules | [ ] | Batch: `wp eval-file …/tests/mordin-backtest-verdicts.php -- --out=task10-report.md` |
 
 **Milestone:** Task 9 — Mordin rules appear in System Builder and affect historic ROI using `mordin_runner_flags`, not FSr backtest.
 
