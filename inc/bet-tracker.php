@@ -204,29 +204,45 @@ if (!function_exists('fhor_bt_get_system_settings_map')) {
             return [];
         }
         $out = [];
-        foreach ($stored as $id => $row) {
-            $id = preg_replace('/\D/', '', (string) $id);
-            if ($id === '') {
+        foreach ($stored as $key => $row) {
+            $key = (string) $key;
+            if ($key === '') {
                 continue;
+            }
+            if (fhor_bt_is_tipster_book_id($key) || fhor_bt_is_legacy_tipster_book_key($key)) {
+                if (fhor_bt_is_legacy_tipster_book_key($key)) {
+                    continue;
+                }
+            } else {
+                $key = preg_replace('/\D/', '', $key);
+                if ($key === '') {
+                    continue;
+                }
             }
             if (!is_array($row)) {
                 continue;
             }
-            $out[$id] = fhor_bt_normalize_settings($row);
+            $out[$key] = fhor_bt_normalize_settings($row);
         }
         return $out;
     }
 }
 
 if (!function_exists('fhor_bt_save_system_settings')) {
-    function fhor_bt_save_system_settings($user_id, $system_id, array $settings) {
+    function fhor_bt_save_system_settings($user_id, $book_key, array $settings) {
+        return fhor_bt_save_book_settings($user_id, $book_key, $settings);
+    }
+}
+
+if (!function_exists('fhor_bt_save_book_settings')) {
+    function fhor_bt_save_book_settings($user_id, $book_key, array $settings) {
         $user_id = intval($user_id);
-        $system_id = preg_replace('/\D/', '', (string) $system_id);
-        if ($user_id <= 0 || $system_id === '') {
+        $book_key = fhor_bt_sanitize_book_key($book_key, $user_id);
+        if ($user_id <= 0 || $book_key === '') {
             return false;
         }
         $map = fhor_bt_get_system_settings_map($user_id);
-        $map[$system_id] = fhor_bt_normalize_settings($settings);
+        $map[$book_key] = fhor_bt_normalize_settings($settings);
         update_user_meta($user_id, fhor_bt_system_settings_key(), $map);
         return true;
     }
@@ -234,17 +250,18 @@ if (!function_exists('fhor_bt_save_system_settings')) {
 
 if (!function_exists('fhor_bt_get_settings_for_book')) {
     /**
-     * Staking for a book: empty system_id = general (untagged) bets; otherwise per saved system.
-     * New systems default to £100 / 5% until you save staking for that system.
+     * Staking for a book: '' = general (untagged); numeric id = System Builder;
+     * Staking for a book: '' = general (untagged); numeric id = System Builder;
+     * tb… = tipster or personal book (stable id, display name on the bet).
      */
-    function fhor_bt_get_settings_for_book($user_id, $system_id) {
-        $system_id = preg_replace('/\D/', '', (string) $system_id);
-        if ($system_id === '') {
+    function fhor_bt_get_settings_for_book($user_id, $book_key) {
+        $book_key = fhor_bt_sanitize_book_key($book_key, $user_id);
+        if ($book_key === '') {
             return fhor_bt_get_settings($user_id);
         }
         $map = fhor_bt_get_system_settings_map($user_id);
-        if (isset($map[$system_id])) {
-            return $map[$system_id];
+        if (isset($map[$book_key])) {
+            return $map[$book_key];
         }
         return fhor_bt_normalize_settings([]);
     }
@@ -254,6 +271,325 @@ if (!function_exists('fhor_bt_norm_system_name')) {
     function fhor_bt_norm_system_name($name) {
         $name = strtolower(trim((string) $name));
         return preg_replace('/[\s\/\-_]+/', '', $name);
+    }
+}
+
+if (!function_exists('fhor_bt_tipster_books_key')) {
+    function fhor_bt_tipster_books_key() {
+        return 'fhor_bet_tracker_tipster_books';
+    }
+}
+
+if (!function_exists('fhor_bt_is_tipster_book_id')) {
+    function fhor_bt_is_tipster_book_id($id) {
+        $id = strtolower(trim((string) $id));
+        return (bool) preg_match('/^tb[a-z0-9]{10}$/', $id);
+    }
+}
+
+if (!function_exists('fhor_bt_is_legacy_tipster_book_key')) {
+    function fhor_bt_is_legacy_tipster_book_key($key) {
+        return is_string($key) && strpos($key, 't:') === 0 && strlen($key) > 2;
+    }
+}
+
+/** @deprecated use fhor_bt_is_tipster_book_id or fhor_bt_is_legacy_tipster_book_key */
+if (!function_exists('fhor_bt_is_tipster_book_key')) {
+    function fhor_bt_is_tipster_book_key($key) {
+        return fhor_bt_is_tipster_book_id($key) || fhor_bt_is_legacy_tipster_book_key($key);
+    }
+}
+
+if (!function_exists('fhor_bt_get_tipster_books')) {
+    function fhor_bt_get_tipster_books($user_id = 0) {
+        $user_id = $user_id ? intval($user_id) : get_current_user_id();
+        if ($user_id <= 0) {
+            return [];
+        }
+        $stored = get_user_meta($user_id, fhor_bt_tipster_books_key(), true);
+        if (!is_array($stored)) {
+            return [];
+        }
+        $out = [];
+        foreach ($stored as $id => $row) {
+            $id = strtolower(trim((string) $id));
+            if (!fhor_bt_is_tipster_book_id($id) || !is_array($row)) {
+                continue;
+            }
+            $name = trim((string) ($row['name'] ?? ''));
+            $norm = fhor_bt_norm_system_name($name);
+            if ($name === '' || $norm === '') {
+                continue;
+            }
+            $out[$id] = [
+                'id' => $id,
+                'name' => $name,
+                'norm' => $norm,
+            ];
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('fhor_bt_save_tipster_books')) {
+    function fhor_bt_save_tipster_books($user_id, array $books) {
+        $user_id = intval($user_id);
+        if ($user_id <= 0) {
+            return false;
+        }
+        update_user_meta($user_id, fhor_bt_tipster_books_key(), $books);
+        return true;
+    }
+}
+
+if (!function_exists('fhor_bt_generate_tipster_book_id')) {
+    function fhor_bt_generate_tipster_book_id(array $existing) {
+        do {
+            $id = 'tb' . substr(bin2hex(random_bytes(8)), 0, 10);
+        } while (isset($existing[$id]));
+        return $id;
+    }
+}
+
+if (!function_exists('fhor_bt_migrate_tipster_settings_key')) {
+    function fhor_bt_migrate_tipster_settings_key($user_id, $from_key, $to_id) {
+        $user_id = intval($user_id);
+        $to_id = fhor_bt_sanitize_book_key($to_id, $user_id);
+        if ($user_id <= 0 || !fhor_bt_is_tipster_book_id($to_id)) {
+            return;
+        }
+        $map = get_user_meta($user_id, fhor_bt_system_settings_key(), true);
+        if (!is_array($map)) {
+            return;
+        }
+        $from_key = (string) $from_key;
+        if ($from_key === '' || !isset($map[$from_key])) {
+            return;
+        }
+        if (!isset($map[$to_id])) {
+            $map[$to_id] = $map[$from_key];
+        }
+        unset($map[$from_key]);
+        update_user_meta($user_id, fhor_bt_system_settings_key(), $map);
+    }
+}
+
+if (!function_exists('fhor_bt_migrate_legacy_tipster_storage')) {
+    function fhor_bt_migrate_legacy_tipster_storage($user_id) {
+        $user_id = intval($user_id);
+        if ($user_id <= 0) {
+            return;
+        }
+        $map = get_user_meta($user_id, fhor_bt_system_settings_key(), true);
+        if (!is_array($map) || !$map) {
+            return;
+        }
+        $books = fhor_bt_get_tipster_books($user_id);
+        $changed = false;
+        foreach (array_keys($map) as $key) {
+            if (!fhor_bt_is_legacy_tipster_book_key($key)) {
+                continue;
+            }
+            $norm = substr($key, 2);
+            $found_id = '';
+            foreach ($books as $id => $meta) {
+                if ($meta['norm'] === $norm) {
+                    $found_id = $id;
+                    break;
+                }
+            }
+            if ($found_id === '') {
+                $found_id = fhor_bt_generate_tipster_book_id($books);
+                $books[$found_id] = [
+                    'id' => $found_id,
+                    'name' => ucfirst($norm),
+                    'norm' => $norm,
+                ];
+                $changed = true;
+            }
+            fhor_bt_migrate_tipster_settings_key($user_id, $key, $found_id);
+        }
+        if ($changed) {
+            fhor_bt_save_tipster_books($user_id, $books);
+        }
+    }
+}
+
+if (!function_exists('fhor_bt_find_or_create_tipster_book')) {
+    function fhor_bt_find_or_create_tipster_book($user_id, $name) {
+        $user_id = intval($user_id);
+        $name = trim((string) $name);
+        $norm = fhor_bt_norm_system_name($name);
+        if ($user_id <= 0 || $name === '' || $norm === '') {
+            return ['id' => '', 'name' => ''];
+        }
+        $books = fhor_bt_get_tipster_books($user_id);
+        foreach ($books as $id => $meta) {
+            if ($meta['norm'] === $norm) {
+                if ($meta['name'] !== $name) {
+                    $books[$id]['name'] = $name;
+                    fhor_bt_save_tipster_books($user_id, $books);
+                }
+                return ['id' => $id, 'name' => $name];
+            }
+        }
+        $id = fhor_bt_generate_tipster_book_id($books);
+        $books[$id] = [
+            'id' => $id,
+            'name' => $name,
+            'norm' => $norm,
+        ];
+        fhor_bt_save_tipster_books($user_id, $books);
+        fhor_bt_migrate_tipster_settings_key($user_id, 't:' . $norm, $id);
+        return ['id' => $id, 'name' => $name];
+    }
+}
+
+if (!function_exists('fhor_bt_resolve_bet_book_fields')) {
+    /**
+     * Saved System Builder systems win on name match; otherwise tipster books get stable tb… ids.
+     */
+    function fhor_bt_resolve_bet_book_fields($user_id, $name, $id) {
+        $user_id = intval($user_id);
+        $name = trim((string) $name);
+        $raw_id = strtolower(trim((string) $id));
+        $idx = fhor_bt_saved_system_index($user_id);
+        $norm = fhor_bt_norm_system_name($name);
+
+        if ($norm !== '' && isset($idx['by_norm'][$norm])) {
+            $cid = $idx['by_norm'][$norm];
+            return [
+                'system_id' => $cid,
+                'system_name' => $idx['by_id'][$cid]['name'],
+            ];
+        }
+
+        $numeric = preg_replace('/\D/', '', $raw_id);
+        if ($numeric !== '' && isset($idx['by_id'][$numeric])) {
+            return [
+                'system_id' => $numeric,
+                'system_name' => $idx['by_id'][$numeric]['name'],
+            ];
+        }
+
+        if (fhor_bt_is_tipster_book_id($raw_id)) {
+            $books = fhor_bt_get_tipster_books($user_id);
+            if (isset($books[$raw_id])) {
+                $book_name = $books[$raw_id]['name'];
+                if ($name !== '' && $norm !== $books[$raw_id]['norm']) {
+                    $book = fhor_bt_find_or_create_tipster_book($user_id, $name);
+                    return [
+                        'system_id' => $book['id'],
+                        'system_name' => $book['name'],
+                    ];
+                }
+                if ($name !== '' && $book_name !== $name) {
+                    $books[$raw_id]['name'] = $name;
+                    fhor_bt_save_tipster_books($user_id, $books);
+                    $book_name = $name;
+                }
+                return [
+                    'system_id' => $raw_id,
+                    'system_name' => $book_name,
+                ];
+            }
+        }
+
+        if ($name === '') {
+            return [
+                'system_id' => '',
+                'system_name' => '',
+            ];
+        }
+
+        $book = fhor_bt_find_or_create_tipster_book($user_id, $name);
+        return [
+            'system_id' => $book['id'],
+            'system_name' => $book['name'],
+        ];
+    }
+}
+
+if (!function_exists('fhor_bt_sanitize_book_key')) {
+    function fhor_bt_sanitize_book_key($raw, $user_id = 0) {
+        $raw = strtolower(trim(sanitize_text_field((string) $raw)));
+        if ($raw === '__general__') {
+            return '';
+        }
+        if (fhor_bt_is_tipster_book_id($raw)) {
+            return $raw;
+        }
+        if (fhor_bt_is_legacy_tipster_book_key($raw) && $user_id > 0) {
+            $norm = substr($raw, 2);
+            foreach (fhor_bt_get_tipster_books($user_id) as $id => $meta) {
+                if ($meta['norm'] === $norm) {
+                    return $id;
+                }
+            }
+        }
+        return preg_replace('/\D/', '', $raw);
+    }
+}
+
+if (!function_exists('fhor_bt_book_key_for_bet')) {
+    function fhor_bt_book_key_for_bet(array $bet) {
+        $raw_id = strtolower(trim((string) ($bet['system_id'] ?? '')));
+        if (fhor_bt_is_tipster_book_id($raw_id)) {
+            return $raw_id;
+        }
+        $numeric = preg_replace('/\D/', '', (string) ($bet['system_id'] ?? ''));
+        if ($numeric !== '') {
+            return $numeric;
+        }
+        $name = trim((string) ($bet['system_name'] ?? ''));
+        if ($name === '') {
+            return '';
+        }
+        $legacy = 't:' . fhor_bt_norm_system_name($name);
+        return $legacy === 't:' ? '' : $legacy;
+    }
+}
+
+if (!function_exists('fhor_bt_book_key_from_fields')) {
+    function fhor_bt_book_key_from_fields($user_id, $name, $id) {
+        $resolved = fhor_bt_resolve_bet_book_fields($user_id, $name, $id);
+        return fhor_bt_book_key_for_bet($resolved);
+    }
+}
+
+if (!function_exists('fhor_bt_book_label')) {
+    function fhor_bt_book_label($user_id, $book_key, array $group_bets = []) {
+        if ($book_key === '') {
+            return 'General';
+        }
+        if (fhor_bt_is_tipster_book_id($book_key)) {
+            $books = fhor_bt_get_tipster_books($user_id);
+            if (isset($books[$book_key]['name'])) {
+                return $books[$book_key]['name'];
+            }
+            foreach ($group_bets as $bet) {
+                $name = trim((string) ($bet['system_name'] ?? ''));
+                if ($name !== '') {
+                    return $name;
+                }
+            }
+            return $book_key;
+        }
+        if (fhor_bt_is_legacy_tipster_book_key($book_key)) {
+            return ucfirst(substr($book_key, 2));
+        }
+        $idx = fhor_bt_saved_system_index($user_id);
+        if (isset($idx['by_id'][$book_key])) {
+            return $idx['by_id'][$book_key]['name'];
+        }
+        return 'System ' . $book_key;
+    }
+}
+
+if (!function_exists('fhor_bt_tipster_book_key')) {
+    function fhor_bt_tipster_book_key($name) {
+        $norm = fhor_bt_norm_system_name($name);
+        return $norm === '' ? '' : ('t:' . $norm);
     }
 }
 
@@ -304,6 +640,9 @@ if (!function_exists('fhor_bt_canonical_system_fields')) {
                 'system_name' => $idx['by_id'][$id]['name'],
             ];
         }
+        if ($id !== '' && !isset($idx['by_id'][$id])) {
+            $id = '';
+        }
         return [
             'system_id' => $id,
             'system_name' => $name,
@@ -317,12 +656,12 @@ if (!function_exists('fhor_bt_repair_system_links')) {
         $user_id = intval($user_id);
         $table = fhor_bt_bets_table();
         foreach ($bets as $i => $bet) {
-            $linked = fhor_bt_canonical_system_fields(
+            $linked = fhor_bt_resolve_bet_book_fields(
                 $user_id,
                 isset($bet['system_name']) ? $bet['system_name'] : '',
                 isset($bet['system_id']) ? $bet['system_id'] : ''
             );
-            $cur_id = preg_replace('/\D/', '', (string) ($bet['system_id'] ?? ''));
+            $cur_id = strtolower(trim((string) ($bet['system_id'] ?? '')));
             $cur_name = trim((string) ($bet['system_name'] ?? ''));
             if ($linked['system_id'] === $cur_id && $linked['system_name'] === $cur_name) {
                 continue;
@@ -351,7 +690,7 @@ if (!function_exists('fhor_bt_group_bets_by_book')) {
     function fhor_bt_group_bets_by_book(array $bets) {
         $groups = [];
         foreach ($bets as $bet) {
-            $key = preg_replace('/\D/', '', (string) ($bet['system_id'] ?? ''));
+            $key = fhor_bt_book_key_for_bet($bet);
             if (!isset($groups[$key])) {
                 $groups[$key] = [];
             }
@@ -362,11 +701,10 @@ if (!function_exists('fhor_bt_group_bets_by_book')) {
 }
 
 if (!function_exists('fhor_bt_filter_bets_for_book')) {
-    function fhor_bt_filter_bets_for_book(array $bets, $system_id) {
-        $system_id = preg_replace('/\D/', '', (string) $system_id);
-        return array_values(array_filter($bets, function ($bet) use ($system_id) {
-            $sid = preg_replace('/\D/', '', (string) ($bet['system_id'] ?? ''));
-            return $sid === $system_id;
+    function fhor_bt_filter_bets_for_book(array $bets, $book_key, $user_id = 0) {
+        $book_key = fhor_bt_sanitize_book_key($book_key, $user_id);
+        return array_values(array_filter($bets, function ($bet) use ($book_key) {
+            return fhor_bt_book_key_for_bet($bet) === $book_key;
         }));
     }
 }
@@ -379,14 +717,18 @@ if (!function_exists('fhor_bt_recalculate_books')) {
         $books = [];
         $total_bankroll = 0.0;
 
-        foreach ($groups as $system_id => $group_bets) {
-            $settings = fhor_bt_get_settings_for_book($user_id, $system_id);
+        foreach ($groups as $book_key => $group_bets) {
+            $settings = fhor_bt_get_settings_for_book($user_id, $book_key);
             $cmp = fhor_bt_compare($group_bets, $settings, $today);
             foreach ($cmp['bets'] as $bet) {
                 $projected_by_id[(int) ($bet['id'] ?? 0)] = $bet;
             }
-            $books[$system_id] = [
-                'system_id' => $system_id,
+            $books[$book_key] = [
+                'book_key' => $book_key,
+                'book_label' => fhor_bt_book_label($user_id, $book_key, $group_bets),
+                'book_kind' => $book_key === '' ? 'general' : ((fhor_bt_is_tipster_book_id($book_key) || fhor_bt_is_legacy_tipster_book_key($book_key)) ? 'tipster' : 'system'),
+                'tipster_id' => fhor_bt_is_tipster_book_id($book_key) ? $book_key : '',
+                'system_id' => (fhor_bt_is_tipster_book_id($book_key) || fhor_bt_is_legacy_tipster_book_key($book_key)) ? '' : $book_key,
                 'bankroll' => $cmp['bankroll'],
                 'today' => $cmp['today'],
                 'today_opening' => $cmp['today_opening'],
@@ -412,6 +754,7 @@ if (!function_exists('fhor_bt_recalculate_books')) {
             'books' => $books,
             'bankroll' => round($total_bankroll, 2),
             'system_settings' => fhor_bt_get_system_settings_map($user_id),
+            'tipster_books' => array_values(fhor_bt_get_tipster_books($user_id)),
         ];
     }
 }
@@ -488,6 +831,7 @@ if (!function_exists('fhor_bt_annotate_bets')) {
             $bets[$i]['type_label'] = $label;
             $bets[$i]['ew_key'] = fhor_bt_ew_key(isset($bet['ew_fraction']) ? $bet['ew_fraction'] : 0.25);
             $bets[$i]['date'] = substr((string) $bet['placed_at'], 0, 10);
+            $bets[$i]['book_key'] = fhor_bt_book_key_for_bet($bet);
             foreach (['total_stake', 'unit_stake', 'returns_amount', 'profit', 'manual_total', 'shadow_total_stake', 'shadow_profit', 'shadow_returns'] as $key) {
                 if (isset($bets[$i][$key])) {
                     $bets[$i][$key] = round((float) $bets[$i][$key], 2);
@@ -531,6 +875,7 @@ if (!function_exists('fhor_bt_recalculate')) {
         $user_id = intval($user_id);
         $settings = fhor_bt_get_settings($user_id);
         $today = fhor_bt_today();
+        fhor_bt_migrate_legacy_tipster_storage($user_id);
         $all_bets = fhor_bt_repair_system_links($user_id, fhor_bt_load_bets($user_id));
         $multi = fhor_bt_recalculate_books($user_id, $all_bets, $today);
         fhor_bt_persist_projection($user_id, $multi['bets']);
@@ -560,6 +905,7 @@ if (!function_exists('fhor_bt_recalculate')) {
             'today' => $today,
             'settings' => $settings,
             'system_settings' => $multi['system_settings'],
+            'tipster_books' => array_values(fhor_bt_get_tipster_books($user_id)),
         ];
         if ($general) {
             $cmp['today_opening'] = $general['today_opening'];
@@ -656,7 +1002,7 @@ if (!function_exists('fhor_bt_parse_bet_input')) {
         }
         $system = sanitize_text_field(isset($raw['system_name']) ? $raw['system_name'] : '');
         $system_id = sanitize_text_field(isset($raw['system_id']) ? $raw['system_id'] : '');
-        $linked = fhor_bt_canonical_system_fields(get_current_user_id(), $system, $system_id);
+        $linked = fhor_bt_resolve_bet_book_fields(get_current_user_id(), $system, $system_id);
         $system = $linked['system_name'];
         $system_id = $linked['system_id'];
         $note = sanitize_textarea_field(isset($raw['note']) ? $raw['note'] : '');
@@ -799,9 +1145,9 @@ if (!function_exists('fhor_bt_ajax_save_settings')) {
             'points_per_bet' => isset($_POST['points_per_bet']) ? wp_unslash($_POST['points_per_bet']) : 1,
         ]);
         $scope = isset($_POST['book_scope']) ? sanitize_text_field(wp_unslash($_POST['book_scope'])) : '';
-        $system_id = preg_replace('/\D/', '', $scope);
-        if ($system_id !== '') {
-            fhor_bt_save_system_settings($user_id, $system_id, $settings);
+        $book_key = fhor_bt_sanitize_book_key($scope, $user_id);
+        if ($book_key !== '') {
+            fhor_bt_save_book_settings($user_id, $book_key, $settings);
         } else {
             update_user_meta($user_id, fhor_bt_settings_key(), $settings);
         }
@@ -822,12 +1168,13 @@ if (!function_exists('fhor_bt_ajax_quote')) {
                 return (int) $bet['id'] !== $exclude;
             }));
         }
+        $system_name = isset($_POST['system_name']) ? sanitize_text_field(wp_unslash($_POST['system_name'])) : '';
         $system_id = isset($_POST['system_id']) ? sanitize_text_field(wp_unslash($_POST['system_id'])) : '';
-        $system_id = preg_replace('/\D/', '', $system_id);
-        $bets = fhor_bt_filter_bets_for_book($bets, $system_id);
+        $book_key = fhor_bt_book_key_from_fields($user_id, $system_name, $system_id);
+        $bets = fhor_bt_filter_bets_for_book($bets, $book_key, $user_id);
         $quote = fhor_bt_quote(
             $bets,
-            fhor_bt_get_settings_for_book($user_id, $system_id),
+            fhor_bt_get_settings_for_book($user_id, $book_key),
             isset($_POST['placed_at']) ? wp_unslash($_POST['placed_at']) : '',
             sanitize_key(isset($_POST['bet_type']) ? wp_unslash($_POST['bet_type']) : 'single'),
             !empty($_POST['each_way']),
@@ -1229,7 +1576,7 @@ if (!function_exists('fhor_bt_modal_html')) {
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="bt-field"><label for="bt-system">System</label><input id="bt-system" type="text" maxlength="190" placeholder="Optional tag"></div>
+                        <div class="bt-field"><label for="bt-system">Tipster / book</label><input id="bt-system" type="text" maxlength="190" placeholder="e.g. SD Racing, Me, Weekends"><span class="bt-note" style="margin:.2rem 0 0">A unique book id (tb…) is assigned automatically — shown in the list after you save.</span></div>
                         <div class="bt-field" id="bt-ew-wrap"><label for="bt-ew-terms">Place terms</label>
                             <select id="bt-ew-terms">
                                 <option value="1/4">1/4 odds</option>
@@ -1344,7 +1691,7 @@ if (!function_exists('fhor_bt_app_html')) {
                     <button type="button" class="bt-tab" data-range="365">Last Year</button>
                     <button type="button" class="bt-tab is-on" data-range="all">All-Time</button>
                     <button type="button" class="bt-btn" id="bt-demo-peek" hidden>Sample book</button>
-                    <select id="bt-system-filter" aria-label="Filter by system"><option value="">All systems</option></select>
+                    <select id="bt-system-filter" aria-label="Filter by book"><option value="">All books</option></select>
                 </div>
                 <div class="bt-chart-grid">
                     <div class="bt-chart-wrap"><canvas id="bt-chart"></canvas></div>
@@ -1353,7 +1700,7 @@ if (!function_exists('fhor_bt_app_html')) {
             </section>
             <section class="bt-panel">
                 <h2>Staking setup</h2>
-                <p class="bt-note" id="bt-staking-scope" style="margin:0 0 .65rem;">Each saved System Builder system has its own bankroll. Choose a system above to set its starting balance and staking. General bets (no system tag) use the settings below.</p>
+                <p class="bt-note" id="bt-staking-scope" style="margin:0 0 .65rem;">General bets have one bankroll. Each tipster name or saved system is a separate book with its own starting balance and staking — no System Builder setup required for tipsters.</p>
                 <form id="bt-settings-form">
                     <div class="bt-grid">
                         <div class="bt-field"><label for="bt-mode">Method</label>
@@ -1380,7 +1727,7 @@ if (!function_exists('fhor_bt_app_html')) {
                     <table class="bt-table">
                         <thead>
                             <tr>
-                                <th>Date</th><th>Course</th><th>Selection</th><th>Type</th><th>Odds</th><th>Stake</th><th>Result</th><th>P/L</th><th>System</th><th id="bt-extra-head"></th>
+                                <th>Date</th><th>Course</th><th>Selection</th><th>Type</th><th>Odds</th><th>Stake</th><th>Result</th><th>P/L</th><th>Book</th><th id="bt-extra-head"></th>
                             </tr>
                         </thead>
                         <tbody id="bt-table-body"></tbody>

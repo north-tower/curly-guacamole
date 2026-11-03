@@ -115,6 +115,9 @@ function bricks_speed_performance_enqueue_scripts() {
 add_action('wp_enqueue_scripts', 'bricks_speed_performance_enqueue_scripts');
 
 function bricks_sire_insights_enqueue_scripts() {
+    if (!function_exists('fhor_sire_form_is_public') || !fhor_sire_form_is_public()) {
+        return;
+    }
     $is_sire_route = bricks_request_uri_contains(['/sire-insights', '/daily-sire-insights', '/daily_sires_insights']);
     $has_sire_shortcode = bricks_current_post_has_shortcode(['daily_sires_insights']);
     if (!$is_sire_route && !$has_sire_shortcode) {

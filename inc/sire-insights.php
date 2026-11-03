@@ -1,7 +1,45 @@
 <?php
 /**
  * Daily sire insights feature: shortcode, AJAX filters, and table render.
+ *
+ * Public page is off by default — Lin5 on race cards covers the same signal in context.
+ * Re-enable when the standalone tool is worth shipping: define('FHOR_SIRE_FORM_PUBLIC', true);
  */
+
+if (!defined('FHOR_SIRE_FORM_PUBLIC')) {
+    define('FHOR_SIRE_FORM_PUBLIC', false);
+}
+
+if (!function_exists('fhor_sire_form_is_public')) {
+    function fhor_sire_form_is_public() {
+        return (bool) apply_filters('fhor_sire_form_public', FHOR_SIRE_FORM_PUBLIC);
+    }
+}
+
+if (!function_exists('fhor_sire_form_request_is_active')) {
+    function fhor_sire_form_request_is_active() {
+        if (!function_exists('bricks_request_uri_contains')) {
+            return false;
+        }
+        return bricks_request_uri_contains(['/sire-insights', '/daily-sire-insights', '/daily_sires_insights']);
+    }
+}
+
+function fhor_sire_form_maybe_block_public_route() {
+    if (fhor_sire_form_is_public()) {
+        return;
+    }
+    if (!fhor_sire_form_request_is_active()) {
+        return;
+    }
+    global $wp_query;
+    if ($wp_query instanceof WP_Query) {
+        $wp_query->set_404();
+    }
+    status_header(404);
+    nocache_headers();
+}
+add_action('template_redirect', 'fhor_sire_form_maybe_block_public_route', 0);
 
 if (!function_exists('bricks_sire_insights_table_candidates')) {
     function bricks_sire_insights_table_candidates() {
@@ -349,6 +387,10 @@ if (!function_exists('bricks_sire_insights_has_rows_for_date')) {
 
 if (!function_exists('bricks_sire_insights_get_filter_options')) {
     function bricks_sire_insights_get_filter_options() {
+        if (!fhor_sire_form_is_public()) {
+            wp_send_json_error(['message' => 'Sire form is not available.'], 403);
+            return;
+        }
         global $wpdb;
         $table = bricks_sire_insights_resolve_table();
 
@@ -661,6 +703,11 @@ if (!function_exists('bricks_sire_insights_render_table_html')) {
 
 if (!function_exists('bricks_ajax_load_sire_insights_table')) {
     function bricks_ajax_load_sire_insights_table() {
+        if (!fhor_sire_form_is_public()) {
+            status_header(403);
+            echo '';
+            wp_die();
+        }
         global $wpdb;
         $table = bricks_sire_insights_resolve_table();
 
@@ -813,6 +860,9 @@ add_action('wp_ajax_nopriv_load_sire_insights_table', 'bricks_ajax_load_sire_ins
 
 if (!function_exists('bricks_daily_sires_insights_shortcode')) {
     function bricks_daily_sires_insights_shortcode($atts = []) {
+        if (!fhor_sire_form_is_public()) {
+            return '';
+        }
         if (!bricks_sire_insights_table_exists()) {
             return '<div style="padding:16px;color:#991b1b;background:#fee2e2;border-radius:8px;">Sire insights data table is not available on the current WP DB connection yet. If the table exists in another schema, copy/sync it into this site DB.</div>';
         }

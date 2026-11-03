@@ -178,8 +178,35 @@
         return sel ? String(sel.value || '') : '';
     }
 
-    function systemLabel(systemId) {
-        var id = String(systemId || '').replace(/\D/g, '');
+    function isTipsterBookId(id) {
+        return /^tb[a-z0-9]{10}$/.test(String(id || '').toLowerCase());
+    }
+
+    function systemLabel(scope) {
+        if (!scope || scope === '__general__') {
+            return 'General';
+        }
+        if (isTipsterBookId(scope)) {
+            var tipsters = state.tipster_books || [];
+            for (var t = 0; t < tipsters.length; t += 1) {
+                if (tipsters[t].id === scope) {
+                    return tipsters[t].name || scope;
+                }
+            }
+            var books = state.books || {};
+            if (books[scope] && books[scope].book_label) {
+                return books[scope].book_label;
+            }
+            return scope;
+        }
+        var booksMeta = state.books || {};
+        if (booksMeta[scope] && booksMeta[scope].book_label) {
+            return booksMeta[scope].book_label;
+        }
+        if (String(scope).indexOf('t:') === 0) {
+            return String(scope).slice(2);
+        }
+        var id = String(scope || '').replace(/\D/g, '');
         if (!id) {
             return 'General';
         }
@@ -248,7 +275,8 @@
             flat_line: (Number(settings.points_per_bet) || 1) * (Number(settings.point_value) || 1),
             settings: settings,
             actual_label: settings.mode === 'flat' ? 'Flat staking' : 'Dynamic ' + pct + '%',
-            shadow_label: settings.mode === 'flat' ? 'Dynamic' : 'Flat'
+            shadow_label: settings.mode === 'flat' ? 'Dynamic' : 'Flat',
+            book_label: systemLabel(scope)
         };
     }
 
@@ -270,6 +298,18 @@
         var scope = filterScope();
         if (!scope || scope === '__general__') {
             return {};
+        }
+        if (String(scope).indexOf('t:') === 0) {
+            return {
+                system_name: systemLabel(scope),
+                system_id: ''
+            };
+        }
+        if (isTipsterBookId(scope)) {
+            return {
+                system_id: scope,
+                system_name: systemLabel(scope)
+            };
         }
         return {
             system_id: scope,
@@ -336,11 +376,13 @@
             return;
         }
         if (combined) {
-            note.textContent = 'Combined view: bankroll is the sum of every separate book. Choose General or a saved system above to edit its starting balance and staking.';
+            note.textContent = 'Combined view: bankroll is the sum of every separate book. Choose General, a tipster book, or a saved system above to edit staking.';
         } else if (scope === '__general__') {
-            note.textContent = 'Staking for bets logged without a System Builder system tag.';
+            note.textContent = 'Staking for bets logged without a tipster or system tag.';
+        } else if (isTipsterBookId(scope)) {
+            note.textContent = 'Staking for “' + systemLabel(scope) + '” (' + scope + '). Tipster books have their own bankroll (default £100 until you change it here).';
         } else {
-            note.textContent = 'Staking for “' + systemLabel(scope) + '”. Each saved system has its own bankroll (default £100 until you change it here).';
+            note.textContent = 'Staking for “' + systemLabel(scope) + '”. Saved System Builder systems have their own bankroll (default £100 until you change it here).';
         }
         if (saveBtn) {
             saveBtn.disabled = combined;
@@ -575,7 +617,8 @@
             each_way: document.getElementById('bt-ew').checked ? '1' : '',
             leg_count: String(readLegs().length),
             exclude_id: document.getElementById('bt-id').value || '0',
-            system_id: document.getElementById('bt-system-id').value || ''
+            system_id: document.getElementById('bt-system-id').value || '',
+            system_name: document.getElementById('bt-system').value.trim()
         }).then(function (json) {
             var hint = document.getElementById('bt-stake-hint');
             if (!hint || !json || !json.success) {
@@ -897,26 +940,50 @@
             return;
         }
         var current = sel.value;
-        var byId = {};
+        var systems = {};
+        var tipsters = {};
         (state.saved_systems || fhorBt.savedSystems || []).forEach(function (sys) {
             var id = String(sys.id || '').replace(/\D/g, '');
             if (id) {
-                byId[id] = sys.name || ('System ' + id);
+                systems[id] = sys.name || ('System ' + id);
+            }
+        });
+        (state.tipster_books || []).forEach(function (book) {
+            if (book && book.id) {
+                tipsters[book.id] = book.name || book.id;
             }
         });
         bets.forEach(function (bet) {
-            var id = String(bet.system_id || '').replace(/\D/g, '');
-            if (id && !byId[id] && bet.system_name) {
-                byId[id] = bet.system_name;
+            var key = betBookKey(bet);
+            if (!key) {
+                return;
+            }
+            if (isTipsterBookId(key)) {
+                tipsters[key] = bet.system_name || tipsters[key] || key;
+                return;
+            }
+            if (!systems[key] && bet.system_name) {
+                systems[key] = bet.system_name;
             }
         });
-        var ids = Object.keys(byId).sort(function (a, b) {
-            return byId[a].localeCompare(byId[b]);
+        Object.keys(state.books || {}).forEach(function (key) {
+            if (!isTipsterBookId(key)) {
+                return;
+            }
+            var meta = state.books[key];
+            tipsters[key] = (meta && meta.book_label) ? meta.book_label : (tipsters[key] || key);
         });
         var html = '<option value="">All books (combined)</option>'
-            + '<option value="__general__">General (no system tag)</option>';
-        ids.forEach(function (id) {
-            html += '<option value="' + escapeHtml(id) + '">' + escapeHtml(byId[id]) + '</option>';
+            + '<option value="__general__">General (no tag)</option>';
+        Object.keys(systems).sort(function (a, b) {
+            return systems[a].localeCompare(systems[b]);
+        }).forEach(function (id) {
+            html += '<option value="' + escapeHtml(id) + '">' + escapeHtml(systems[id]) + ' (system)</option>';
+        });
+        Object.keys(tipsters).sort(function (a, b) {
+            return tipsters[a].localeCompare(tipsters[b]);
+        }).forEach(function (key) {
+            html += '<option value="' + escapeHtml(key) + '">' + escapeHtml(tipsters[key]) + ' · ' + escapeHtml(key) + '</option>';
         });
         sel.innerHTML = html;
         if (current) {
@@ -934,25 +1001,46 @@
         return String(name || '').toLowerCase().replace(/[\s\/\-_]+/g, '');
     }
 
+    function betBookKey(bet) {
+        var raw = String(bet.system_id || '').trim().toLowerCase();
+        if (isTipsterBookId(raw)) {
+            return raw;
+        }
+        var bid = raw.replace(/\D/g, '');
+        if (bid) {
+            return bid;
+        }
+        if (bet.book_key) {
+            return bet.book_key;
+        }
+        var name = normSystemName(bet.system_name);
+        if (!name) {
+            return '';
+        }
+        return 't:' + name;
+    }
+
+    function formatBookCell(bet) {
+        var name = bet.system_name || '—';
+        var id = String(bet.system_id || '').trim().toLowerCase();
+        if (isTipsterBookId(id)) {
+            return name + ' · ' + id;
+        }
+        return name;
+    }
+
     function betBookId(bet) {
         return String(bet.system_id || '').replace(/\D/g, '');
     }
 
     function betMatchesScope(bet, scope) {
-        var bid = betBookId(bet);
         if (scope === '__general__') {
-            return !bid;
+            return betBookKey(bet) === '';
         }
         if (!scope) {
             return true;
         }
-        if (bid === scope) {
-            return true;
-        }
-        if (!bid && normSystemName(bet.system_name) === normSystemName(systemLabel(scope))) {
-            return true;
-        }
-        return false;
+        return betBookKey(bet) === scope;
     }
 
     function visibleBets() {
@@ -1209,7 +1297,7 @@
                 + '<td data-label="Stake"><span>' + money(bet.total_stake) + '</span></td>'
                 + '<td data-label="Result"><span class="bt-badge is-' + escapeHtml(bet.result || 'pending') + '">' + escapeHtml(labelResult(bet.result)) + '</span></td>'
                 + '<td data-label="P/L" class="' + pnlClass + '"><span>' + pnl + '</span></td>'
-                + '<td data-label="System"><span>' + escapeHtml(bet.system_name || '—') + '</span></td>'
+                + '<td data-label="Book"><span>' + escapeHtml(formatBookCell(bet)) + '</span></td>'
                 + '<td class="bt-td-actions" data-label="' + actionLabel + '"><span>' + action + '</span></td>'
                 + '</tr>';
         }).join('');

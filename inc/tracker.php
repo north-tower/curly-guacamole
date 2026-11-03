@@ -369,7 +369,6 @@ if (!function_exists('bricks_tracker_should_load_frontend_assets')) {
                 '/system-builder',
                 '/my-qualifiers',
                 '/today-picks',
-                '/daily_sires_insights',
                 '/admin-pnl',
                 '/race/',
                 '/horse-history/',
@@ -402,7 +401,6 @@ if (!function_exists('bricks_tracker_should_load_frontend_assets')) {
                 'race_detail',
                 'points_backtest',
                 'points_today_picks',
-                'daily_sires_insights',
                 'admin_pnl_dashboard',
                 'trainer_cycles_dashboard',
                 'trainer_cycles_profile',
@@ -768,7 +766,6 @@ function bricks_tracker_floating_quick_link() {
                 : home_url('/trainer-cycles/');
             ?>
             <a class="fhor-fab__link fhor-fab__link--trainer-cycles" href="<?php echo esc_url($tc_fab_url); ?>" title="Seasonal hot and cold yards by calendar month">📅 Trainer Cycles</a>
-            <a class="fhor-fab__link fhor-fab__link--sires" href="<?php echo esc_url(home_url('/daily_sires_insights/')); ?>" title="Sire PRB form for today's card">🧬 Sire form</a>
             <?php if (current_user_can('manage_options')): ?>
             <a class="fhor-fab__link fhor-fab__link--admin" href="<?php echo esc_url(home_url('/admin-pnl/')); ?>" title="Open Admin P&L">💷 Admin P&amp;L</a>
             <?php endif; ?>
