@@ -87,6 +87,67 @@ Improvement (if product wants fewer gaps): extend `mordin_tier_code` for NULL-cl
 
 ## Calibration (Task 5)
 
-**Deploy (VPS):** load `mordin_calibration_REPORT.sql`, then `CALL mordin_calibration_REPORT();` (or `mysql … < tests/mordin_calibration_VERIFY.sql` after the CALL). Expect **50–60** rows in `mordin_class_calibration`. Compare **gaps** between tiers in `avg_winner_sr` with gaps in `spec_mcr` (absolute levels differ from Mordin’s scale). If a lower tier beats a higher one at the same `comp_level` in **3+** adjacent tier steps, note it here; matrix edits are data-only (`mordin_class_matrix`).
+**Verified 2026-11-03 (VPS):** `CALL mordin_calibration_REPORT();` → **50** rows (`row_count_check = ok`). Window: 5 years, `tier_code <> 'UNQ'`, non-null `winner_speed_rating`. **No rows** for **`C2_HIGH`** or **`C34_MID`** (no qualifying races in window — matrix still has 60 seed rows).
 
-*(Paste full `SELECT * FROM mordin_class_calibration …` output below after VPS run.)*
+### Observed vs spec (gap review)
+
+- **Scale:** Site `avg_winner_sr` sits ~**68–90**; `spec_mcr` ~**59–90**. Rank order of tiers mostly matches Mordin at **comp_level 3** (main volume): G1 **87.4** → G2 **81.8** → G3 **80.2** → … → C67_BOTTOM **68.8**, while `spec_mcr` steps **88 → 87 → 86 → … → 67**.
+- **Class band (comp 3):** C4_LOWMID **71.3** > C5_LOW **69.4** > C67_BOTTOM **68.8** — aligns with spec (**74 / 71 / 67**). Bottom-tier spec gaps are **wider** on MCR than on observed SR (~2–3 pts SR vs ~4–7 pts MCR).
+- **Reversal — LISTED vs C2_OPEN:** At the same `comp_level`, **`C2_OPEN` winners rate higher than `LISTED`** on levels **1, 3, and 4** (e.g. comp 3: LISTED **77.5**, C2_OPEN **79.1**; comp 4: **78.8** vs **81.9**). **`C2_OPEN` sample is small** (9–87 races per cell). Not changing `mordin_class_matrix` in this build — optional follow-up if product wants Listed strictly above open Class 2 in SR space.
+- **Noise:** G1 comp **5** only **7** races (**81.7** SR vs spec **90**); ignore for matrix tuning.
+- **Matrix action:** None required for Tasks 6–10; tier separation for handicap/novice rules uses `comp_level` + flags, not winner SR calibration alone.
+
+### Full table (`mordin_class_calibration`)
+
+| tier_code | comp_level | races | avg_winner_sr | sd_winner_sr | spec_mcr |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| G1 | 1 | 39 | 89.8 | 11.0 | 87.0 |
+| G1 | 2 | 25 | 85.2 | 11.7 | 87.0 |
+| G1 | 3 | 86 | 87.4 | 10.7 | 88.0 |
+| G1 | 4 | 88 | 86.0 | 10.7 | 89.0 |
+| G1 | 5 | 7 | 81.7 | 10.6 | 90.0 |
+| G2 | 1 | 44 | 85.6 | 11.1 | 85.0 |
+| G2 | 2 | 23 | 79.1 | 14.1 | 86.0 |
+| G2 | 3 | 113 | 81.8 | 11.3 | 87.0 |
+| G2 | 4 | 105 | 80.5 | 13.8 | 87.0 |
+| G2 | 5 | 16 | 77.3 | 11.7 | 88.0 |
+| G3 | 1 | 62 | 82.6 | 12.7 | 81.0 |
+| G3 | 2 | 32 | 79.3 | 15.6 | 84.0 |
+| G3 | 3 | 174 | 80.2 | 13.4 | 86.0 |
+| G3 | 4 | 229 | 79.1 | 14.4 | 86.0 |
+| G3 | 5 | 24 | 79.2 | 14.1 | 86.0 |
+| LISTED | 1 | 107 | 79.4 | 17.2 | 80.0 |
+| LISTED | 2 | 44 | 80.0 | 12.8 | 82.0 |
+| LISTED | 3 | 232 | 77.5 | 12.3 | 85.0 |
+| LISTED | 4 | 273 | 78.8 | 12.0 | 86.0 |
+| LISTED | 5 | 32 | 76.7 | 9.9 | 86.0 |
+| C2_OPEN | 1 | 9 | 80.4 | 10.1 | 80.0 |
+| C2_OPEN | 2 | 11 | 85.5 | 8.9 | 82.0 |
+| C2_OPEN | 3 | 73 | 79.1 | 9.2 | 85.0 |
+| C2_OPEN | 4 | 87 | 81.9 | 12.4 | 86.0 |
+| C2_OPEN | 5 | 40 | 78.7 | 15.7 | 86.0 |
+| C2_MID | 1 | 190 | 73.8 | 12.2 | 77.0 |
+| C2_MID | 2 | 84 | 76.0 | 13.0 | 79.0 |
+| C2_MID | 3 | 505 | 75.4 | 12.0 | 81.0 |
+| C2_MID | 4 | 598 | 74.5 | 12.6 | 82.0 |
+| C2_MID | 5 | 122 | 76.2 | 10.1 | 84.0 |
+| C3_MIDHIGH | 1 | 259 | 74.7 | 12.0 | 75.0 |
+| C3_MIDHIGH | 2 | 80 | 75.0 | 11.0 | 77.0 |
+| C3_MIDHIGH | 3 | 574 | 74.3 | 12.3 | 80.0 |
+| C3_MIDHIGH | 4 | 643 | 73.6 | 12.1 | 81.0 |
+| C3_MIDHIGH | 5 | 107 | 73.6 | 9.6 | 83.0 |
+| C4_LOWMID | 1 | 796 | 71.2 | 11.6 | 70.0 |
+| C4_LOWMID | 2 | 261 | 70.6 | 12.7 | 72.0 |
+| C4_LOWMID | 3 | 1427 | 71.3 | 12.0 | 74.0 |
+| C4_LOWMID | 4 | 1755 | 71.5 | 11.8 | 77.0 |
+| C4_LOWMID | 5 | 195 | 72.9 | 10.9 | 79.0 |
+| C5_LOW | 1 | 827 | 70.3 | 11.4 | 68.0 |
+| C5_LOW | 2 | 301 | 69.7 | 12.2 | 70.0 |
+| C5_LOW | 3 | 1683 | 69.4 | 11.5 | 71.0 |
+| C5_LOW | 4 | 2054 | 69.5 | 11.3 | 75.0 |
+| C5_LOW | 5 | 207 | 71.2 | 11.2 | 78.0 |
+| C67_BOTTOM | 1 | 570 | 69.2 | 11.9 | 59.0 |
+| C67_BOTTOM | 2 | 241 | 68.9 | 11.6 | 63.0 |
+| C67_BOTTOM | 3 | 1417 | 68.8 | 11.2 | 67.0 |
+| C67_BOTTOM | 4 | 1753 | 68.3 | 10.7 | 71.0 |
+| C67_BOTTOM | 5 | 226 | 68.2 | 10.8 | 73.0 |
