@@ -67,7 +67,7 @@ Use this file to track execution. Check boxes as tasks complete; paste verificat
 | --- | --- | --- | --- | --- |
 | **7** | `inc/mordin-class.php`, `tests/mordin-class-test.php` | `php tests/mordin-class-test.php` all ok | [x] | Local 2026-11-03: **27** checks, exit **0** |
 | **8** | `functions.php`, `inc/runner-card-wide.php`, `race-detail-premium.css` | Staging race page pills; `git add -p functions.php` | [x] | Repo wired 2026-11-03; staging spot-check pending |
-| **9** | `inc/system-builder.php`, `system-builder.js` | Backtest e.g. `not_outclassed`; save/load filters | [ ] | |
+| **9** | `inc/system-builder.php`, `system-builder.js` | Backtest e.g. `not_outclassed`; save/load filters | [ ] | Repo wired 2026-11-03; local tests OK; staging backtest pending |
 | **10** | `mordin_class_NOTES.md`, maybe trim badges in `inc/mordin-class.php` | Backtest verdict table; badges match ROI rules | [ ] | |
 
 **Milestone:** Task 9 — Mordin rules appear in System Builder and affect historic ROI using `mordin_runner_flags`, not FSr backtest.
@@ -115,6 +115,7 @@ Append dated lines as you go:
 2026-11-03 — Task 7: added `inc/mordin-class.php` + `tests/mordin-class-test.php` (stamina, badges, SB row check).
 2026-11-03 — Task 7 verified locally: `php tests/mordin-class-test.php` → all ok, exit 0.
 2026-11-03 — Task 8: racecard Mordin pills (require + lookup + badges in `functions.php`, `runner-card-wide.php`, CSS tones).
+2026-11-03 — Task 9: System Builder Mordin filters (sanitize/join/row_passes/needs_dosage, UI, JS collect/restore); `php tests/system-builder-test.php`, `mordin-class-test.php`, `system-builder-filters-test.mjs` exit 0.
 ```
 
 ---

@@ -51,6 +51,7 @@
                 race_type: checked('race_type[]'),
                 going: checked('going[]'),
                 flags: checked('flags[]'),
+                mordin: checked('mordin[]'),
                 course: val('course'),
                 class: val('class'),
                 track_type: val('track_type'),
@@ -146,6 +147,7 @@
             setChecked('race_type[]', filters.race_type);
             setChecked('going[]', filters.going);
             setChecked('flags[]', filters.flags);
+            setChecked('mordin[]', filters.mordin);
             syncFsrRankLoadNote();
             syncChips();
         }

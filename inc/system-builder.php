@@ -275,6 +275,7 @@ if (!function_exists('fhor_sb_sanitize_filters')) {
             'trainer' => '',
             'jockey' => '',
             'flags' => [],
+            'mordin' => [],
         ];
 
         $text = ['course', 'class', 'track_type', 'handicap', 'age_range', 'from', 'to', 'trainer', 'jockey'];
@@ -297,7 +298,7 @@ if (!function_exists('fhor_sb_sanitize_filters')) {
         $zone = (string) ($raw['pace_zone'] ?? '');
         $out['pace_zone'] = in_array($zone, ['1', '2', '3', '4'], true) ? $zone : '';
 
-        $lists = ['country', 'race_type', 'going', 'flags'];
+        $lists = ['country', 'race_type', 'going', 'flags', 'mordin'];
         foreach ($lists as $key) {
             $vals = $raw[$key] ?? [];
             if (!is_array($vals)) {
@@ -309,6 +310,9 @@ if (!function_exists('fhor_sb_sanitize_filters')) {
         }
         $allowed_flags = ['course', 'distance', 'cd', 'going', 'lbf', 'last_win', 'last_placed', 'lone_leader', 'swooper'];
         $out['flags'] = array_values(array_intersect($out['flags'], $allowed_flags));
+        $out['mordin'] = function_exists('fhor_mordin_rule_keys')
+            ? array_values(array_intersect($out['mordin'], fhor_mordin_rule_keys()))
+            : [];
 
         $nums = [
             'dist_f_min', 'dist_f_max', 'field_min', 'field_max',
@@ -537,6 +541,12 @@ if (!function_exists('fhor_sb_fetch_historic')) {
         if (fhor_sb_table_exists('non_runners')) {
             $joins .= ' LEFT JOIN non_runners nr ON nr.race_id = hrunb.race_id AND nr.runner_id = hrunb.runner_id';
         }
+        if (function_exists('fhor_mordin_sb_columns') && fhor_sb_table_exists('mordin_runner_flags')) {
+            $joins .= ' LEFT JOIN mordin_runner_flags mrf ON mrf.race_id = hrunb.race_id AND mrf.runner_id = hrunb.runner_id';
+            foreach (fhor_mordin_sb_columns() as $mrf_col) {
+                $select[] = "mrf.`$mrf_col` AS `mrf_$mrf_col`";
+            }
+        }
 
         if (fhor_sb_table_exists('backtest_cr_data')) {
             $joins .= ' LEFT JOIN backtest_cr_data bcr ON bcr.race_id = hrunb.race_id AND bcr.runner_id = hrunb.runner_id';
@@ -739,6 +749,12 @@ if (!function_exists('fhor_sb_fetch_live')) {
         $from = "`$sp_table` sp";
         if (fhor_sb_table_exists('non_runners')) {
             $from .= ' LEFT JOIN non_runners nr ON nr.race_id = sp.race_id AND nr.runner_id = sp.runner_id';
+        }
+        if (function_exists('fhor_mordin_sb_columns') && fhor_sb_table_exists('mordin_runner_flags')) {
+            $from .= ' LEFT JOIN mordin_runner_flags mrf ON mrf.race_id = sp.race_id AND mrf.runner_id = sp.runner_id';
+            foreach (fhor_mordin_sb_columns() as $mrf_col) {
+                $select[] = "mrf.`$mrf_col` AS `mrf_$mrf_col`";
+            }
         }
 
         $where = ['(sp.`' . esc_sql($date_col) . '` = %s OR sp.`' . esc_sql($date_col) . '` = %s)'];
@@ -1515,6 +1531,9 @@ if (!function_exists('fhor_sb_row_passes_runner_filters')) {
         if (in_array('last_placed', $flags, true) && ($last_pos === null || $last_pos > 3)) {
             return false;
         }
+        if (!empty($filters['mordin']) && function_exists('fhor_mordin_row_passes') && !fhor_mordin_row_passes($row, $filters['mordin'])) {
+            return false;
+        }
         $has_pace = isset($row->pms) || isset($row->zone);
         if ($has_pace) {
             if (in_array('lone_leader', $flags, true) && empty($row->_pace_lone_leader)) {
@@ -1666,7 +1685,7 @@ if (!function_exists('fhor_sb_needs_dosage')) {
                 return true;
             }
         }
-        return false;
+        return (bool) array_intersect(['stamina_ok', 'dosage_target'], $filters['mordin'] ?? []);
     }
 }
 
@@ -2966,6 +2985,19 @@ if (!function_exists('fhor_sb_shortcode')) {
                                     <label><input type="checkbox" name="flags[]" value="last_placed"><span>Placed last time</span></label>
                                     <label><input type="checkbox" name="flags[]" value="lone_leader"><span>Lone leader (today)</span></label>
                                     <label><input type="checkbox" name="flags[]" value="swooper"><span>Swooper (today)</span></label>
+                                </div>
+                            </div>
+                            <div class="sb-field span2"><span>Mordin class rules</span>
+                                <div class="sb-opts">
+                                    <label><input type="checkbox" name="mordin[]" value="class_ok"><span>Won at this class or higher</span></label>
+                                    <label><input type="checkbox" name="mordin[]" value="not_outclassed"><span>Not outclassed (handicaps)</span></label>
+                                    <label><input type="checkbox" name="mordin[]" value="not_juv_eliminated"><span>No nursery/claimer/seller form (2yo Group)</span></label>
+                                    <label><input type="checkbox" name="mordin[]" value="not_northern"><span>No northern minor form (2yo G1)</span></label>
+                                    <label><input type="checkbox" name="mordin[]" value="clear_2nd"><span>Clear 2nd last time (maidens)</span></label>
+                                    <label><input type="checkbox" name="mordin[]" value="debut_pocket"><span>Yarmouth/Salisbury debut pocket</span></label>
+                                    <label><input type="checkbox" name="mordin[]" value="group_trainer"><span>Group trainer (15%+)</span></label>
+                                    <label><input type="checkbox" name="mordin[]" value="stamina_ok"><span>No stamina doubt (10f+ Class 1)</span></label>
+                                    <label><input type="checkbox" name="mordin[]" value="dosage_target"><span>DI ≤ 3.30 (10f+ Class 1)</span></label>
                                 </div>
                             </div>
                         </div>
