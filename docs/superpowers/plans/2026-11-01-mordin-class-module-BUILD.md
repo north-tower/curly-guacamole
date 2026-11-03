@@ -2,7 +2,7 @@
 
 **Master plan:** [2026-11-01-mordin-class-module.md](./2026-11-01-mordin-class-module.md)
 
-**Status:** Phase 0 complete (commit pending) · **Last updated:** 2026-11-02
+**Status:** Task 1 verified on VPS · **Last updated:** 2026-11-03
 
 Use this file to track execution. Check boxes as tasks complete; paste verification notes under each phase.
 
@@ -48,8 +48,8 @@ Use this file to track execution. Check boxes as tasks complete; paste verificat
 
 | Task | Files | Verify | Done | Notes |
 | --- | --- | --- | --- | --- |
-| **1** | `mordin_functions.sql`, `tests/mordin_functions_TEST.sql` | Test script: `failures = 0` | [ ] | Files in repo; deploy + run on VPS pending |
-| **2** | `mordin_seed_tables.sql` | 60 matrix rows; trainers match DB | [ ] | |
+| **1** | `mordin_functions.sql`, `tests/mordin_functions_TEST.sql` | Test script: `failures = 0` | [x] | VPS `coolwed1_wp364`: checks **77**, failures **0** (2026-11-03) |
+| **2** | `mordin_seed_tables.sql`, `tests/mordin_seed_TEST.sql` | 60 matrix rows; trainers match DB | [ ] | Repo ready 2026-11-03; `Charles Hills` (not Charlie); VPS deploy + test pending |
 | **3** | `mordin_history_UPDATE.sql` | `CALL mordin_history_UPDATE()`; G1 sample sane | [ ] | |
 | **4** | `mordin_runner_flags_UPDATE.sql` | `leaks = 0`; today’s card spot check | [ ] | |
 | **5** | `mordin_calibration_REPORT.sql` | Paste calibration into NOTES | [ ] | |
@@ -102,6 +102,8 @@ Append dated lines as you go:
 2026-11-02 — Build tracker created. Awaiting Task 0 discovery.
 2026-11-02 — Task 0 discovery written to `mordin_class_NOTES.md` (commit 0.6 pending).
 2026-11-02 — Task 1: added `mordin_functions.sql` + `tests/mordin_functions_TEST.sql` (NI→GB; +6 discovery/daily age_range checks → 77 total).
+2026-11-03 — Task 1 verified on server: `mysql … < tests/mordin_functions_TEST.sql` → checks 77, failures 0.
+2026-11-03 — Task 2: added `mordin_seed_tables.sql` + `tests/mordin_seed_TEST.sql` (trainer seed `Charles Hills` per NOTES).
 ```
 
 ---
