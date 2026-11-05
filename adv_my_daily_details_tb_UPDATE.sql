@@ -92,8 +92,8 @@ BEGIN
         adrunb.forecast_price AS forecast_price,
         adrunb.forecast_price_decimal AS forecast_price_decimal,
         adrunb.days_since_ran AS days_since_ran,
-        adrunb.days_since_ran_flat AS days_since_ran_flat,
-        adrunb.days_since_ran_jumps AS days_since_ran_jumps,
+        adrunb_b.days_since_ran_flat AS days_since_ran_flat,
+        adrunb_b.days_since_ran_jumps AS days_since_ran_jumps,
         adrunb.weight_pounds AS weight_pounds,
         adrunb.weight_penalty AS weight_penalty,
         adrunb.tack_hood AS tack_hood,
@@ -114,6 +114,8 @@ BEGIN
     FROM
         ((adv_my_daily_races amdr
         JOIN advance_daily_runners adrunb ON ((amdr.race_id = adrunb.race_id)))
+        LEFT JOIN advance_daily_runners_beta adrunb_b ON ((amdr.race_id = adrunb_b.race_id)
+            AND (adrunb.runner_id = adrunb_b.runner_id)))
         LEFT JOIN non_runners nr ON (((amdr.race_id = nr.race_id)
             AND (adrunb.runner_id = nr.runner_id))))
     ORDER BY amdr.scheduled_time , adrunb.cloth_number;
