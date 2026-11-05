@@ -11,6 +11,8 @@
     var quoteTimer = null;
     var showingDemo = false;
     var preferSample = true;
+    var modalStateLoaded = false;
+    var modalStateLoading = null;
 
     function debugOn() {
         return !!(window.fhorBt && (Number(fhorBt.debug) || fhorBt.debug === true));
@@ -412,19 +414,78 @@
         return m ? (m[1] + 'T' + m[2]) : (fhorBt.now || '');
     }
 
+    function normalizeRaceDate(date) {
+        var raw = String(date || '').trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw.slice(0, 10))) {
+            return raw.slice(0, 10);
+        }
+        var dmy = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+        if (dmy) {
+            return dmy[3] + '-' + ('0' + dmy[2]).slice(-2) + '-' + ('0' + dmy[1]).slice(-2);
+        }
+        var parsed = Date.parse(raw);
+        if (!isNaN(parsed)) {
+            var dt = new Date(parsed);
+            return dt.getFullYear() + '-'
+                + ('0' + (dt.getMonth() + 1)).slice(-2) + '-'
+                + ('0' + dt.getDate()).slice(-2);
+        }
+        return '';
+    }
+
+    function raceTimeFromRaw(time) {
+        var raw = String(time || '').trim();
+        if (!raw) {
+            return '';
+        }
+        var iso = raw.match(/^\d{4}-\d{2}-\d{2}[ T](\d{2}:\d{2})/);
+        if (iso) {
+            return iso[1];
+        }
+        var hm = raw.match(/(\d{1,2})[:.](\d{2})/);
+        if (hm) {
+            return ('0' + hm[1]).slice(-2) + ':' + hm[2];
+        }
+        return '';
+    }
+
     function combineWhen(date, time) {
-        var d = String(date || '').slice(0, 10);
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+        var d = normalizeRaceDate(date);
+        if (!d) {
             return fhorBt.now || '';
         }
-        var m = String(time || '').match(/(\d{1,2})[:.](\d{2})/);
+        var tm = raceTimeFromRaw(time);
         var hh = '12';
         var mm = '00';
-        if (m) {
-            hh = ('0' + m[1]).slice(-2);
-            mm = m[2];
+        if (tm) {
+            var parts = tm.split(':');
+            hh = parts[0];
+            mm = parts[1] || '00';
         }
         return d + 'T' + hh + ':' + mm;
+    }
+
+    function ensureModalBookState() {
+        if (document.getElementById('fhor-bet-tracker') || modalStateLoaded) {
+            return Promise.resolve();
+        }
+        if (modalStateLoading) {
+            return modalStateLoading;
+        }
+        modalStateLoading = refreshNonce().then(function () {
+            return post('fhor_bt_bootstrap', {});
+        }).then(function (json) {
+            if (json && json.success) {
+                state = json.data || {};
+                state.bets = state.bets || [];
+                modalStateLoaded = true;
+            }
+        }).catch(function () {
+            return null;
+        }).then(function () {
+            modalStateLoading = null;
+        });
+        return modalStateLoading;
     }
 
     function onLogClick(event) {
@@ -438,6 +499,7 @@
             return;
         }
         var system = btn.getAttribute('data-system') || '';
+        var systemId = btn.getAttribute('data-system-id') || '';
         var builder = document.getElementById('fhor-system-builder');
         if (builder && builder.contains(btn)) {
             var nameEl = document.getElementById('sb-name');
@@ -445,13 +507,18 @@
                 system = nameEl.value.trim();
             }
         }
+        var filterPrefill = prefillFromFilter();
+        if (!systemId && !system) {
+            system = filterPrefill.system_name || '';
+            systemId = filterPrefill.system_id || '';
+        }
         openModal({
             when: combineWhen(btn.getAttribute('data-date'), btn.getAttribute('data-time')),
             horse: btn.getAttribute('data-horse') || '',
             course: btn.getAttribute('data-course') || '',
             odds: btn.getAttribute('data-odds') || '',
             system_name: system,
-            system_id: btn.getAttribute('data-system-id') || '',
+            system_id: systemId,
             bet_type: 'single',
             each_way: false,
             stake_mode: 'auto'
@@ -589,7 +656,9 @@
         syncEw();
         modal.hidden = false;
         modal.classList.add('is-open');
-        scheduleQuote();
+        ensureModalBookState().then(function () {
+            scheduleQuote();
+        });
     }
 
     function closeModal() {
@@ -621,7 +690,11 @@
             system_name: document.getElementById('bt-system').value.trim()
         }).then(function (json) {
             var hint = document.getElementById('bt-stake-hint');
-            if (!hint || !json || !json.success) {
+            if (!hint) {
+                return;
+            }
+            if (!json || !json.success) {
+                hint.textContent = errMsg(json) || 'Could not calculate stake for this book. Check date/time and try again.';
                 return;
             }
             var data = json.data || {};
@@ -662,6 +735,9 @@
         });
         document.getElementById('bt-ew-terms').addEventListener('change', scheduleQuote);
         document.getElementById('bt-when').addEventListener('change', scheduleQuote);
+        document.getElementById('bt-system').addEventListener('input', scheduleQuote);
+        document.getElementById('bt-system').addEventListener('change', scheduleQuote);
+        document.getElementById('bt-system-id').addEventListener('change', scheduleQuote);
         document.getElementById('bt-add-leg').addEventListener('click', function () {
             var legs = readLegs();
             legs.push({});

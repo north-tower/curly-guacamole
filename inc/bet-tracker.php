@@ -1750,9 +1750,36 @@ if (!function_exists('fhor_bt_shortcode')) {
 }
 add_shortcode('bet_tracker', 'fhor_bt_shortcode');
 
+if (!function_exists('fhor_bt_normalize_log_context')) {
+    /**
+     * Normalise race date/time for data-* attributes on Log Bet buttons.
+     */
+    function fhor_bt_normalize_log_context(array $args) {
+        $date = trim((string) ($args['date'] ?? ''));
+        if ($date !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            $ts = strtotime($date);
+            if ($ts) {
+                $date = wp_date('Y-m-d', $ts);
+            }
+        }
+        $args['date'] = $date;
+
+        $time = trim((string) ($args['time'] ?? ''));
+        if ($time !== '' && !preg_match('/^\d{1,2}:\d{2}$/', $time)) {
+            $ts = strtotime($time);
+            if ($ts) {
+                $time = wp_date('H:i', $ts);
+            }
+        }
+        $args['time'] = $time;
+
+        return $args;
+    }
+}
+
 if (!function_exists('fhor_bt_log_button_html')) {
     function fhor_bt_log_button_html($args) {
-        $args = is_array($args) ? $args : [];
+        $args = fhor_bt_normalize_log_context(is_array($args) ? $args : []);
         $label = isset($args['label']) && $args['label'] !== '' ? (string) $args['label'] : '⚡ Log Bet';
         $class = 'sb-btn fhor-bt-log';
         if (!empty($args['class'])) {

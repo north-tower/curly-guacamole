@@ -456,6 +456,20 @@
 
         var qualifierSets = { today: null, tomorrow: null };
 
+        function activeSystemIdForLog() {
+            var nameEl = document.getElementById('sb-name');
+            var name = nameEl ? nameEl.value.trim() : '';
+            if (!name || !saved.length) {
+                return '';
+            }
+            for (var i = 0; i < saved.length; i += 1) {
+                if (saved[i].name === name) {
+                    return String(saved[i].id || '');
+                }
+            }
+            return '';
+        }
+
         function renderQualifierRows(block) {
             document.getElementById('sb-today-empty').hidden = true;
             document.getElementById('sb-today-body').hidden = false;
@@ -468,7 +482,10 @@
                 var name = row.race_url
                     ? '<a href="' + escapeHtml(row.race_url) + '">' + escapeHtml(row.horse) + '</a>'
                     : escapeHtml(row.horse);
-                var log = '<button type="button" class="sb-btn fhor-bt-log" data-horse="' + escapeHtml(row.horse) + '" data-course="' + escapeHtml(row.course) + '" data-time="' + escapeHtml(row.time) + '" data-date="' + escapeHtml(block.date || '') + '" data-odds="' + escapeHtml(row.forecast || '') + '" data-system="">⚡ Log Bet</button>';
+                var logSystem = (document.getElementById('sb-name') || {}).value || '';
+                logSystem = String(logSystem).trim();
+                var logSystemId = activeSystemIdForLog();
+                var log = '<button type="button" class="sb-btn fhor-bt-log" data-horse="' + escapeHtml(row.horse) + '" data-course="' + escapeHtml(row.course) + '" data-time="' + escapeHtml(row.time) + '" data-date="' + escapeHtml(block.date || '') + '" data-odds="' + escapeHtml(row.forecast || '') + '" data-system="' + escapeHtml(logSystem) + '" data-system-id="' + escapeHtml(logSystemId) + '">⚡ Log Bet</button>';
                 tr.innerHTML = '<td>' + escapeHtml(row.time) + '</td><td>' + name + '</td><td>' + escapeHtml(row.course) + '</td><td>' + (row.fsr == null ? '–' : row.fsr) + '</td><td>' + (row.fsr_rank || '–') + '</td><td>' + (row.pts == null ? '–' : row.pts) + '</td><td>' + (row.di == null ? '–' : escapeHtml(row.di)) + '</td><td>' + (row.cd == null ? '–' : escapeHtml(row.cd)) + '</td><td>' + escapeHtml(row.forecast || '') + '</td><td>' + log + '</td>';
                 tb.appendChild(tr);
             });
